@@ -16,4 +16,4 @@ pip install -e .
 ```
 
 ## Usage
-Run the main.py
+Run the main.py. You can change parameters in config.cfg.
