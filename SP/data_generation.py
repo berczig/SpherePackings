@@ -1,7 +1,7 @@
 import numpy as np; #NumPy package for arrays, random number generation, etc
 from SP import cfg
 import matplotlib.pyplot as plt
-from SP.thinning import thin_points
+from SP.Max_Indep_Sets import thin_points
 
 def sample_poisson_point_process(dimension, bounding_box_width, intensity):
     areaTotal = bounding_box_width**dimension
@@ -20,4 +20,6 @@ def plot_and_sample_test():
     plt.scatter(points[0], points[1], c="black")
     thinned_points = thin_points(points.T, min_distance = cfg.getfloat("ppp_sample_generation", "sphere_radius"))
     plt.scatter(thinned_points[0], thinned_points[1], c="red")
+    # print the number of red points as a caption of the plot
+    plt.title(str(len(thinned_points[0])) + " points")
     plt.show()
