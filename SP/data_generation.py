@@ -57,6 +57,7 @@ def generate_dataset(num_samples, min_size):
 
     print("Dataset shape:", dataset.shape)
     # Save dataset as a tensor
-    torch.save(dataset, "./SP/sample_packings.pt")
+    dataset_tensor = torch.tensor(dataset, dtype=torch.float32)
+    torch.save(dataset_tensor, "./SP/sample_packings.pt")
 
     
