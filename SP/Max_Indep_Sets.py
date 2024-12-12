@@ -53,7 +53,14 @@ if __name__ == "__main__":
     mis = lubys_algorithm(graph)
     print("Maximal Independent Set:", mis)
 
-
+def MIS_luby(points, min_distance):
+    graph = defaultdict(list)
+    for i, p in enumerate(points):
+        for j, q in enumerate(points):
+            if i != j and np.linalg.norm(p-q) < min_distance:
+                graph[i].append(j)
+    mis = lubys_algorithm(graph)
+    return points[mis].T
 
 
 def MIS_basic(points, min_distance):
