@@ -127,6 +127,7 @@ def sample(model, scheduler, num_samples, packings):
     with torch.no_grad():
         # Form samples by adding small gaussian noise to input samples
         samples = packings + 0.1 * torch.randn_like(packings)
+        samples = samples.to(device)
         input_sample = samples.clone()
         for t in reversed(range(scheduler.num_train_timesteps)):
             timestep = torch.full((num_samples,), t, device=device, dtype=torch.long)  # Ensure batch consistency
