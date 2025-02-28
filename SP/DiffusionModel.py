@@ -110,13 +110,16 @@ def sample_diffusion_model(model, data_loader, num_train_timesteps):
             samples = packings + 0.1 * torch.randn_like(packings)
             samples = samples.to(device)
             input_sample = samples.clone()
-            inputs_batch.append(input_sample)
+            inputs_batch.append(np.array(input_sample.cpu()))
+            samples_history = [np.array(samples.cpu())]
             for t in reversed(range(scheduler.config.num_train_timesteps)):
                 predicted_noise = model(samples)
                 samples = scheduler.step(predicted_noise, t, samples).prev_sample  # Use scalar for `timestep[0]`
-            samples_batch.append(samples)
-    return (torch.concat(inputs_batch, 0).cpu(), 
-    torch.concat(samples_batch, 0).cpu())
+                samples_history.append(np.array(samples.cpu()))
+            samples_history = np.transpose(np.array(samples_history), (1,0,2,3)) # to make the first axis the batch not the history
+            samples_batch.append(samples_history)
+    return (np.concat(inputs_batch, 0), 
+    np.concat(samples_batch, 0))
 
 # Example usage
 if __name__ == "__main__":

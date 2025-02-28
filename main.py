@@ -17,12 +17,13 @@ if __name__ == "__main__":
     batch_size = cfg.getint("diffusion_model", "batch_size")
     dimension = cfg.getint("ppp_sample_generation", "dimension")
     radius = cfg.getfloat("ppp_sample_generation", "sphere_radius")
+    num_train_timesteps = cfg.getint("diffusion_model", "num_train_timesteps")
     num_spheres = 45
 
     # Generate Point Cloud Data and MIS
     #plot_and_sample_test()
-    #generate_dataset(10,num_spheres, filename=cfg.get("ppp_sample_generation", 'train_dataset_path'))
-    #generate_dataset(1,num_spheres, filename=cfg.get("ppp_sample_generation", 'test_dataset_path'))
+    generate_dataset(50,num_spheres, filename=cfg.get("ppp_sample_generation", 'train_dataset_path'))
+    generate_dataset(1,num_spheres, filename=cfg.get("ppp_sample_generation", 'test_dataset_path'))
 
 
     # Load and print the dataset
@@ -50,13 +51,16 @@ if __name__ == "__main__":
     originals = []
     sampleds = []
     OG = next(iter(test_data_loader))[0]
-    print("OG:", OG)
-    for t in range(60):
-        original, sampled = sample_diffusion_model(model, test_data_loader, num_train_timesteps=t)
-        #originals.append(np.array(original[0]).T)
-        originals.append(np.array(OG).T)
-        sampleds.append(np.array(sampled[0]).T)
-    animate_scatter(np.array(originals), np.array(sampleds), interval=60)
+    #print("OG:", OG)
+    original, sampled = sample_diffusion_model(model, test_data_loader, num_train_timesteps=num_train_timesteps)
+    print("original:", original.shape)
+    print("sampled:", sampled.shape)
+    #originals.append(np.array(original[0]).T)
+    #originals.append(np.array(OG).T)
+    #sampleds.append(np.array(sampled[0]).T)
+    animate_scatter(np.transpose(sampled[0], (0,2,1)), 
+    [original[0].T for _ in range(len(sampled[0]))], 
+    interval=60)
     # Plot the samples
     #print("original points shape: ", original.shape)
     #for i in range(1):
