@@ -15,22 +15,12 @@ from torch.utils.data import DataLoader, Dataset
 from diffusers import DDPMScheduler
 import numpy as np
 import matplotlib.pyplot as plt
-from SP.data_generation import data_loader, split_data_loader
+from SP.data_generation import get_data_loader, split_data_loader
 
-
-# Hyperparameters
-batch_size = 1
-sample_size = 64
-d = 2  # Dimensionality of points
-N = 10  # Number of points per sample
-dataset_path = './SP/sample_packings.pt'  # Path to training tensors
-num_epochs = 10
-learning_rate = 1e-4
-num_train_timesteps = 100
 
 # PointNet++ Components
 class PointNetSetAbstraction(nn.Module):
-    def __init__(self, num_points, in_channels, out_channels):
+    def __init__(self, in_channels, out_channels):
         super(PointNetSetAbstraction, self).__init__()
         self.mlp = nn.Sequential(
             nn.Conv1d(in_channels, out_channels[0], 1),
@@ -45,10 +35,10 @@ class PointNetSetAbstraction(nn.Module):
         return self.mlp(x)
 
 class PointNetPlusPlus(nn.Module):
-    def __init__(self, d, N):
+    def __init__(self, d):
         super(PointNetPlusPlus, self).__init__()
-        self.sa1 = PointNetSetAbstraction(N, d, [64, 128])
-        self.sa2 = PointNetSetAbstraction(N, 128, [256, 512])
+        self.sa1 = PointNetSetAbstraction(d, [64, 128])
+        self.sa2 = PointNetSetAbstraction(128, [256, 512])
         self.mlp = nn.Sequential(
             nn.Conv1d(512, d, 1),
         )
@@ -62,17 +52,17 @@ class PointNetPlusPlus(nn.Module):
         return x
 
 
-def distance_penalty(output):
+def distance_penalty(output, radius):
     # output: (batch_size, d, N)
     distances = torch.cdist(output.permute(0, 2, 1), output.permute(0, 2, 1))  # (batch_size, N, N)
-    mask = (distances < 2) & (distances > 0)  # Ignore self-distances
-    penalty = torch.sum(mask * (2 - distances) ** 2)
+    mask = (distances < 2*radius) & (distances > 0)  # Ignore self-distances
+    penalty = torch.sum(mask * (2*radius - distances) ** 2)
     return penalty / output.shape[0]  # Normalize by batch size
 
 # Training Loop
-def train_diffusion_model(train_data_loader, num_epochs, learning_rate, num_train_timesteps):
+def train_diffusion_model(train_data_loader, num_epochs, learning_rate, num_train_timesteps, dimension, batch_size, sphere_radius):
     # Model
-    model = PointNetPlusPlus(d, N)
+    model = PointNetPlusPlus(dimension)
     scheduler = DDPMScheduler(num_train_timesteps=num_train_timesteps)
 
     # Optimizer
@@ -96,7 +86,7 @@ def train_diffusion_model(train_data_loader, num_epochs, learning_rate, num_trai
 
             # Compute losses
             mse_loss = criterion(predicted_noise, noise)
-            penalty_loss = distance_penalty(predicted_noise)
+            penalty_loss = distance_penalty(predicted_noise, sphere_radius)
             loss = mse_loss + penalty_loss
 
             optimizer.zero_grad()
@@ -108,19 +98,25 @@ def train_diffusion_model(train_data_loader, num_epochs, learning_rate, num_trai
 
 # Sampling Function: Generate samples from the model and return (input, output) pairs
 
-def sample_diffusion_model(model, packings, num_samples, num_train_timesteps):
+def sample_diffusion_model(model, data_loader, num_train_timesteps):
     scheduler = DDPMScheduler(num_train_timesteps=num_train_timesteps)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.eval()
+    inputs_batch = []
+    samples_batch = []
     with torch.no_grad():
         # Form samples by adding small gaussian noise to input samples
-        samples = packings + 0.1 * torch.randn_like(packings)
-        samples = samples.to(device)
-        input_sample = samples.clone()
-        for t in reversed(range(scheduler.num_train_timesteps)):
-            timestep = torch.full((num_samples,), t, device=device, dtype=torch.long)  # Ensure batch consistency
-            predicted_noise = model(samples)
-            samples = scheduler.step(predicted_noise, timestep[0], samples).prev_sample  # Use scalar for `timestep[0]`
-    return (input_sample.cpu(), samples.cpu())
+        for packings in data_loader:
+            samples = packings + 0.1 * torch.randn_like(packings)
+            samples = samples.to(device)
+            input_sample = samples.clone()
+            inputs_batch.append(input_sample)
+            for t in reversed(range(scheduler.config.num_train_timesteps)):
+                predicted_noise = model(samples)
+                samples = scheduler.step(predicted_noise, t, samples).prev_sample  # Use scalar for `timestep[0]`
+            samples_batch.append(samples)
+    return (torch.concat(inputs_batch, 0).cpu(), 
+    torch.concat(samples_batch, 0).cpu())
 
 # Example usage
 if __name__ == "__main__":

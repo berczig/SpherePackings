@@ -1,0 +1,1 @@
+VAE: https://stats.stackexchange.com/questions/321841/what-are-variational-autoencoders-and-to-what-learning-tasks-are-they-used/328181#328181

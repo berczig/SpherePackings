@@ -1,9 +1,10 @@
 import numpy as np; #NumPy package for arrays, random number generation, etc
-from SP import cfg
+from SP import cfg, reffolder
 import matplotlib.pyplot as plt
 from SP.Max_Indep_Sets import MIS_basic, MIS_luby
 import torch
 from torch.utils.data import DataLoader, Dataset
+import os
 
 
 def sample_poisson_point_process(dimension, bounding_box_width, intensity):
@@ -26,7 +27,8 @@ def plot_and_sample_test():
     plt.title(str(len(thinned_points[0])) + " points")
     plt.show()
 
-def generate_dataset(num_samples, min_size):
+def generate_dataset(num_samples, min_size, filename):
+    print("generate {} points..".format(num_samples))
     num_big_samples = 0
     dimension = cfg.getint("ppp_sample_generation", "dimension")
     dataset = np.empty((0, dimension, min_size))
@@ -41,7 +43,6 @@ def generate_dataset(num_samples, min_size):
 
         # Apply MIS Luby's algorithm to thin points
         thinned_points = MIS_luby(points.T, min_distance=cfg.getfloat("ppp_sample_generation", "sphere_radius"))
-        
         if thinned_points.shape[1] < min_size:
             continue
         
@@ -60,14 +61,17 @@ def generate_dataset(num_samples, min_size):
     print("Dataset shape:", dataset.shape)
     # Save dataset as a tensor
     dataset_tensor = torch.tensor(dataset, dtype=torch.float32)
-    torch.save(dataset_tensor, "./SP/sample_packings.pt")
+
+    savepath = os.path.join(reffolder, filename)
+    print("saving data set as {}".format(savepath))
+    torch.save(dataset_tensor, savepath)
 
 # Dataset
 class SpherePackingDataset(Dataset):
     def __init__(self, path):
         self.data = torch.load(path)  # Assuming .pt file with tensor of shape (num_samples, d, N)
         # print the shape and type of the dataset
-        print(self.data.shape, self.data.dtype)
+        print("loading dataset {} of shape {}".format(path, self.data.shape))
         
     def __len__(self):
         return self.data.shape[0]
@@ -77,7 +81,7 @@ class SpherePackingDataset(Dataset):
 
 # DataLoader
 
-def data_loader(batch_size, dataset_path):
+def get_data_loader(batch_size, dataset_path):
     data = SpherePackingDataset(dataset_path)
     data_loader = DataLoader(data, batch_size=batch_size, shuffle=True)
     return data_loader
@@ -89,6 +93,8 @@ def split_data_loader(data_loader, train_ratio):
     train_size = int(train_ratio * total_size)
     test_size = total_size - train_size
     train_data_loader, test_data_loader = torch.utils.data.random_split(data_loader, [train_size, test_size])
+    print("data_loader:", type(data_loader), data_loader)
+    print("train_data_loader:", type(train_data_loader), train_data_loader)
     return train_data_loader, test_data_loader
 
     

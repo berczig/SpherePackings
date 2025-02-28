@@ -1,0 +1,33 @@
+main plan ideas:
+step 1:
+    generate a poisson point process
+
+step 2:
+    find a good independet set inside the point process
+
+step 3:
+    transform the independet set by moving the centers around to try to get a better IS, still without 
+    overlap but hopefully with enough space for 1 extra sphere
+
+step 4:
+    if there is enough room add a new sphere. We could also try to add a sphere with overlap and see
+    if the model can fix it
+
+idea for diffusion model:
+    - 1 configuration of sphere packings can be better than another packing eventhough the have the
+    same number of sphere. Because one of these configuration might have enough room for another sphere -
+    Samehow our loss function must measure this "enough room for another sphere" attribute. 
+    maybe by using some local density
+
+- VAE to generate new independet sets. If they cover more space than the previous best we can collect
+new training input data
+
+
+
+28.02 steps:
+1 - estimation upper bound number of spheres using the table. Call it optimal_number. Compare for lower_bound to see 
+    how big the bounding box has to be.
+2 - Construct many good sphere packings. For example using luby on 10*optimal_number spheres
+3 - A diffusion model with can take a varying number of points as input. Train on data on inference on optimal_number+1 spheres,
+    that is add one sphere extra.
+4 - Test other models (VAR, GNN, Unet in POintnet) 
