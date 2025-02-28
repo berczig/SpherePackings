@@ -3,6 +3,8 @@ from SP import cfg
 import matplotlib.pyplot as plt
 from SP.Max_Indep_Sets import MIS_basic, MIS_luby
 import torch
+from torch.utils.data import DataLoader, Dataset
+
 
 def sample_poisson_point_process(dimension, bounding_box_width, intensity):
     areaTotal = bounding_box_width**dimension
@@ -59,5 +61,34 @@ def generate_dataset(num_samples, min_size):
     # Save dataset as a tensor
     dataset_tensor = torch.tensor(dataset, dtype=torch.float32)
     torch.save(dataset_tensor, "./SP/sample_packings.pt")
+
+# Dataset
+class SpherePackingDataset(Dataset):
+    def __init__(self, path):
+        self.data = torch.load(path)  # Assuming .pt file with tensor of shape (num_samples, d, N)
+        # print the shape and type of the dataset
+        print(self.data.shape, self.data.dtype)
+        
+    def __len__(self):
+        return self.data.shape[0]
+
+    def __getitem__(self, idx):
+        return self.data[idx]
+
+# DataLoader
+
+def data_loader(batch_size, dataset_path):
+    data = SpherePackingDataset(dataset_path)
+    data_loader = DataLoader(data, batch_size=batch_size, shuffle=True)
+    return data_loader
+
+# Splitting data_loader into training and test sets
+
+def split_data_loader(data_loader, train_ratio):
+    total_size = len(data_loader.dataset)   
+    train_size = int(train_ratio * total_size)
+    test_size = total_size - train_size
+    train_data_loader, test_data_loader = torch.utils.data.random_split(data_loader, [train_size, test_size])
+    return train_data_loader, test_data_loader
 
     

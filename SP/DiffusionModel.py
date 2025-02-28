@@ -15,6 +15,8 @@ from torch.utils.data import DataLoader, Dataset
 from diffusers import DDPMScheduler
 import numpy as np
 import matplotlib.pyplot as plt
+from SP.data_generation import data_loader, split_data_loader
+
 
 # Hyperparameters
 batch_size = 1
@@ -25,23 +27,6 @@ dataset_path = './SP/sample_packings.pt'  # Path to training tensors
 num_epochs = 10
 learning_rate = 1e-4
 num_train_timesteps = 100
-
-# Dataset
-class SpherePackingDataset(Dataset):
-    def __init__(self, path):
-        self.data = torch.load(path)  # Assuming .pt file with tensor of shape (num_samples, d, N)
-        # print the shape and type of the dataset
-        print(self.data.shape, self.data.dtype)
-        
-    def __len__(self):
-        return self.data.shape[0]
-
-    def __getitem__(self, idx):
-        return self.data[idx]
-
-# DataLoader
-data = SpherePackingDataset(dataset_path)
-data_loader = DataLoader(data, batch_size=batch_size, shuffle=True)
 
 # PointNet++ Components
 class PointNetSetAbstraction(nn.Module):
@@ -76,15 +61,6 @@ class PointNetPlusPlus(nn.Module):
         x = self.mlp(x)  # (batch_size, d, N)
         return x
 
-# Model
-model = PointNetPlusPlus(d, N)
-scheduler = DDPMScheduler(num_train_timesteps=num_train_timesteps)
-
-# Optimizer
-optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
-
-# Loss Function
-criterion = nn.MSELoss()
 
 def distance_penalty(output):
     # output: (batch_size, d, N)
@@ -94,35 +70,46 @@ def distance_penalty(output):
     return penalty / output.shape[0]  # Normalize by batch size
 
 # Training Loop
-model.train()
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model.to(device)
+def train_diffusion_model(train_data_loader, num_epochs, learning_rate, num_train_timesteps):
+    # Model
+    model = PointNetPlusPlus(d, N)
+    scheduler = DDPMScheduler(num_train_timesteps=num_train_timesteps)
 
-for epoch in range(num_epochs):
-    for batch in data_loader:
-        batch = batch.to(device)  # (batch_size, d, N)
-        noise = torch.randn_like(batch).to(device)
-        timesteps = torch.randint(0, num_train_timesteps, (batch_size,), device=device).long()
-        noisy_data = scheduler.add_noise(batch, noise, timesteps)
+    # Optimizer
+    optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
 
-        predicted_noise = model(noisy_data)  # (batch_size, d, N)
+    # Loss Function
+    criterion = nn.MSELoss()
 
-        # Compute losses
-        mse_loss = criterion(predicted_noise, noise)
-        penalty_loss = distance_penalty(predicted_noise)
-        loss = mse_loss + penalty_loss
+    model.train()
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model.to(device)
 
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+    for epoch in range(num_epochs):
+        for batch in train_data_loader:
+            batch = batch.to(device)  # (batch_size, d, N)
+            noise = torch.randn_like(batch).to(device)
+            timesteps = torch.randint(0, num_train_timesteps, (batch_size,), device=device).long()
+            noisy_data = scheduler.add_noise(batch, noise, timesteps)
 
-    print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {loss.item():.4f}, MSE Loss: {mse_loss.item():.4f}, Penalty Loss: {penalty_loss.item():.4f}")
+            predicted_noise = model(noisy_data)  # (batch_size, d, N)
+
+            # Compute losses
+            mse_loss = criterion(predicted_noise, noise)
+            penalty_loss = distance_penalty(predicted_noise)
+            loss = mse_loss + penalty_loss
+
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+        print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {loss.item():.4f}, MSE Loss: {mse_loss.item():.4f}, Penalty Loss: {penalty_loss.item():.4f}")
+    return model
 
 # Sampling Function: Generate samples from the model and return (input, output) pairs
 
-import torch
-
-def sample(model, scheduler, num_samples, packings):
+def sample_diffusion_model(model, packings, num_samples, num_train_timesteps):
+    scheduler = DDPMScheduler(num_train_timesteps=num_train_timesteps)
     model.eval()
     with torch.no_grad():
         # Form samples by adding small gaussian noise to input samples
@@ -136,26 +123,28 @@ def sample(model, scheduler, num_samples, packings):
     return (input_sample.cpu(), samples.cpu())
 
 # Example usage
-num_samples = 4
-# Start with random packings
-packings = torch.rand(num_samples, d, N)
-input,output = sample(model, scheduler, num_samples, packings)
-# Print type and shape of input_output_pairs
-print(input.shape, output.shape)
+if __name__ == "__main__":
+    num_samples = 4
+    # Start with random packings
+    packings = torch.rand(num_samples, d, N)
+    print(packings.shape)
+    input,output = sample(model, scheduler, num_samples, packings)
+    # Print type and shape of input_output_pairs
+    print(input.shape, output.shape)
 
-# Post-process and Save
-#for i, (input_sample, output_sample) in enumerate(input_output_pairs):
-#    np.save(f"input_sample_{i}.npy", input_sample.cpu().numpy())
-#    np.save(f"output_sample_{i}.npy", output_sample.cpu().numpy())
+    # Post-process and Save
+    #for i, (input_sample, output_sample) in enumerate(input_output_pairs):
+    #    np.save(f"input_sample_{i}.npy", input_sample.cpu().numpy())
+    #    np.save(f"output_sample_{i}.npy", output_sample.cpu().numpy())
 
 
-# Plot generated pairs: input points in black output points in red in separate plots for each pair
+    # Plot generated pairs: input points in black output points in red in separate plots for each pair
 
-def plot_sample(input, output):
-    for i in range(input.shape[0]):
-        plt.scatter(input[i][0], input[i][1], c="black")
-        plt.scatter(output[i][0], output[i][1], c="red")
-        plt.title(f"Sample {i}")
-        plt.show()
+    def plot_sample(input, output):
+        for i in range(input.shape[0]):
+            plt.scatter(input[i][0], input[i][1], c="black")
+            plt.scatter(output[i][0], output[i][1], c="red")
+            plt.title(f"Sample {i}")
+            plt.show()
 
-plot_sample(input, output)
+    plot_sample(input, output)
