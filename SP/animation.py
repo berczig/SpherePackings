@@ -1,8 +1,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
+import os
+import SP
 
-def animate_scatter(black_data, red_data, interval=200):
+def animate_scatter(black_data, red_data, interval=200, filename="anim", show=True):
     """
     Animate scatter plots with black and red points.
     :param black_data: NumPy array of shape (timesteps, num_points, 2) for black scatter points.
@@ -24,4 +26,6 @@ def animate_scatter(black_data, red_data, interval=200):
         return black_scatter, red_scatter
     
     ani = animation.FuncAnimation(fig, update, frames=timesteps, interval=interval, blit=True)
-    plt.show()
+    if show:
+        plt.show()
+    ani.save(os.path.join(SP.reffolder, "output/{}.mp4".format(filename)))

@@ -40,9 +40,11 @@ def generate_dataset(num_samples, min_size, filename):
             bounding_box_width=cfg.getfloat("ppp_sample_generation", "bounding_box_width"),
             intensity=cfg.getfloat("ppp_sample_generation", "intensity")
         )
+        print("points:",   len(points.T))
 
         # Apply MIS Luby's algorithm to thin points
-        thinned_points = MIS_luby(points.T, min_distance=cfg.getfloat("ppp_sample_generation", "sphere_radius"))
+        thinned_points = MIS_luby(points.T, min_distance=2*cfg.getfloat("ppp_sample_generation", "sphere_radius"))
+        print("luby:", thinned_points.shape[1])
         if thinned_points.shape[1] < min_size:
             continue
         

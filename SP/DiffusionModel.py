@@ -15,6 +15,7 @@ from torch.utils.data import DataLoader, Dataset
 from diffusers import DDPMScheduler
 import numpy as np
 import matplotlib.pyplot as plt
+from tqdm import tqdm
 from SP.data_generation import get_data_loader, split_data_loader
 
 
@@ -54,16 +55,19 @@ class PointNetPlusPlus(nn.Module):
 
 def distance_penalty(output, radius):
     # output: (batch_size, d, N)
-    distances = torch.cdist(output.permute(0, 2, 1), output.permute(0, 2, 1))  # (batch_size, N, N)
+    distances = torch.cdist(output.permute(0, 2, 1), output.permute(0, 2, 1))  # (batch_size, N, d)
     mask = (distances < 2*radius) & (distances > 0)  # Ignore self-distances
     penalty = torch.sum(mask * (2*radius - distances) ** 2)
     return penalty / output.shape[0]  # Normalize by batch size
 
 # Training Loop
-def train_diffusion_model(train_data_loader, num_epochs, learning_rate, num_train_timesteps, dimension, batch_size, sphere_radius):
+def train_diffusion_model(train_data_loader, num_epochs, 
+learning_rate, num_train_timesteps, dimension, batch_size, sphere_radius, beta_start, beta_end, 
+clip_sample, clip_sample_range):
     # Model
     model = PointNetPlusPlus(dimension)
-    scheduler = DDPMScheduler(num_train_timesteps=num_train_timesteps)
+    scheduler = DDPMScheduler(num_train_timesteps=num_train_timesteps, beta_start = beta_start, 
+    beta_end = beta_end, clip_sample = clip_sample, clip_sample_range = clip_sample_range)
 
     # Optimizer
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
@@ -75,31 +79,36 @@ def train_diffusion_model(train_data_loader, num_epochs, learning_rate, num_trai
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
 
-    for epoch in range(num_epochs):
-        for batch in train_data_loader:
-            batch = batch.to(device)  # (batch_size, d, N)
-            noise = torch.randn_like(batch).to(device)
-            timesteps = torch.randint(0, num_train_timesteps, (batch_size,), device=device).long()
-            noisy_data = scheduler.add_noise(batch, noise, timesteps)
+    with tqdm(range(num_epochs)) as tqepoch:
+        for epoch in tqepoch:
+            for batch in train_data_loader:
+                batch = batch.to(device)  # (batch_size, d, N)
+                noise = torch.randn_like(batch).to(device)
+                timesteps = torch.randint(0, num_train_timesteps, (batch_size,), device=device).long()
+                noisy_data = scheduler.add_noise(batch, noise, timesteps)
 
-            predicted_noise = model(noisy_data)  # (batch_size, d, N)
+                predicted_noise = model(noisy_data)  # (batch_size, d, N)
 
-            # Compute losses
-            mse_loss = criterion(predicted_noise, noise)
-            penalty_loss = distance_penalty(predicted_noise, sphere_radius)
-            loss = mse_loss + penalty_loss
+                # Compute losses
+                mse_loss = criterion(predicted_noise, noise)
+                penalty_loss = distance_penalty(predicted_noise, sphere_radius)
+                loss = mse_loss  + 500*penalty_loss
 
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-
-        print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {loss.item():.4f}, MSE Loss: {mse_loss.item():.4f}, Penalty Loss: {penalty_loss.item():.4f}")
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+            tqepoch.set_description(f"Epoch {epoch + 1}/{num_epochs}")
+            tqepoch.set_postfix(Loss=f"{loss.item():.4f}", MSE = f"{mse_loss.item():.4f}", Penalty=f"{penalty_loss.item():.4f}")
+            #print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {loss.item():.4f}, MSE Loss: {mse_loss.item():.4f}, Penalty Loss: {penalty_loss.item():.4f}")
     return model
 
 # Sampling Function: Generate samples from the model and return (input, output) pairs
 
-def sample_diffusion_model(model, data_loader, num_train_timesteps):
-    scheduler = DDPMScheduler(num_train_timesteps=num_train_timesteps)
+def sample_diffusion_model(model, data_loader, num_train_timesteps, num_inference_timesteps, 
+beta_start, beta_end, clip_sample, clip_sample_range):
+    scheduler = DDPMScheduler(num_train_timesteps=num_train_timesteps, beta_start = beta_start, 
+    beta_end = beta_end, clip_sample = clip_sample, clip_sample_range = clip_sample_range)
+    scheduler.set_timesteps(num_inference_timesteps)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.eval()
     inputs_batch = []
@@ -112,7 +121,8 @@ def sample_diffusion_model(model, data_loader, num_train_timesteps):
             input_sample = samples.clone()
             inputs_batch.append(np.array(input_sample.cpu()))
             samples_history = [np.array(samples.cpu())]
-            for t in reversed(range(scheduler.config.num_train_timesteps)):
+            for t in scheduler.timesteps:
+                print("t:", t)
                 predicted_noise = model(samples)
                 samples = scheduler.step(predicted_noise, t, samples).prev_sample  # Use scalar for `timestep[0]`
                 samples_history.append(np.array(samples.cpu()))
