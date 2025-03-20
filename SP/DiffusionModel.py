@@ -13,6 +13,7 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader, Dataset
 from diffusers import DDPMScheduler
+import diffusers
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
@@ -86,9 +87,11 @@ clip_sample, clip_sample_range, save_path, save_model=False):
                 batch = batch.to(device)  # (batch_size, d, N)
                 noise = torch.randn_like(batch).to(device)
                 timesteps = torch.randint(0, num_train_timesteps, (batch_size,), device=device).long()
-                print("batch: ", batch.shape)
-                print("noise: ", noise.shape)
-                print("timesteps: ", timesteps.shape)
+                #print("batch_size:", batch_size)
+                #print("batch: ", batch.shape)
+                #print("noise: ", noise.shape)
+                #print("timesteps: ", timesteps.shape)
+                print("using diffusers version: ", diffusers.__version__)
                 noisy_data = scheduler.add_noise(batch, noise, timesteps)
 
                 predicted_noise = model(noisy_data)  # (batch_size, d, N)
