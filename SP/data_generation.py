@@ -59,6 +59,7 @@ def generate_dataset(num_samples, min_size, filename):
         if thinned_points.shape[1] == min_size:
             dataset = np.concatenate((dataset, thinned_points[np.newaxis, :, :]), axis=0)
             num_big_samples += 1
+            print("Generated {}/{} samples with {} spheres each".format(num_big_samples, num_samples, min_size))
 
     print("Dataset shape:", dataset.shape)
     # Save dataset as a tensor

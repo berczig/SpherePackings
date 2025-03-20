@@ -63,7 +63,7 @@ def distance_penalty(output, radius):
 # Training Loop
 def train_diffusion_model(train_data_loader, num_epochs, 
 learning_rate, num_train_timesteps, dimension, batch_size, sphere_radius, beta_start, beta_end, 
-clip_sample, clip_sample_range):
+clip_sample, clip_sample_range, save_path, save_model=False):
     # Model
     model = PointNetPlusPlus(dimension)
     scheduler = DDPMScheduler(num_train_timesteps=num_train_timesteps, beta_start = beta_start, 
@@ -76,6 +76,7 @@ clip_sample, clip_sample_range):
     criterion = nn.MSELoss()
 
     model.train()
+    loss_history = []
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
 
@@ -92,7 +93,8 @@ clip_sample, clip_sample_range):
                 # Compute losses
                 mse_loss = criterion(predicted_noise, noise)
                 penalty_loss = distance_penalty(predicted_noise, sphere_radius)
-                loss = mse_loss  + 500*penalty_loss
+                loss = mse_loss  + 0*penalty_loss
+                loss_history.append(loss.item())
 
                 optimizer.zero_grad()
                 loss.backward()
@@ -100,6 +102,9 @@ clip_sample, clip_sample_range):
             tqepoch.set_description(f"Epoch {epoch + 1}/{num_epochs}")
             tqepoch.set_postfix(Loss=f"{loss.item():.4f}", MSE = f"{mse_loss.item():.4f}", Penalty=f"{penalty_loss.item():.4f}")
             #print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {loss.item():.4f}, MSE Loss: {mse_loss.item():.4f}, Penalty Loss: {penalty_loss.item():.4f}")
+    plot_loss(loss_history)
+    if save_model:
+        save_model_(epoch=num_epochs, model=model, optimizer=optimizer, loss_history =loss_history, path=save_path)
     return model
 
 # Sampling Function: Generate samples from the model and return (input, output) pairs
@@ -157,3 +162,32 @@ if __name__ == "__main__":
             plt.show()
 
     plot_sample(input, output)
+
+def save_model_(epoch, model, optimizer, loss_history, path):
+    torch.save({
+            'epoch': epoch,
+            'model_state_dict': model.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            "loss_history":loss_history
+            }, path)
+    
+# def load_model(path):
+#     model = TheModelClass(*args, **kwargs)
+#     optimizer = TheOptimizerClass(*args, **kwargs)
+
+#     checkpoint = torch.load(path, weights_only=True)
+#     model.load_state_dict(checkpoint['model_state_dict'])
+#     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+#     epoch = checkpoint['epoch']
+#     loss = checkpoint['loss']
+
+#     model.eval()
+#     # - or -
+#     model.train()
+    
+def plot_loss(loss_history):
+    plt.plot(loss_history)
+    plt.title("Loss history")
+    plt.xlabel("Batch")
+    plt.ylabel("Loss")
+    plt.show()
