@@ -2,7 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from tqdm import tqdm
-from data_evaluation import SphereDatasetEvaluator
+import SP
+import SP.data_evaluation
 
 def shortest_vector_torus(p1, p2, box_size):
     """
@@ -10,11 +11,12 @@ def shortest_vector_torus(p1, p2, box_size):
     Handles multiple dimensions.
     """
     delta = p1 - p2
-    # Ensure box_size is a numpy array for broadcasting
+    # Ensure box_size(total width from left to right) is a numpy array for broadcasting
     box_size_arr = np.array(box_size)
     # Correct wrapping calculation
     wrapped_delta = delta - box_size_arr * np.round(delta / box_size_arr)
     return wrapped_delta
+
 
 def eliminate_overlaps(initial_centers, radius, box_size,
                        max_iter=100, dt=0.2, tol=1e-5, visualize=False):
@@ -46,8 +48,8 @@ def eliminate_overlaps(initial_centers, radius, box_size,
     target_dist_sq = (2 * radius) ** 2
     history = [] # Store history for visualization
 
-    print(f"Starting simulation: {n} spheres, d={d}, radius={radius}, box={box_size}")
-    print(f"Parameters: max_iter={max_iter}, dt={dt}, tol={tol}")
+    #print(f"Starting simulation: {n} spheres, d={d}, radius={radius}, box={box_size}")
+    #print(f"Parameters: max_iter={max_iter}, dt={dt}, tol={tol}")
 
     progress_bar = tqdm(range(max_iter), desc="Simulation Progress")
     converged = False
@@ -116,8 +118,8 @@ def eliminate_overlaps(initial_centers, radius, box_size,
              break
 
     if not converged:
-        print(f"\nReached maximum iterations ({max_iter}) without full convergence.")
-        print(f"Final maximum overlap: {max_overlap_this_iter:.2e}")
+        #print(f"\nReached maximum iterations ({max_iter}) without full convergence.")
+        #print(f"Final maximum overlap: {max_overlap_this_iter:.2e}")
         # Add final state to history for visualization
         if visualize and d == 2 and len(history) == 0: # Ensure final state is added if loop finished
              history.append(centers.copy())
@@ -187,6 +189,23 @@ def eliminate_overlaps(initial_centers, radius, box_size,
         return centers, anim    
     return centers
 
+def eliminate_overlaps_batched(initial_centers, radius, box_size,
+                       batched_iterations, dt=0.2, tol=1e-5, visualize=False):
+    # Generate random batched_iterations points
+    centers = initial_centers
+    data_evaluations = {}
+    it = 0
+    print("running simulations using this iteration schedule: ", batched_iterations)
+    for iterations in batched_iterations:
+        it += iterations
+        centers = eliminate_overlaps(centers, radius, box_size, int(iterations), dt, tol, visualize)
+
+        # Evaluate resulting dataset
+        S = SP.data_evaluation.SphereDatasetEvaluator(centers, radius, box_size[0])
+        data_evaluations[it] = S.evaluate()
+
+    return centers, data_evaluations
+
 # --- Example Usage ---
 
 # --- 2D Example ---
@@ -198,7 +217,7 @@ if __name__ == "__main__":
     box_2d = [10.0, 10.0]
 
     # Generate random starting points
-    np.random.seed(42)
+    #np.random.seed(42)
     initial_centers_2d = np.random.rand(n_points_2d, dims_2d) * box_2d
 
     # Run the simulation with visualization
@@ -214,7 +233,7 @@ if __name__ == "__main__":
 
     print("\nInitial Centers (2D Head):\n", initial_centers_2d[:5])
     print("Final Centers (2D Head):\n", final_centers_2d[:5])
-    S = SphereDatasetEvaluator(final_centers_2d, radius_2d)
+    S = SP.data_evaluation.SphereDatasetEvaluator(final_centers_2d, radius_2d, box_2d[0])
     print("evaluate: ", S.evaluate())
 
     # To display the animation in a Jupyter Notebook:
@@ -229,10 +248,10 @@ if __name__ == "__main__":
 
     # --- 3D Example ---
     print("\n--- Running 3D Example ---")
-    n_points_3d = 50
-    dims_3d = 3
-    radius_3d = 0.6
-    box_3d = [8.0, 8.0, 8.0]
+    n_points_3d = 90
+    dims_3d = 5
+    radius_3d = 1
+    box_3d = 4*np.ones(dims_3d)
 
     # Generate random starting points
     initial_centers_3d = np.random.rand(n_points_3d, dims_3d) * box_3d
@@ -242,7 +261,7 @@ if __name__ == "__main__":
         initial_centers_3d,
         radius_3d,
         box_3d,
-        max_iter=500,
+        max_iter=100,
         dt=0.2,
         tol=1e-4,
         visualize=False # Set to False or it will just print a message
@@ -251,7 +270,7 @@ if __name__ == "__main__":
     print("\nInitial Centers (3D Head):\n", initial_centers_3d[:5])
     print("Final Centers (3D Head):\n", final_centers_3d[:5])
 
-    S = SphereDatasetEvaluator(final_centers_3d, radius_3d)
+    S = SP.data_evaluation.SphereDatasetEvaluator(final_centers_3d, radius_3d, box_3d[0])
     print("evaluate 3D: ", S.evaluate())
 
     # Verify final overlaps (optional check)

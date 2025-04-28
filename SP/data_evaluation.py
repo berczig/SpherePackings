@@ -2,6 +2,10 @@ import math
 from scipy.special import betainc
 from collections import defaultdict, Counter
 import numpy as np
+import os
+from pathlib import Path
+import SP
+import matplotlib.pyplot as plt
 
 
 # -------------------
@@ -13,6 +17,7 @@ class UnionFind:
     """
     def __init__(self, n):
         self.parent = list(range(n))
+        self.intersections = 0
     
     def find(self, x):
         if self.parent[x] != x:
@@ -21,6 +26,7 @@ class UnionFind:
     
     def union(self, x, y):
         self.parent[self.find(x)] = self.find(y)
+        self.intersections+=1
     
     def groups(self):
         comps = defaultdict(list)
@@ -34,21 +40,31 @@ class SphereDatasetEvaluator:
     """
     Calculates the volume of the union of spheres and computes the number of connected components in the intersection graph. 
     """
-    def __init__(self, centers, sphere_radius):
+    def __init__(self, centers, sphere_radius, box_size, monte_carlo_sim_steps=100_000):
         self.centers = np.array(centers)
         self.sphere_radius = sphere_radius
+        self.intsect_dst_sq = (2*sphere_radius)**2
+        self.radius_sq = sphere_radius**2
         self.n_spheres = len(centers)
+        self.box_size = box_size
+        self.monte_carlo_sim_steps = monte_carlo_sim_steps
+        self.min_dist = np.inf
         if len(centers) > 0:
             self.dimension = len(centers[0])
 
         self.sphere_volume = self.get_sphere_volume(self.dimension, self.sphere_radius)
 
-    def get_sphere_volume(self, dimension, radius) -> float:
+    @staticmethod
+    def get_num_sphere_to_cover(ratio, bounding_box_width, dimension, radius):
+        return math.floor((ratio*bounding_box_width**dimension)/SphereDatasetEvaluator.get_sphere_volume(dimension, radius))
+
+    @staticmethod
+    def get_sphere_volume(dimension, radius) -> float:
         return math.pi**(dimension/2)/math.gamma(dimension/2 + 1) * (radius**dimension)
     
     def intersection_volume_two_spheres(self, center1,  center2, eps = 10**-6):
         """intersection volume of two d-spheres using spherical caps"""
-        dist = np.linalg.norm(center1 - center2)
+        dist = np.sum(SP.physics_push.shortest_vector_torus(center1, center2, self.box_size)**2)**0.5
 
         if dist >= 2*self.sphere_radius:
             return 0  # No overlap
@@ -63,6 +79,13 @@ class SphereDatasetEvaluator:
         spherical_cap_vol = self.sphere_volume*betainc((self.dimension+1)/2, 1/2, x)/2
         return 2 * spherical_cap_vol
     
+    def spheres_intersect(self, center1, center2, track=False):
+        vec_ij = SP.physics_push.shortest_vector_torus(center1, center2, self.box_size)
+        dist_sq = np.sum(vec_ij**2)
+        if track:
+            self.min_dist = min(self.min_dist, dist_sq**0.5)
+        return dist_sq < self.intsect_dst_sq
+    
     def get_bouding_box(self, centers):
         lower_corner = np.min(centers - self.sphere_radius, axis=0)
         upper_corner = np.max(centers + self.sphere_radius, axis=0)
@@ -71,16 +94,19 @@ class SphereDatasetEvaluator:
     def monte_carlo_union_volume(self, centers, num_samples=10_000):
         """Monte Carlo estimation of the union volume of multiple d-spheres"""     
         # Get bounding box
-        lower_corner, upper_corner = self.get_bouding_box(centers)
-        volume_box = np.prod(upper_corner - lower_corner)
-
+        #lower_corner, upper_corner = self.get_bouding_box(centers)
+        #volume_box = np.prod(upper_corner - lower_corner)
+        lower_corner = -np.ones(self.dimension)*self.box_size/2
+        upper_corner = np.ones(self.dimension)*self.box_size/2
+        volume_box = self.box_size**self.dimension
         # Sample random points
         samples = np.random.uniform(low=lower_corner, high=upper_corner, size=(num_samples, self.dimension))
         
         # Check if inside any sphere
         inside = np.zeros(num_samples, dtype=bool)
         for c in centers:
-            inside |= np.linalg.norm(samples - c, axis=1) <= self.sphere_radius
+            dist_sq = np.sum(SP.physics_push.shortest_vector_torus(samples, c, self.box_size)**2, axis=1)
+            inside |= dist_sq <= self.radius_sq
         
         fraction_inside = np.mean(inside)
         return volume_box * fraction_inside
@@ -94,14 +120,13 @@ class SphereDatasetEvaluator:
         # Build intersection graph
         for i in range(self.n_spheres):
             for j in range(i + 1, self.n_spheres):
-                dist = np.linalg.norm(self.centers[i] - self.centers[j])
-                if dist < 2 *self.sphere_radius:
+                if self.spheres_intersect(self.centers[i], self.centers[j], track=True):
                     uf.union(i, j)
 
-        return uf.groups()
+        return uf.groups(), uf.intersections
 
     def evaluate(self):
-        connected_components = self.compute_connected_components()
+        connected_components, n_intersections = self.compute_connected_components()
         total_volume = 0
         cc_sizes = Counter()
 
@@ -116,22 +141,69 @@ class SphereDatasetEvaluator:
                 total_volume += 2*self.sphere_volume - self.intersection_volume_two_spheres(self.centers[i], self.centers[j])
             else:
                 # Estimate the volume using monte carlo for >= 3 spheres
-                total_volume += self.monte_carlo_union_volume(self.centers[cc])
+                total_volume += self.monte_carlo_union_volume(self.centers[cc], num_samples=self.monte_carlo_sim_steps)
 
-        lower_corner, upper_corner = self.get_bouding_box(self.centers)
-        box_volume = np.prod(upper_corner - lower_corner)
+        #lower_corner, upper_corner = self.get_bouding_box(self.centers)
+        box_volume = self.box_size**self.dimension
 
-        return {"no_intersections":cc_sizes[1]==self.n_spheres, 
-                "sphere_vol":total_volume,
-                "sphere_intersect_vol":self.n_spheres*self.sphere_volume-total_volume,
+        return {"sphere_vol":total_volume,
                 "box_vol":box_volume, 
                 "box_ratio":total_volume/box_volume,
-                "intersect_ratio":(self.n_spheres*self.sphere_volume-total_volume)/self.n_spheres*self.sphere_volume,
-                "connected_components":cc_sizes,
-                "bounding_box":[lower_corner, upper_corner]}
+                "n_intersections":n_intersections, 
+                "min_dist":self.min_dist,
+                "sphere_intersect_vol":self.n_spheres*self.sphere_volume-total_volume,
+                "intersect_ratio":(self.n_spheres*self.sphere_volume-total_volume)/(self.n_spheres*self.sphere_volume),
+                "connected_components":cc_sizes}
+    
+def plot_evaluations(data_evaluations, lowerbound, savepath, show=True):
+    # Using Numpy to create an array X
+    X = []
+    Y1 = []
+    Y2 = []
+    Y3 = []
+    Y4 = []
+    for it in data_evaluations:
+        X.append(it)
+        eval = data_evaluations[it]
+        Y1.append(eval["box_ratio"])
+        Y2.append(eval["min_dist"])
+        Y3.append(eval["n_intersections"])
+        Y4.append(eval["n_intersections"])
+
+
+    # Initialise the subplot function using number of rows and columns
+    figure, axis = plt.subplots(2, 2)
+    figure.set_size_inches(8,6)
+
+    # For Sine Function
+    axis[0, 0].plot(X, Y1)
+    axis[0, 0].set_title("box_ratio")
+    axis[0, 0].axhline(y=lowerbound, color='r', linestyle='-')
+
+    # For Cosine Function
+    axis[0, 1].plot(X, Y2)
+    axis[0, 1].set_title("min_dist")
+    axis[0, 1].axhline(y=2, color='r', linestyle='-')
+
+    # For Tangent Function
+    axis[1, 0].plot(X, Y3)
+    axis[1, 0].set_title("n_intersections")
+
+    
+    savefolder = os.path.dirname(savepath)
+    Path(savefolder).mkdir(parents=True, exist_ok=True)
+    plt.savefig(savepath)
+
+    if show:
+        plt.show()
+    else:
+        plt.close()
     
 
 if __name__ == "__main__":
-    centers = np.array([(0,0,0), (0.01, 0.01,0), (0.003, -0.01,0), (4,5,3)])
-    S = SphereDatasetEvaluator(centers, 1)
+    #centers = np.array([(0,0,0), (0.01, 0.01,0), (0.003, -0.01,0), (4,5,3)])
+    #S = SphereDatasetEvaluator(centers, 1, 12)
+    centers = np.array([(2.9,2.9,2.9), (-2.9, -2.9, -2.9)])
+    S = SphereDatasetEvaluator(centers, 1, 8, 10**6)
+    print("number spheres: ", S.get_num_sphere_to_cover(0.46526, 4, 5, 1))
     print(S.evaluate())
