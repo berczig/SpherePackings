@@ -79,6 +79,7 @@ def eliminate_overlaps(initial_centers, radius, box_size,
 
                     # Calculate movement direction (unit vector) and magnitude
                     # Move each sphere by overlap / 2 along the connecting vector
+                    #move_magnitude = ((1+overlap)**2 - 1) / 2.0
                     move_magnitude = overlap / 2.0
                     direction = vec_ij / dist
 
@@ -194,6 +195,7 @@ def eliminate_overlaps_batched(initial_centers, radius, box_size,
     # Generate random batched_iterations points
     centers = initial_centers
     data_evaluations = {}
+    data_evaluations[0] = SP.data_evaluation.SphereDatasetEvaluator(initial_centers, radius, box_size[0]).evaluate()
     it = 0
     print("running simulations using this iteration schedule: ", batched_iterations)
     for iterations in batched_iterations:
@@ -209,9 +211,9 @@ def eliminate_overlaps_batched(initial_centers, radius, box_size,
 # --- Example Usage ---
 
 # --- 2D Example ---
-if __name__ == "__main__":
+def main():
     print("--- Running 2D Example ---")
-    n_points_2d = 21
+    n_points_2d = 29
     dims_2d = 2
     radius_2d = 1
     box_2d = [10.0, 10.0]

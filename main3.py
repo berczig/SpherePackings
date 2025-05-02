@@ -1,4 +1,4 @@
-from SP.physics_push import eliminate_overlaps_batched
+from SP.physics_push import eliminate_overlaps_batched, main
 from SP.data_evaluation import SphereDatasetEvaluator, plot_evaluations
 from SP import cfg
 import ast
@@ -7,8 +7,13 @@ import os
 import numpy as np
 from datetime import datetime
 
-if __name__ == "__main__":
+"""
+Runs the physics_push file.
+"""
 
+
+if __name__ == "__main__":
+    #main()
     # Load Parameters
     n_points = cfg.getint("physics_push", "n_points")
     dimension = cfg.getint("physics_push", "dimension")
@@ -21,7 +26,8 @@ if __name__ == "__main__":
     tol = cfg.getfloat("physics_push", "tol")
 
     lower_bound = ast.literal_eval(cfg["lower_bounds"]["data"])[dimension]
-    batched_iterations = max_iter/evaluations * np.ones(evaluations)
+    evaluation_skip = max_iter//evaluations
+    batched_iterations = evaluation_skip * np.ones(evaluations)
     box = box_size*np.ones(dimension)
 
     print("The current best lower bound ({:.3f}%) for dim={} can be improved using {} spheres in a box of size={}".format(100*lower_bound, dimension,
@@ -52,7 +58,7 @@ if __name__ == "__main__":
 
 
         # plot
-        plot_evaluations(data_evaluations, lower_bound, show=False, 
+        plot_evaluations(data_evaluations, lower_bound, n_spheres=n_points, dimension=dimension, box_size=box_size, dt=dt, tol=tol, evaluation_skip=evaluation_skip, show=False, 
                         savepath=os.path.join(SP.reffolder, "output/push_simulation/{}/eval{:05d}.png".format(s_now, sim+1)))
 
         # get best
@@ -67,7 +73,7 @@ if __name__ == "__main__":
                 best_min_dist = data_evaluations
                 best_min_dist_value =  eval["min_dist"]
 
-    plot_evaluations(best_min_dist, lower_bound, show=False, 
+    plot_evaluations(best_min_dist, lower_bound, n_spheres=n_points, dimension=dimension, box_size=box_size, dt=dt, tol=tol, evaluation_skip=evaluation_skip, show=False, 
                         savepath=os.path.join(SP.reffolder, "output/push_simulation/{}/best_min_dist.png".format(s_now)))
-    plot_evaluations(best_ratio, lower_bound, show=False, 
+    plot_evaluations(best_ratio, lower_bound, n_spheres=n_points, dimension=dimension, box_size=box_size, dt=dt, tol=tol, evaluation_skip=evaluation_skip, show=False, 
                         savepath=os.path.join(SP.reffolder, "output/push_simulation/{}/best_ratio.png".format(s_now)))

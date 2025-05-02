@@ -126,6 +126,7 @@ class SphereDatasetEvaluator:
         return uf.groups(), uf.intersections
 
     def evaluate(self):
+        print("Evaluating Spheres...")
         connected_components, n_intersections = self.compute_connected_components()
         total_volume = 0
         cc_sizes = Counter()
@@ -152,10 +153,10 @@ class SphereDatasetEvaluator:
                 "n_intersections":n_intersections, 
                 "min_dist":self.min_dist,
                 "sphere_intersect_vol":self.n_spheres*self.sphere_volume-total_volume,
-                "intersect_ratio":(self.n_spheres*self.sphere_volume-total_volume)/(self.n_spheres*self.sphere_volume),
+                "intersect_ratio":(self.n_spheres*self.sphere_volume-total_volume)/((self.n_spheres-1)*self.sphere_volume),
                 "connected_components":cc_sizes}
     
-def plot_evaluations(data_evaluations, lowerbound, savepath, show=True):
+def plot_evaluations(data_evaluations, lowerbound, savepath, n_spheres, dimension, box_size, dt, tol, evaluation_skip, show=True):
     # Using Numpy to create an array X
     X = []
     Y1 = []
@@ -168,26 +169,30 @@ def plot_evaluations(data_evaluations, lowerbound, savepath, show=True):
         Y1.append(eval["box_ratio"])
         Y2.append(eval["min_dist"])
         Y3.append(eval["n_intersections"])
-        Y4.append(eval["n_intersections"])
+        Y4.append(eval["intersect_ratio"])
 
 
     # Initialise the subplot function using number of rows and columns
     figure, axis = plt.subplots(2, 2)
-    figure.set_size_inches(8,6)
+    figure.set_size_inches(12,10)
+    figure.suptitle("spheres={}, dim={}, box={}, dt={}, tol={}, eval_skip={}".format(n_spheres, dimension, box_size, dt, tol, evaluation_skip))
 
     # For Sine Function
     axis[0, 0].plot(X, Y1)
-    axis[0, 0].set_title("box_ratio")
+    axis[0, 0].set_title("density - [{:.4f}]".format(Y1[-1]))
     axis[0, 0].axhline(y=lowerbound, color='r', linestyle='-')
 
     # For Cosine Function
     axis[0, 1].plot(X, Y2)
-    axis[0, 1].set_title("min_dist")
+    axis[0, 1].set_title("min. dist among spheres - [{:.4f}]".format(Y2[-1]))
     axis[0, 1].axhline(y=2, color='r', linestyle='-')
 
     # For Tangent Function
     axis[1, 0].plot(X, Y3)
-    axis[1, 0].set_title("n_intersections")
+    axis[1, 0].set_title("#intersections - [{}]".format(Y3[-1]))
+
+    axis[1, 1].plot(X, Y4)
+    axis[1, 1].set_title("overlap quotient - [{:.4f}]".format(Y4[-1]))
 
     
     savefolder = os.path.dirname(savepath)
@@ -198,6 +203,8 @@ def plot_evaluations(data_evaluations, lowerbound, savepath, show=True):
         plt.show()
     else:
         plt.close()
+
+#def plot_distances
     
 
 if __name__ == "__main__":
