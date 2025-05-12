@@ -79,8 +79,8 @@ def eliminate_overlaps(initial_centers, radius, box_size,
 
                     # Calculate movement direction (unit vector) and magnitude
                     # Move each sphere by overlap / 2 along the connecting vector
-                    #move_magnitude = ((1+overlap)**2 - 1) / 2.0
-                    move_magnitude = overlap / 2.0
+                    move_magnitude = ((1+overlap)**2 - 1) / 2.0
+                    #move_magnitude = overlap / 2.0
                     direction = vec_ij / dist
 
                     # Accumulate movements (apply dt later)

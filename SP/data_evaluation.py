@@ -7,6 +7,8 @@ from pathlib import Path
 import SP
 import matplotlib.pyplot as plt
 
+import SP.animation
+
 
 # -------------------
 # Union-Find Structure
@@ -48,7 +50,7 @@ class SphereDatasetEvaluator:
         self.n_spheres = len(centers)
         self.box_size = box_size
         self.monte_carlo_sim_steps = monte_carlo_sim_steps
-        self.min_dist = np.inf
+        self.min_distances = [np.inf for _ in range(self.n_spheres)]
         if len(centers) > 0:
             self.dimension = len(centers[0])
 
@@ -79,12 +81,9 @@ class SphereDatasetEvaluator:
         spherical_cap_vol = self.sphere_volume*betainc((self.dimension+1)/2, 1/2, x)/2
         return 2 * spherical_cap_vol
     
-    def spheres_intersect(self, center1, center2, track=False):
+    def get_spheres_dist_sq(self, center1, center2):
         vec_ij = SP.physics_push.shortest_vector_torus(center1, center2, self.box_size)
-        dist_sq = np.sum(vec_ij**2)
-        if track:
-            self.min_dist = min(self.min_dist, dist_sq**0.5)
-        return dist_sq < self.intsect_dst_sq
+        return np.sum(vec_ij**2)
     
     def get_bouding_box(self, centers):
         lower_corner = np.min(centers - self.sphere_radius, axis=0)
@@ -120,7 +119,10 @@ class SphereDatasetEvaluator:
         # Build intersection graph
         for i in range(self.n_spheres):
             for j in range(i + 1, self.n_spheres):
-                if self.spheres_intersect(self.centers[i], self.centers[j], track=True):
+                dist_sq =  self.get_spheres_dist_sq(self.centers[i], self.centers[j])
+                self.min_distances[i] = min(self.min_distances[i], dist_sq**0.5)
+                self.min_distances[j] = min(self.min_distances[j], dist_sq**0.5)
+                if dist_sq < self.intsect_dst_sq:
                     uf.union(i, j)
 
         return uf.groups(), uf.intersections
@@ -151,7 +153,7 @@ class SphereDatasetEvaluator:
                 "box_vol":box_volume, 
                 "box_ratio":total_volume/box_volume,
                 "n_intersections":n_intersections, 
-                "min_dist":self.min_dist,
+                "min_distances":self.min_distances,
                 "sphere_intersect_vol":self.n_spheres*self.sphere_volume-total_volume,
                 "intersect_ratio":(self.n_spheres*self.sphere_volume-total_volume)/((self.n_spheres-1)*self.sphere_volume),
                 "connected_components":cc_sizes}
@@ -163,19 +165,22 @@ def plot_evaluations(data_evaluations, lowerbound, savepath, n_spheres, dimensio
     Y2 = []
     Y3 = []
     Y4 = []
+    Y5 = []
     for it in data_evaluations:
         X.append(it)
         eval = data_evaluations[it]
         Y1.append(eval["box_ratio"])
-        Y2.append(eval["min_dist"])
+        Y2.append(min(eval["min_distances"]))
         Y3.append(eval["n_intersections"])
         Y4.append(eval["intersect_ratio"])
+        Y5.append((np.linspace(1, n_spheres, n_spheres), sorted(eval["min_distances"])))
 
 
     # Initialise the subplot function using number of rows and columns
     figure, axis = plt.subplots(2, 2)
     figure.set_size_inches(12,10)
-    figure.suptitle("spheres={}, dim={}, box={}, dt={}, tol={}, eval_skip={}".format(n_spheres, dimension, box_size, dt, tol, evaluation_skip))
+    title = "spheres={}, dim={}, box={}, dt={}, tol={}, eval_skip={}".format(n_spheres, dimension, box_size, dt, tol, evaluation_skip)
+    figure.suptitle(title)
 
     # For Sine Function
     axis[0, 0].plot(X, Y1)
@@ -198,13 +203,13 @@ def plot_evaluations(data_evaluations, lowerbound, savepath, n_spheres, dimensio
     savefolder = os.path.dirname(savepath)
     Path(savefolder).mkdir(parents=True, exist_ok=True)
     plt.savefig(savepath)
+    SP.animation.animate_histogram(Y5, savepath[:-4]+".gif", title=title, fps=max(1,len(data_evaluations)//2))
 
     if show:
         plt.show()
     else:
         plt.close()
 
-#def plot_distances
     
 
 if __name__ == "__main__":

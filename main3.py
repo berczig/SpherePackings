@@ -1,5 +1,6 @@
 from SP.physics_push import eliminate_overlaps_batched, main
 from SP.data_evaluation import SphereDatasetEvaluator, plot_evaluations
+from SP.data_generation import get_data_loader
 from SP import cfg
 import ast
 import SP
@@ -39,15 +40,16 @@ if __name__ == "__main__":
     best_ratio_value = 0
 
     s_now = datetime.now().strftime("%Y-%m-%d %H_%M_%S")
+    dataset = np.zeros((simulations, dimension, n_points))
 
     for sim in range(simulations):
         print("Simulation: {}/{}".format(sim+1, simulations))
         # Generate random starting points
-        initial_centers_3d = np.random.rand(n_points, dimension) * box
+        initial_centers = np.random.rand(n_points, dimension) * box
 
         # Run the simulation
-        final_centers_3d, data_evaluations = eliminate_overlaps_batched(
-            initial_centers_3d,
+        final_centers, data_evaluations = eliminate_overlaps_batched(
+            initial_centers,
             radius,
             box,
             batched_iterations=batched_iterations,
@@ -56,11 +58,12 @@ if __name__ == "__main__":
             visualize=False # Set to False or it will just print a message
         )
 
+        dataset[sim] = final_centers.T
 
         # plot
         plot_evaluations(data_evaluations, lower_bound, n_spheres=n_points, dimension=dimension, box_size=box_size, dt=dt, tol=tol, evaluation_skip=evaluation_skip, show=False, 
                         savepath=os.path.join(SP.reffolder, "output/push_simulation/{}/eval{:05d}.png".format(s_now, sim+1)))
-
+        
         # get best
         for it in data_evaluations:
             eval = data_evaluations[it]
@@ -69,9 +72,21 @@ if __name__ == "__main__":
                 best_ratio_value =  eval["box_ratio"]
                 best_ratio = data_evaluations
 
-            if eval["min_dist"] > best_min_dist_value:
+            if min(eval["min_distances"]) > best_min_dist_value:
                 best_min_dist = data_evaluations
-                best_min_dist_value =  eval["min_dist"]
+                best_min_dist_value =  min(eval["min_distances"])
+
+    # Save dataset as a tensor
+    from torch import tensor, save, float32
+    print("Dataset shape:", dataset.shape)
+    dataset_tensor = tensor(dataset, dtype=float32)
+
+    savepath = os.path.join(SP.reffolder, "output/push_simulation/{}/dataset.pt".format(s_now))
+    print("saving data set as {}".format(savepath))
+    save(dataset_tensor, savepath)
+
+    # how to load the data
+    # loader = get_data_loader(batch_size=2, dataset_path=savepath)
 
     plot_evaluations(best_min_dist, lower_bound, n_spheres=n_points, dimension=dimension, box_size=box_size, dt=dt, tol=tol, evaluation_skip=evaluation_skip, show=False, 
                         savepath=os.path.join(SP.reffolder, "output/push_simulation/{}/best_min_dist.png".format(s_now)))

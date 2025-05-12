@@ -69,6 +69,9 @@ def generate_dataset(num_samples, min_size, filename):
     print("saving data set as {}".format(savepath))
     torch.save(dataset_tensor, savepath)
 
+def generate_dataset_push():
+    pass
+
 # Dataset
 class SpherePackingDataset(Dataset):
     def __init__(self, path):
