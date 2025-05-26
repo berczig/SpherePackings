@@ -99,7 +99,7 @@ clip_sample, clip_sample_range, save_path, save_model=False):
                 # Compute losses
                 mse_loss = criterion(predicted_noise, noise)
                 penalty_loss = distance_penalty(predicted_noise, sphere_radius)
-                loss = mse_loss  + 0*penalty_loss
+                loss = mse_loss  + 0.01*penalty_loss
                 loss_history.append(loss.item())
 
                 optimizer.zero_grad()
@@ -108,10 +108,10 @@ clip_sample, clip_sample_range, save_path, save_model=False):
             tqepoch.set_description(f"Epoch {epoch + 1}/{num_epochs}")
             tqepoch.set_postfix(Loss=f"{loss.item():.4f}", MSE = f"{mse_loss.item():.4f}", Penalty=f"{penalty_loss.item():.4f}")
             #print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {loss.item():.4f}, MSE Loss: {mse_loss.item():.4f}, Penalty Loss: {penalty_loss.item():.4f}")
-    plot_loss(loss_history)
-    if save_model:
-        save_model_(epoch=num_epochs, model=model, optimizer=optimizer, loss_history =loss_history, path=save_path)
-    return model
+    #plot_loss(loss_history)
+    #if save_model:
+    #    save_model_(epoch=num_epochs, model=model, optimizer=optimizer, loss_history =loss_history, path=save_path)
+    #return model
 
 # Sampling Function: Generate samples from the model and return (input, output) pairs
 
@@ -139,61 +139,50 @@ beta_start, beta_end, clip_sample, clip_sample_range):
                 samples_history.append(np.array(samples.cpu()))
             samples_history = np.transpose(np.array(samples_history), (1,0,2,3)) # to make the first axis the batch not the history
             samples_batch.append(samples_history)
-    return (np.concat(inputs_batch, 0), 
-    np.concat(samples_batch, 0))
+    return (np.concatenate(inputs_batch, 0), 
+    np.concatenate(samples_batch, 0))
 
 # Example usage
 if __name__ == "__main__":
+    # Parameters (set these as needed or load from config)
+    batch_size = 4
+    d = 2  # dimension (e.g., 2 for 2D)
+    N = 50 # number of points per sample
     num_samples = 4
-    # Start with random packings
-    packings = torch.rand(num_samples, d, N)
-    print(packings.shape)
-    input,output = sample(model, scheduler, num_samples, packings)
-    # Print type and shape of input_output_pairs
-    print(input.shape, output.shape)
+    num_train_timesteps = 1000
+    num_inference_timesteps = 50
+    beta_start = 0.0001
+    beta_end = 0.02
+    clip_sample = True
+    clip_sample_range = 1.0
+    learning_rate = 1e-3
+    num_epochs = 1
+    sphere_radius = 0.5
+    dataset_path = "/Users/au596283/MLProjects/SpherePacking/SP/sample_packings_train2.pt"
+    # Create or load data loader
+    data_loader = get_data_loader(batch_size, dataset_path)
 
-    # Post-process and Save
-    #for i, (input_sample, output_sample) in enumerate(input_output_pairs):
-    #    np.save(f"input_sample_{i}.npy", input_sample.cpu().numpy())
-    #    np.save(f"output_sample_{i}.npy", output_sample.cpu().numpy())
+    # Initialize model
+    model = PointNetPlusPlus(d)
 
+    # Example: train the model (optional)
+    # model = train_diffusion_model(data_loader, num_epochs, learning_rate, num_train_timesteps, d, batch_size, sphere_radius, beta_start, beta_end, clip_sample, clip_sample_range, "model.pt", save_model=False)
 
-    # Plot generated pairs: input points in black output points in red in separate plots for each pair
+    # Sample from the model
+    input, output = sample_diffusion_model(
+        model, data_loader, num_train_timesteps, num_inference_timesteps,
+        beta_start, beta_end, clip_sample, clip_sample_range
+    )
 
+    print("Input shape:", input.shape, "Output shape:", output.shape)
+
+    # Plot generated pairs: input points in black, output points in red
     def plot_sample(input, output):
         for i in range(input.shape[0]):
-            plt.scatter(input[i][0], input[i][1], c="black")
-            plt.scatter(output[i][0], output[i][1], c="red")
+            plt.scatter(input[i][0], input[i][1], c="black", label="Input")
+            plt.scatter(output[i][0], output[i][1], c="red", label="Output")
             plt.title(f"Sample {i}")
+            plt.legend()
             plt.show()
 
     plot_sample(input, output)
-
-def save_model_(epoch, model, optimizer, loss_history, path):
-    torch.save({
-            'epoch': epoch,
-            'model_state_dict': model.state_dict(),
-            'optimizer_state_dict': optimizer.state_dict(),
-            "loss_history":loss_history
-            }, path)
-    
-# def load_model(path):
-#     model = TheModelClass(*args, **kwargs)
-#     optimizer = TheOptimizerClass(*args, **kwargs)
-
-#     checkpoint = torch.load(path, weights_only=True)
-#     model.load_state_dict(checkpoint['model_state_dict'])
-#     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-#     epoch = checkpoint['epoch']
-#     loss = checkpoint['loss']
-
-#     model.eval()
-#     # - or -
-#     model.train()
-    
-def plot_loss(loss_history):
-    plt.plot(loss_history)
-    plt.title("Loss history")
-    plt.xlabel("Batch")
-    plt.ylabel("Loss")
-    plt.show()
