@@ -40,7 +40,7 @@ if __name__ == "__main__":
     best_ratio_value = 0
 
     s_now = datetime.now().strftime("%Y-%m-%d %H_%M_%S")
-    dataset = np.zeros((simulations, dimension, n_points))
+    datasets = []
 
     for sim in range(simulations):
         print("Simulation: {}/{}".format(sim+1, simulations))
@@ -58,8 +58,6 @@ if __name__ == "__main__":
             visualize=False # Set to False or it will just print a message
         )
 
-        dataset[sim] = final_centers.T
-
         # plot
         plot_evaluations(data_evaluations, lower_bound, n_spheres=n_points, dimension=dimension, box_size=box_size, dt=dt, tol=tol, evaluation_skip=evaluation_skip, show=False, 
                         savepath=os.path.join(SP.reffolder, "output/push_simulation/{}/eval{:05d}.png".format(s_now, sim+1)))
@@ -76,8 +74,14 @@ if __name__ == "__main__":
                 best_min_dist = data_evaluations
                 best_min_dist_value =  min(eval["min_distances"])
 
+        smallest_dist = min(data_evaluations[max_iter]["min_distances"])
+        print("biggest_dist: ", smallest_dist)
+        if smallest_dist > 1.96:
+            datasets.append(final_centers.T)
+
     # Save dataset as a tensor
     from torch import tensor, save, float32
+    dataset = np.array(datasets)
     print("Dataset shape:", dataset.shape)
     dataset_tensor = tensor(dataset, dtype=float32)
 
