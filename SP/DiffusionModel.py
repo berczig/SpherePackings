@@ -11,16 +11,14 @@
 
 import torch
 from torch import nn
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader, random_split
 from diffusers import DDPMScheduler
-import diffusers
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-from SP.data_generation import get_data_loader, split_data_loader
+import configparser
 
-
-# PointNet++ Components
+# --- PointNet++ Components ---
 class PointNetSetAbstraction(nn.Module):
     def __init__(self, in_channels, out_channels):
         super(PointNetSetAbstraction, self).__init__()
@@ -32,8 +30,7 @@ class PointNetSetAbstraction(nn.Module):
         )
 
     def forward(self, x):
-        # x: (batch_size, in_channels, num_points)
-        x = x.float()  # Ensure input is float32
+        x = x.float()
         return self.mlp(x)
 
 class PointNetPlusPlus(nn.Module):
@@ -46,143 +43,280 @@ class PointNetPlusPlus(nn.Module):
         )
 
     def forward(self, x):
-        # x: (batch_size, d, N)
-        x = x.float()  # Ensure input is float32
-        x = self.sa1(x)  # (batch_size, 128, N)
-        x = self.sa2(x)  # (batch_size, 512, N)
-        x = self.mlp(x)  # (batch_size, d, N)
+        x = x.float()
+        x = self.sa1(x)
+        x = self.sa2(x)
+        x = self.mlp(x)
         return x
 
+# --- SetTransformer and dependencies ---
+class MultiheadAttention(nn.Module):
+    def __init__(self, dim, num_heads):
+        super().__init__()
+        self.num_heads = num_heads
+        self.dim = dim
+        assert dim % num_heads == 0, "dim must be divisible by num_heads"
+        self.head_dim = dim // num_heads
+        self.q_proj = nn.Linear(dim, dim)
+        self.k_proj = nn.Linear(dim, dim)
+        self.v_proj = nn.Linear(dim, dim)
+        self.out_proj = nn.Linear(dim, dim)
 
+    def forward(self, query, key, value):
+        B, Nq, D = query.shape
+        Nk = key.shape[1]
+        q = self.q_proj(query).view(B, Nq, self.num_heads, self.head_dim).transpose(1,2)
+        k = self.k_proj(key).view(B, Nk, self.num_heads, self.head_dim).transpose(1,2)
+        v = self.v_proj(value).view(B, Nk, self.num_heads, self.head_dim).transpose(1,2)
+        attn = (q @ k.transpose(-2, -1)) / (self.head_dim ** 0.5)
+        attn = torch.softmax(attn, dim=-1)
+        out = attn @ v
+        out = out.transpose(1,2).contiguous().view(B, Nq, D)
+        out = self.out_proj(out)
+        return out, attn
+
+class ISAB(nn.Module):
+    def __init__(self, dim_in, dim_hidden, num_heads, num_inds):
+        super().__init__()
+        self.inducing = nn.Parameter(torch.randn(1, num_inds, dim_hidden))
+        self.mab1 = MultiheadAttention(dim_hidden, num_heads)
+        self.mab2 = MultiheadAttention(dim_hidden, num_heads)
+        self.fc0 = nn.Linear(dim_in, dim_hidden)
+    def forward(self, X):
+        B, N, _ = X.shape
+        H = self.fc0(X)
+        inducing = self.inducing.expand(B, -1, -1)
+        H1, _ = self.mab1(inducing, H, H)
+        H2, _ = self.mab2(H, H1, H1)
+        return H2
+
+class SetTransformer(nn.Module):
+    def __init__(self, dim_in, dim_hidden=128, num_heads=4, num_inds=16, num_isab=2, dim_out=None):
+        super().__init__()
+        self.isabs = nn.ModuleList([
+            ISAB(dim_in if i==0 else dim_hidden, dim_hidden, num_heads, num_inds)
+            for i in range(num_isab)
+        ])
+        self.fc_out = nn.Linear(dim_hidden, dim_out if dim_out is not None else dim_in)
+    def forward(self, X):
+        # X: (batch, d, N)
+        X = X.permute(0, 2, 1)  # (batch, N, d)
+        for isab in self.isabs:
+            X = isab(X)
+        X = self.fc_out(X)      # (batch, N, d_out)
+        X = X.permute(0, 2, 1)  # (batch, d_out, N)
+        return X
+    
 def distance_penalty(output, radius):
-    # output: (batch_size, d, N)
-    distances = torch.cdist(output.permute(0, 2, 1), output.permute(0, 2, 1))  # (batch_size, N, d)
-    mask = (distances < 2*radius) & (distances > 0)  # Ignore self-distances
+    # output: (batch, d, N)
+    B, d, N = output.shape
+    coords = output.permute(0, 2, 1)  # (B, N, d)
+    distances = torch.cdist(coords, coords)  # (B, N, N)
+    mask = (distances < 2*radius) & (distances > 0)
     penalty = torch.sum(mask * (2*radius - distances) ** 2)
-    return penalty / output.shape[0]  # Normalize by batch size
+    num_pairs = B * N * (N - 1) / 2
+    return penalty / num_pairs
 
-# Training Loop
-def train_diffusion_model(train_data_loader, num_epochs, 
-learning_rate, num_train_timesteps, dimension, batch_size, sphere_radius, beta_start, beta_end, 
-clip_sample, clip_sample_range, save_path, save_model=False):
-    # Model
-    model = PointNetPlusPlus(dimension)
-    scheduler = DDPMScheduler(num_train_timesteps=num_train_timesteps, beta_start = beta_start, 
-    beta_end = beta_end, clip_sample = clip_sample, clip_sample_range = clip_sample_range)
-
-    # Optimizer
+def train_diffusion_model(
+    model,
+    train_data_loader,
+    num_epochs,
+    learning_rate,
+    num_train_timesteps,
+    sphere_radius,
+    beta_start,
+    beta_end,
+    clip_sample,
+    clip_sample_range,
+    device
+):
+    scheduler = DDPMScheduler(
+        num_train_timesteps=num_train_timesteps,
+        beta_start=beta_start,
+        beta_end=beta_end,
+        clip_sample=clip_sample,
+        clip_sample_range=clip_sample_range
+    )
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
-
-    # Loss Function
     criterion = nn.MSELoss()
+    model.train().to(device)
 
-    model.train()
-    loss_history = []
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model.to(device)
+    for epoch in tqdm(range(num_epochs), desc="Training"):
+        for batch in train_data_loader:
+            # x0: clean point set
+            batch = batch.to(device)                   # (B, d, N)
+            noise = torch.randn_like(batch)            # (B, d, N)
+            timesteps = torch.randint(
+                0,
+                num_train_timesteps,
+                (batch.shape[0],),
+                device=device
+            ).long()                                   # (B,)
 
-    with tqdm(range(num_epochs)) as tqepoch:
-        for epoch in tqepoch:
-            for batch in train_data_loader:
-                batch = batch.to(device)  # (batch_size, d, N)
-                noise = torch.randn_like(batch).to(device)
-                timesteps = torch.randint(0, num_train_timesteps, (batch_size,), device=device).long()
-                #print("batch_size:", batch_size)
-                #print("batch: ", batch.shape)
-                #print("noise: ", noise.shape)
-                #print("timesteps: ", timesteps.shape)
-                print("using diffusers version: ", diffusers.__version__)
-                noisy_data = scheduler.add_noise(batch, noise, timesteps)
+            # Add noise according to schedule
+            noisy = scheduler.add_noise(batch, noise, timesteps)
 
-                predicted_noise = model(noisy_data)  # (batch_size, d, N)
+            # Predict the added noise
+            predicted_noise = model(noisy)
 
-                # Compute losses
-                mse_loss = criterion(predicted_noise, noise)
-                penalty_loss = distance_penalty(predicted_noise, sphere_radius)
-                loss = mse_loss  + 0.01*penalty_loss
-                loss_history.append(loss.item())
+            # Manually reconstruct x0_pred from noisy + predicted_noise
+            # ᾱ_t = cumulative product of alphas at each timestep
+            alphas_cumprod = scheduler.alphas_cumprod.to(device)           # (T,)
+            a_bar_t = alphas_cumprod[timesteps].view(-1, 1, 1)             # (B,1,1)
+            sqrt_a_bar_t = torch.sqrt(a_bar_t)                             # (B,1,1)
+            sqrt_1m_a_bar_t = torch.sqrt(1 - a_bar_t)                      # (B,1,1)
+            x0_pred = (noisy - sqrt_1m_a_bar_t * predicted_noise) / sqrt_a_bar_t
 
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
-            tqepoch.set_description(f"Epoch {epoch + 1}/{num_epochs}")
-            tqepoch.set_postfix(Loss=f"{loss.item():.4f}", MSE = f"{mse_loss.item():.4f}", Penalty=f"{penalty_loss.item():.4f}")
-            #print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {loss.item():.4f}, MSE Loss: {mse_loss.item():.4f}, Penalty Loss: {penalty_loss.item():.4f}")
-    #plot_loss(loss_history)
-    #if save_model:
-    #    save_model_(epoch=num_epochs, model=model, optimizer=optimizer, loss_history =loss_history, path=save_path)
-    #return model
+            # Apply geometric penalty to reconstructed positions
+            penalty_loss = distance_penalty(x0_pred, sphere_radius)
 
-# Sampling Function: Generate samples from the model and return (input, output) pairs
+            # Standard MSE between predicted and true noise
+            mse_loss = criterion(predicted_noise, noise)
 
-def sample_diffusion_model(model, data_loader, num_train_timesteps, num_inference_timesteps, 
-beta_start, beta_end, clip_sample, clip_sample_range):
-    scheduler = DDPMScheduler(num_train_timesteps=num_train_timesteps, beta_start = beta_start, 
-    beta_end = beta_end, clip_sample = clip_sample, clip_sample_range = clip_sample_range)
+            # Combine losses (λ can be tuned)
+            loss = mse_loss + 0.0*penalty_loss
+
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+    return model
+
+def sample_diffusion_model(model, data_loader, num_train_timesteps, num_inference_timesteps, beta_start, beta_end, clip_sample, clip_sample_range, device):
+    scheduler = DDPMScheduler(num_train_timesteps=num_train_timesteps, beta_start=beta_start, beta_end=beta_end, clip_sample=clip_sample, clip_sample_range=clip_sample_range)
     scheduler.set_timesteps(num_inference_timesteps)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.eval()
     inputs_batch = []
+    noised_batch = []
     samples_batch = []
     with torch.no_grad():
-        # Form samples by adding small gaussian noise to input samples
         for packings in data_loader:
-            samples = packings + 0.1 * torch.randn_like(packings)
-            samples = samples.to(device)
-            input_sample = samples.clone()
-            inputs_batch.append(np.array(input_sample.cpu()))
+            packings = packings.to(device)
+            # Add noise to the input packings
+            noised = scheduler.add_noise(packings, torch.randn_like(packings), torch.randint(0, 2, (packings.shape[0],), device=device).long())
+            inputs_batch.append(np.array(packings.cpu()))
+            noised_batch.append(np.array(noised.cpu()))
+            samples = noised.clone()
             samples_history = [np.array(samples.cpu())]
             for t in scheduler.timesteps:
-                print("t:", t)
                 predicted_noise = model(samples)
-                samples = scheduler.step(predicted_noise, t, samples).prev_sample  # Use scalar for `timestep[0]`
+                samples = scheduler.step(predicted_noise, t, samples).prev_sample
                 samples_history.append(np.array(samples.cpu()))
-            samples_history = np.transpose(np.array(samples_history), (1,0,2,3)) # to make the first axis the batch not the history
+            samples_history = np.transpose(np.array(samples_history), (1,0,2,3))
             samples_batch.append(samples_history)
-    return (np.concatenate(inputs_batch, 0), 
-    np.concatenate(samples_batch, 0))
+    return (
+        np.concatenate(inputs_batch, 0),    # original input
+        np.concatenate(noised_batch, 0),    # initial noised
+        np.concatenate(samples_batch, 0)    # full denoising trajectory
+    )
+import matplotlib.animation as animation
 
-# Example usage
+def animate_sample(input, output, sample_idx=0):
+    num_steps = output.shape[1]
+    fig, ax = plt.subplots(figsize=(5, 5))
+    ax.set_xlim(-16, 16)
+    ax.set_ylim(-16, 16)
+    scat = ax.scatter([], [], c="red", label="Denoised")
+    ax.scatter(input[sample_idx][0], input[sample_idx][1], c="black", label="Input", alpha=0.3)
+    ax.legend()
+
+    def update(frame):
+        ax.set_title(f"Sample {sample_idx}, Step {frame+1}/{num_steps}")
+        data = output[sample_idx][frame]  # (d, N)
+        scat.set_offsets(np.column_stack([data[0], data[1]]))  # (N, d)
+        return scat,
+
+    ani = animation.FuncAnimation(
+        fig, update, frames=num_steps, interval=1, blit=True, repeat=False
+    )
+    plt.show()
+
+def plot_packings_noised_denoised(inputs, noised, output, sample_idx=0):
+    plt.figure(figsize=(6, 6))
+    # Original packing
+    plt.scatter(inputs[sample_idx][0], inputs[sample_idx][1], c="black", label="Original", alpha=0.5)
+    # Noised sample
+    plt.scatter(noised[sample_idx][0], noised[sample_idx][1], c="blue", label="Noised", alpha=0.5)
+    # Final denoised
+    final = output[sample_idx]
+    for i in range(min(5,final.shape[0])):
+        plt.scatter(final[i][0], final[i][1], c="yellow", alpha=0.7, s=10)
+    # Plot the final denoised packing
+    final = final[-1]  # Take the last step of denoising
+    plt.scatter(final[0], final[1], c="red", label="Denoised", alpha=0.7)
+    plt.legend()
+    plt.xlabel("x")
+    plt.ylabel("y")
+    plt.title(f"Sample {sample_idx}: Original, Noised, Denoised")
+    plt.xlim(-16, 16)
+    plt.ylim(-16, 16)
+    plt.show()
+
 if __name__ == "__main__":
-    # Parameters (set these as needed or load from config)
-    batch_size = 4
-    d = 2  # dimension (e.g., 2 for 2D)
-    N = 50 # number of points per sample
-    num_samples = 4
-    num_train_timesteps = 1000
-    num_inference_timesteps = 50
-    beta_start = 0.0001
-    beta_end = 0.02
-    clip_sample = True
-    clip_sample_range = 1.0
-    learning_rate = 1e-3
-    num_epochs = 1
-    sphere_radius = 0.5
-    dataset_path = "/Users/au596283/MLProjects/SpherePacking/SP/sample_packings_train2.pt"
-    # Create or load data loader
-    data_loader = get_data_loader(batch_size, dataset_path)
+    # --- Read config ---
+    config = configparser.ConfigParser()
+    config.read("config.cfg")
+    section = config["diffusion_model"]
+    # --- Extract parameters ---
 
-    # Initialize model
-    model = PointNetPlusPlus(d)
+    batch_size = int(section["batch_size"])
+    d = int(section["dimension"])
+    num_train_timesteps = int(section["num_train_timesteps"])
+    num_inference_timesteps = int(section["num_inference_timesteps"])
+    beta_start = float(section["beta_start"])
+    beta_end = float(section["beta_end"])
+    clip_sample = section.getboolean("clip_sample")
+    clip_sample_range = float(section["clip_sample_range"])
+    learning_rate = float(section["learning_rate"])
+    num_epochs = int(section["num_epochs"])
+    sphere_radius = float(section["sphere_radius"])
+    dataset_path = section["dataset_path"]
+    model_type = section.get("model_type", "pointnet").lower()
 
-    # Example: train the model (optional)
-    # model = train_diffusion_model(data_loader, num_epochs, learning_rate, num_train_timesteps, d, batch_size, sphere_radius, beta_start, beta_end, clip_sample, clip_sample_range, "model.pt", save_model=False)
+    # SetTransformer-specific parameters (with defaults)
+    st_dim_hidden = int(section.get("st_dim_hidden", 128))
+    st_num_heads = int(section.get("st_num_heads", 4))
+    st_num_inds = int(section.get("st_num_inds", 16))
+    st_num_isab = int(section.get("st_num_isab", 2))
 
-    # Sample from the model
-    input, output = sample_diffusion_model(
-        model, data_loader, num_train_timesteps, num_inference_timesteps,
-        beta_start, beta_end, clip_sample, clip_sample_range
+    # --- Load and split dataset ---
+    from SP.data_generation import SpherePackingDataset
+
+    dataset = SpherePackingDataset(dataset_path)
+    total_size = len(dataset)
+    train_size = int(0.9 * total_size)
+    val_size = total_size - train_size
+
+    train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
+    train_data_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    val_data_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+
+    print(f"Train DataLoader: {len(train_data_loader.dataset)} samples")
+    print(f"Validation DataLoader: {len(val_data_loader.dataset)} samples")
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    # --- Model selection ---
+    if model_type == "pointnet":
+        model = PointNetPlusPlus(d)
+    elif model_type == "settransformer":
+        model = SetTransformer(dim_in=d, dim_hidden=st_dim_hidden, num_heads=st_num_heads, num_inds=st_num_inds, num_isab=st_num_isab, dim_out=d)
+    else:
+        raise ValueError(f"Unknown model_type: {model_type}")
+
+    print("Training the diffusion model...")
+    model = train_diffusion_model(
+        model, train_data_loader, num_epochs, learning_rate, num_train_timesteps, sphere_radius,
+        beta_start, beta_end, clip_sample, clip_sample_range, device
     )
 
-    print("Input shape:", input.shape, "Output shape:", output.shape)
+    inputs, noised, output = sample_diffusion_model(
+    model, val_data_loader, num_train_timesteps, num_inference_timesteps,
+    beta_start, beta_end, clip_sample, clip_sample_range, device
+    )
 
-    # Plot generated pairs: input points in black, output points in red
-    def plot_sample(input, output):
-        for i in range(input.shape[0]):
-            plt.scatter(input[i][0], input[i][1], c="black", label="Input")
-            plt.scatter(output[i][0], output[i][1], c="red", label="Output")
-            plt.title(f"Sample {i}")
-            plt.legend()
-            plt.show()
+    print("Input shape:", inputs.shape, "Output shape:", output.shape)
+    
+    plot_packings_noised_denoised(inputs, noised, output, sample_idx=0)
 
-    plot_sample(input, output)
+    #animate_sample(inputs, output, sample_idx=0)
