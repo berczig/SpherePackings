@@ -45,7 +45,7 @@ if __name__ == "__main__":
     for sim in range(simulations):
         print("Simulation: {}/{}".format(sim+1, simulations))
         # Generate random starting points
-        initial_centers = np.random.rand(n_points, dimension) * box
+        initial_centers = (np.random.rand(n_points, dimension)-0.5) * box
 
         # Run the simulation
         final_centers, data_evaluations = eliminate_overlaps_batched(
@@ -76,7 +76,7 @@ if __name__ == "__main__":
 
         smallest_dist = min(data_evaluations[max_iter]["min_distances"])
         print("biggest_dist: ", smallest_dist)
-        if smallest_dist > 1.96:
+        if smallest_dist > 0:
             datasets.append(final_centers.T)
 
     # Save dataset as a tensor
