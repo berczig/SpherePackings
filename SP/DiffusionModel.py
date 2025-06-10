@@ -112,9 +112,9 @@ def distance_penalty(output, radius):
     B, d, N = output.shape
     coords = output.permute(0, 2, 1)  # (B, N, d)
     distances = torch.cdist(coords, coords)  # (B, N, N)
-    mask = (distances < 2*radius) & (distances > 0)
-    penalty = torch.sum(mask * (2*radius - distances) ** 2)
+    violation = torch.relu(2*radius - distances)      # (B,N,N)
     num_pairs = B * N * (N - 1) / 2
+    penalty = (violation**2).sum() / num_pairs
     return penalty / num_pairs
 
 def train_diffusion_model(
@@ -141,6 +141,8 @@ def train_diffusion_model(
     criterion = nn.MSELoss()
     model.train().to(device)
 
+    loss_history = []
+    # Training loop
     for epoch in tqdm(range(num_epochs), desc="Training"):
         for batch in train_data_loader:
             # x0: clean point set
@@ -166,21 +168,29 @@ def train_diffusion_model(
             sqrt_a_bar_t = torch.sqrt(a_bar_t)                             # (B,1,1)
             sqrt_1m_a_bar_t = torch.sqrt(1 - a_bar_t)                      # (B,1,1)
             x0_pred = (noisy - sqrt_1m_a_bar_t * predicted_noise) / sqrt_a_bar_t
+            x0_clamped = x0_pred.clamp(min=0, max=clip_sample_range)  # Clamping to avoid out of bounds
 
             # Apply geometric penalty to reconstructed positions
-            penalty_loss = distance_penalty(x0_pred, sphere_radius)
+            penalty_loss = distance_penalty(x0_clamped, sphere_radius)
 
             # Standard MSE between predicted and true noise
             mse_loss = criterion(predicted_noise, noise)
+            x0_true = batch
+            recon_loss = nn.MSELoss()(x0_pred, x0_true)
 
-            # Combine losses (λ can be tuned)
-            loss = mse_loss + 0.0*penalty_loss
+            l_max = 500
+            l = l_max * (epoch/num_epochs)  # Exponential decay
+            loss = mse_loss + 0.0*recon_loss + l*penalty_loss
 
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-
-    return model
+            loss_history.append(loss.item())
+        # Print loss every epoch
+        print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.4f}")
+    print("Training complete.")
+            
+    return model, loss_history
 
 def sample_diffusion_model(model, data_loader, num_train_timesteps, num_inference_timesteps, beta_start, beta_end, clip_sample, clip_sample_range, device):
     scheduler = DDPMScheduler(num_train_timesteps=num_train_timesteps, beta_start=beta_start, beta_end=beta_end, clip_sample=clip_sample, clip_sample_range=clip_sample_range)
@@ -193,7 +203,7 @@ def sample_diffusion_model(model, data_loader, num_train_timesteps, num_inferenc
         for packings in data_loader:
             packings = packings.to(device)
             # Add noise to the input packings
-            noised = scheduler.add_noise(packings, torch.randn_like(packings), torch.randint(0, 2, (packings.shape[0],), device=device).long())
+            noised = scheduler.add_noise(packings, torch.randn_like(packings), torch.randint(0, num_train_timesteps, (packings.shape[0],), device=device).long())
             inputs_batch.append(np.array(packings.cpu()))
             noised_batch.append(np.array(noised.cpu()))
             samples = noised.clone()
@@ -248,8 +258,8 @@ def plot_packings_noised_denoised(inputs, noised, output, sample_idx=0):
     plt.xlabel("x")
     plt.ylabel("y")
     plt.title(f"Sample {sample_idx}: Original, Noised, Denoised")
-    plt.xlim(-16, 16)
-    plt.ylim(-16, 16)
+    plt.xlim(0, 16)
+    plt.ylim(0, 16)
     plt.show()
 
 if __name__ == "__main__":
@@ -284,7 +294,7 @@ if __name__ == "__main__":
 
     dataset = SpherePackingDataset(dataset_path)
     total_size = len(dataset)
-    train_size = int(0.9 * total_size)
+    train_size = int(0.95 * total_size)
     val_size = total_size - train_size
 
     train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
@@ -303,12 +313,43 @@ if __name__ == "__main__":
         model = SetTransformer(dim_in=d, dim_hidden=st_dim_hidden, num_heads=st_num_heads, num_inds=st_num_inds, num_isab=st_num_isab, dim_out=d)
     else:
         raise ValueError(f"Unknown model_type: {model_type}")
+    
+    # report parameter counts
+    total_params = sum(p.numel() for p in model.parameters())
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print(f"SetTransformer: total params = {total_params:,}, trainable = {trainable_params:,}")
 
     print("Training the diffusion model...")
-    model = train_diffusion_model(
+    model, loss_history = train_diffusion_model(
         model, train_data_loader, num_epochs, learning_rate, num_train_timesteps, sphere_radius,
         beta_start, beta_end, clip_sample, clip_sample_range, device
     )
+    # Save the trained model under the name "diffusion_SetTransformer.pth" or "diffusion_PointNet.pth" in the folder 
+    # /Users/au596283/MLProjects/SpherePacking/output/saved_models/
+    model_name = f"diffusion_{model_type}.pth"
+    model_save_path = f"output/saved_models/{model_name}"
+    torch.save(model.state_dict(), model_save_path)
+    print(f"Model saved to {model_save_path}")
+    
+    
+    
+    # 2) Epoch-average loss
+    batches_per_epoch = len(train_data_loader)
+    epoch_avgs = [
+        np.mean(loss_history[i*batches_per_epoch:(i+1)*batches_per_epoch])
+        for i in range(num_epochs)
+    ]
+    plt.plot(
+        np.arange(batches_per_epoch/2, batches_per_epoch*num_epochs, batches_per_epoch),
+        epoch_avgs, color="red", marker="o", label="Epoch avg"
+    )
+
+    plt.xlabel("Batch index")
+    plt.ylabel("Loss")
+    plt.title("Training Loss")
+    plt.legend()
+    plt.yscale("log")        # optional: log scale often helps
+    plt.show()
 
     inputs, noised, output = sample_diffusion_model(
     model, val_data_loader, num_train_timesteps, num_inference_timesteps,
@@ -317,6 +358,17 @@ if __name__ == "__main__":
 
     print("Input shape:", inputs.shape, "Output shape:", output.shape)
     
-    plot_packings_noised_denoised(inputs, noised, output, sample_idx=0)
+    # Save the output tensor as .pt file into the folder /Users/au596283/MLProjects/SpherePacking/output/generated_sets/
+    output_tensor = torch.tensor(output, dtype=torch.float32)
+    output_save_path = "output/generated_sets/diffusion_output.pt"
+    torch.save(output_tensor, output_save_path)
+    print(f"Generated output saved to {output_save_path}") 
 
+    # Plot the first 5 samples
+    for i in range(min(5, inputs.shape[0])):
+        plot_packings_noised_denoised(
+            inputs, noised, output, sample_idx=i
+        )
+
+        
     #animate_sample(inputs, output, sample_idx=0)
