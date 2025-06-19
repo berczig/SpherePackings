@@ -192,33 +192,65 @@ def train_diffusion_model(
             
     return model, loss_history
 
-def sample_diffusion_model(model, data_loader, num_train_timesteps, num_inference_timesteps, beta_start, beta_end, clip_sample, clip_sample_range, device):
-    scheduler = DDPMScheduler(num_train_timesteps=num_train_timesteps, beta_start=beta_start, beta_end=beta_end, clip_sample=clip_sample, clip_sample_range=clip_sample_range)
+def sample_diffusion_model(
+    model,
+    data_loader,
+    num_train_timesteps,
+    num_inference_timesteps,
+    beta_start,
+    beta_end,
+    clip_sample,
+    clip_sample_range,
+    device,
+    num_new_from_one
+):
+    scheduler = DDPMScheduler(
+        num_train_timesteps=num_train_timesteps,
+        beta_start=beta_start,
+        beta_end=beta_end,
+        clip_sample=clip_sample,
+        clip_sample_range=clip_sample_range
+    )
     scheduler.set_timesteps(num_inference_timesteps)
     model.eval()
+
     inputs_batch = []
     noised_batch = []
     samples_batch = []
+
     with torch.no_grad():
         for packings in data_loader:
-            packings = packings.to(device)
-            # Add noise to the input packings
-            noised = scheduler.add_noise(packings, torch.randn_like(packings), torch.randint(0, num_train_timesteps, (packings.shape[0],), device=device).long())
-            inputs_batch.append(np.array(packings.cpu()))
-            noised_batch.append(np.array(noised.cpu()))
-            samples = noised.clone()
-            samples_history = [np.array(samples.cpu())]
-            for t in scheduler.timesteps:
-                predicted_noise = model(samples)
-                samples = scheduler.step(predicted_noise, t, samples).prev_sample
-                samples_history.append(np.array(samples.cpu()))
-            samples_history = np.transpose(np.array(samples_history), (1,0,2,3))
-            samples_batch.append(samples_history)
+            packings = packings.to(device)  # Original input sample (B, d, N)
+
+            for _ in range(num_new_from_one):
+                # Add noise to the input packings
+                noise = torch.randn_like(packings)  # (B, d, N)
+                timesteps = torch.randint(
+                    0, num_train_timesteps, (packings.shape[0],), device=device
+                ).long()  # (B,)
+                noised = scheduler.add_noise(packings, noise, timesteps)
+
+                inputs_batch.append(np.array(packings.cpu()))
+                noised_batch.append(np.array(noised.cpu()))
+
+                # Run the diffusion process
+                samples = noised.clone()
+                samples_history = [np.array(samples.cpu())]
+                for t in scheduler.timesteps:
+                    predicted_noise = model(samples)
+                    samples = scheduler.step(predicted_noise, t, samples).prev_sample
+                    samples_history.append(np.array(samples.cpu()))
+
+                # Collect the full denoising trajectory
+                samples_history = np.transpose(np.array(samples_history), (1, 0, 2, 3))
+                samples_batch.append(samples_history)
+
     return (
-        np.concatenate(inputs_batch, 0),    # original input
-        np.concatenate(noised_batch, 0),    # initial noised
-        np.concatenate(samples_batch, 0)    # full denoising trajectory
+        np.concatenate(inputs_batch, 0),    # Original inputs
+        np.concatenate(noised_batch, 0),   # Noised inputs
+        np.concatenate(samples_batch, 0)   # Full denoising trajectories
     )
+
 import matplotlib.animation as animation
 
 def animate_sample(input, output, sample_idx=0):
@@ -273,6 +305,7 @@ if __name__ == "__main__":
     d = int(section["dimension"])
     num_train_timesteps = int(section["num_train_timesteps"])
     num_inference_timesteps = int(section["num_inference_timesteps"])
+    num_new_from_one = int(section.get("num_new_from_one", 1))  # Default to 1 if not specified
     beta_start = float(section["beta_start"])
     beta_end = float(section["beta_end"])
     clip_sample = section.getboolean("clip_sample")
@@ -282,6 +315,7 @@ if __name__ == "__main__":
     sphere_radius = float(section["sphere_radius"])
     dataset_path = section["dataset_path"]
     model_type = section.get("model_type", "pointnet").lower()
+    output_save_path = section["output_save_path"]
 
     # SetTransformer-specific parameters (with defaults)
     st_dim_hidden = int(section.get("st_dim_hidden", 128))
@@ -294,7 +328,7 @@ if __name__ == "__main__":
 
     dataset = SpherePackingDataset(dataset_path)
     total_size = len(dataset)
-    train_size = int(0.95 * total_size)
+    train_size = int(0.9 * total_size)
     val_size = total_size - train_size
 
     train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
@@ -324,9 +358,12 @@ if __name__ == "__main__":
         model, train_data_loader, num_epochs, learning_rate, num_train_timesteps, sphere_radius,
         beta_start, beta_end, clip_sample, clip_sample_range, device
     )
-    # Save the trained model under the name "diffusion_SetTransformer.pth" or "diffusion_PointNet.pth" in the folder 
-    # /Users/au596283/MLProjects/SpherePacking/output/saved_models/
-    model_name = f"diffusion_{model_type}.pth"
+    
+
+    from datetime import datetime
+    s_now = datetime.now().strftime("%Y%m%d_%H%M%S")
+    # Save the model
+    model_name = f"diffusion_model_{model_type}_{s_now}.pth"
     model_save_path = f"output/saved_models/{model_name}"
     torch.save(model.state_dict(), model_save_path)
     print(f"Model saved to {model_save_path}")
@@ -353,14 +390,14 @@ if __name__ == "__main__":
 
     inputs, noised, output = sample_diffusion_model(
     model, val_data_loader, num_train_timesteps, num_inference_timesteps,
-    beta_start, beta_end, clip_sample, clip_sample_range, device
+    beta_start, beta_end, clip_sample, clip_sample_range, device, num_new_from_one
     )
 
     print("Input shape:", inputs.shape, "Output shape:", output.shape)
     
-    # Save the output tensor as .pt file into the folder /Users/au596283/MLProjects/SpherePacking/output/generated_sets/
     output_tensor = torch.tensor(output, dtype=torch.float32)
-    output_save_path = "output/generated_sets/diffusion_output.pt"
+    # Save the output tensor to the given output_save_path directory, by adding the date and time to the filename
+    output_save_path = f"{output_save_path}/diffusion_output_{s_now}.pt"
     torch.save(output_tensor, output_save_path)
     print(f"Generated output saved to {output_save_path}") 
 
