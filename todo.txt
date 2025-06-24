@@ -31,3 +31,9 @@ new training input data
 3 - A diffusion model with can take a varying number of points as input. Train on data on inference on optimal_number+1 spheres,
     that is add one sphere extra.
 4 - Test other models (VAR, GNN, Unet in POintnet) 
+
+24 June 
+
+1 - Analyzing the boundaries of the pushing algorithm (can it get rid of overlappings for 200 spheres?) 
+Is there a better algorithm for pushing: Gensane’s perturbed-billiard algorithm?
+
