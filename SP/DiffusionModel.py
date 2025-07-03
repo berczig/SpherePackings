@@ -352,7 +352,8 @@ if __name__ == "__main__":
     total_params = sum(p.numel() for p in model.parameters())
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(f"SetTransformer: total params = {total_params:,}, trainable = {trainable_params:,}")
-
+    # Print the shape of the train dataset
+    print(f"Train dataset shape: {train_dataset.dataset.data.shape}")
     print("Training the diffusion model...")
     model, loss_history = train_diffusion_model(
         model, train_data_loader, num_epochs, learning_rate, num_train_timesteps, sphere_radius,
