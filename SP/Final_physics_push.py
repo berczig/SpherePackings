@@ -95,7 +95,7 @@ if __name__ == "__main__":
         mn = float(pdist.min())
         av = float(pdist.mean())
         # Log to metrics file
-        metrics_file = os.path.join(output_dir, "metrics.txt")
+        metrics_file = os.path.join(output_dir, f"metrics_physics_push_{s_now}.txt")
         if sim == 0:
             with open(metrics_file, 'w') as mf:
                 mf.write("sim,min_dist,avg_dist,overlap_amount\n")
