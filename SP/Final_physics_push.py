@@ -37,7 +37,7 @@ if __name__ == "__main__":
     output_save_path = os.path.join(output_dir, f"physics_push_{s_now}")
     os.makedirs(output_dir, exist_ok=True)
     print(f"Output will be saved to {output_save_path}")
-    os.makedirs(output_save_path, exist_ok=True)
+    #os.makedirs(output_save_path, exist_ok=True)
 
     # Prepare simulation counter and load dataset
     if os.path.isfile(dataset_load_path):
