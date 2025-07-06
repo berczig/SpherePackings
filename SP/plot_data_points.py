@@ -41,7 +41,7 @@ def compute_metrics2(tensor_data):
         mindists.append(mindist)
     return mindists, []
 
-def plot(Arrays, labels, n_bins=100, title="Min dist", xlabel="Min dist", ylabel="Frequency"):
+def plot(Arrays, labels, n_bins=300, title="Min dist", xlabel="Min dist", ylabel="Frequency"):
     max_val = -np.inf
     min_val = np.inf
     for values in Arrays:
@@ -80,8 +80,23 @@ def plot(Arrays, labels, n_bins=100, title="Min dist", xlabel="Min dist", ylabel
     plt.ylabel(ylabel)
     plt.show()
 
+def plot_files_combined(files, labels):
+    min_distances = []
+    for file in files:
+        dataset = load_dataset(file)
+        min_dist, avg = compute_metrics(dataset)
+        min_distances.append(min_dist)
+    plot(Arrays=min_distances, labels=labels)
+
 if __name__ == "__main__":
-    f1 = "output/push_simulation_PESC/2025-07-03/dataset_combined_sym.pt"
+    #plot_files_combined(["output/generated_sets/generated_20250706_120635.pt"], ["After Diff"])
+    plot_files_combined([
+        "output/push_simulation_PESC/2025-07-03/dataset_combined_sym.pt",
+        "output/generated_sets/generated_20250704_053415.pt",
+        "output/fixed_gen_sets/physics_push_2025-07-06_140100.pt"
+    ], ["Input data", "After Diff.", "Final push"]) 
+
+    """f1 = "output/push_simulation_PESC/2025-07-03/dataset_combined_sym.pt"
     d1 = load_dataset(f1)
     f1_min, f1_avg = compute_metrics(d1)
 
@@ -90,18 +105,11 @@ if __name__ == "__main__":
     f2_min, f2_avg = compute_metrics(d2)
     print("f2_min: ", min(f2_min))
 
-    f3 = "output/fixed_gen_sets/physics_push_2025-07-05_225745.pt"
+    f3 = "output/fixed_gen_sets/physics_push_2025-07-06_104040.pt"
     d3 = load_dataset(f3)
     f3_min, f3_avg = compute_metrics(d3)
 
-    f4 = "output/fixed_gen_sets/physics_push_2025-07-04_134725.pt"
-    d4 = load_dataset(f4)
-    f4_min, f4_avg = compute_metrics(d4)
-
-    diff = d3-d4
-    for i,k in enumerate(diff):
-        print(i, k)
 
     plot(Arrays=[f1_min, f2_min, f3_min], labels=("Input data", "After Diff.", "Final push"))
-    #plot(Arrays=[f1_min], labels=("Input data"))
+    #plot(Arrays=[f1_min], labels=("Input data"))"""
     
