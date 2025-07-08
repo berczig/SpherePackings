@@ -25,76 +25,79 @@ def compute_metrics(tensor_data):
         #overlap_amt = best_known_diameter - mn
         min_dists.append(mn)
         avg_dists.append(av)
-    return np.array(min_dists), avg_dists
+    return {"min_dists":np.array(min_dists), 
+                   "avg_dists":avg_dists}
 
-def compute_metrics2(tensor_data):
-    mindists = []
-    for index in range(len(tensor_data)):
-        print(f"{index+1}/{len(tensor_data)}")
-        mindist = 99999
-        P = tensor_data[index].T
-        for i in range(len(P)):
-            for j in range(i+1, len(P)):
-                dist = np.linalg.norm(P[i]-P[j])
-                if dist < mindist:
-                    mindist = dist
-        mindists.append(mindist)
-    return mindists, []
-
-def plot(Arrays, labels, n_bins=300, title="Min dist", xlabel="Min dist", ylabel="Frequency"):
+def plot(Arrays, labels, n_bins=100, title="Min dist", xlabel="Min dist", ylabel="Frequency", plotmode="overlay", n_xticks=15):
     max_val = -np.inf
     min_val = np.inf
     for values in Arrays:
         max_val = max(max_val, max(values))
         min_val = min(min_val, min(values))
+    max_val = max_val*1.1
+    min_val = min_val*0.9
 
     bin_edges = np.linspace(min_val, max_val, n_bins+1)
     bin_widths = np.diff(bin_edges)
     bar_x_positions = (bin_edges[:-1] + bin_edges[1:]) / 2
     
     # Plot bars
-    max_freq = 0
-    datas = []
-    weights = []
-    labels_samples = []
-    for index, values in enumerate(Arrays):
-        datas.append(values)
-        w = np.empty(len(values))
-        w.fill(1/len(w))
-        weights.append(w)
-        labels_samples.append("{}[{} samples]".format(labels[index], len(values)))
-        #hist_data = np.histogram(values, bins=bin_edges)[0]/len(values)
-        #max_freq = max(max_freq, max(hist_data))
-        #color = mpl.colors.hsv_to_rgb((index/len(Arrays), 1, 1))
-        #plt.hist()
-        #plt.bar(bar_x_positions, hist_data, width=bin_widths, edgecolor='black', alpha=0.4, label=labels[index], 
-                #color=color, histtype="step")
-    plt.hist(datas, bin_edges, weights=weights, label=labels_samples)
+    if plotmode == "overlay":
+        max_freq = 0
+        for index, values in enumerate(Arrays):
+            hist_data = np.histogram(values, bins=bin_edges)[0]/len(values)
+            color = mpl.colors.hsv_to_rgb((index/len(Arrays), 1, 1))
+            max_freq = max(max_freq, max(hist_data))
+            label = "{}[{} samples]".format(labels[index], len(values))
+            plt.bar(bar_x_positions, hist_data, width=bin_widths, edgecolor='black', alpha=0.4, label=label, color=color)
+        plt.ylim(0, max_freq)
+    else:
+        datas = []
+        weights = []
+        labels_samples = []
+        for index, values in enumerate(Arrays):
+            datas.append(values)
+            w = np.empty(len(values))
+            w.fill(1/len(w))
+            weights.append(w)
+            labels_samples.append("{}[{} samples]".format(labels[index], len(values)))
+        plt.hist(datas, bin_edges, weights=weights, label=labels_samples)
 
     plt.legend(loc='upper right')
-    plt.xticks(np.arange(min_val, max_val, (max_val-min_val)/(n_bins/10)))
-    #plt.ylim(0, max_freq)
-    #plt.xlim(min_val, max_val)
+    plt.xticks(np.arange(min_val, max_val, (max_val-min_val)/n_xticks))
     plt.title(title)
+    plt.xlim(min_val, max_val)
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     plt.show()
 
-def plot_files_combined(files, labels):
+def plot_files_combined(files, labels, **kwargs):
     min_distances = []
+    avg_distances = []
     for file in files:
         dataset = load_dataset(file)
-        min_dist, avg = compute_metrics(dataset)
-        min_distances.append(min_dist)
-    plot(Arrays=min_distances, labels=labels)
+        metr = compute_metrics(dataset)
+        min_distances.append(metr["min_dists"])
+        avg_distances.append(metr["avg_dists"])
+    plot(Arrays=min_distances, labels=labels, **kwargs)
+    plot(Arrays=avg_distances, labels=labels, title="Average Dist",xlabel="Average Dist",**kwargs)
 
 if __name__ == "__main__":
-    #plot_files_combined(["output/generated_sets/generated_20250706_120635.pt"], ["After Diff"])
+    plot_files_combined([
+        "output/push_simulation_PESC/2025-07-07/dataset_combined_96k.pt",
+        "output/generated_sets/generated_20250706_120635.pt",
+        "output/generated_sets/generated_20250707_111228.pt",
+        "output/generated_sets/generated_20250708_105703.pt",
+        "output/fixed_gen_sets/physics_push_2025-07-06_140100.pt"
+    ], ["Input data", "After Diff(Pointnet)", "After Diff 2(Transformer)", "After Diff 3(Transformer)", "Pointnet pushed"], n_bins=300, plotmode="overlay") 
+
     plot_files_combined([
         "output/push_simulation_PESC/2025-07-03/dataset_combined_sym.pt",
         "output/generated_sets/generated_20250704_053415.pt",
+        "output/generated_sets/generated_20250706_120635.pt",
         "output/fixed_gen_sets/physics_push_2025-07-06_140100.pt"
-    ], ["Input data", "After Diff.", "Final push"]) 
+    ], ["Input data", "After Diff.", "After Diff. Large", "Final push"], n_bins=300) 
+    
 
     """f1 = "output/push_simulation_PESC/2025-07-03/dataset_combined_sym.pt"
     d1 = load_dataset(f1)

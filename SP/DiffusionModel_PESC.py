@@ -7,6 +7,8 @@ from diffusers import DDPMScheduler
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 import configparser
+from SP import data_load_save
+from datetime import datetime
 
 # --- PointNet++ Components ---
 class PointNetSetAbstraction(nn.Module):
@@ -94,11 +96,44 @@ def distance_penalty(output, radius):
     num_pairs = B * N * (N - 1) / 2
     return (violation**2).sum() / (num_pairs**2)
 
+# --- Save Model with Loss plot ---
+def save_with_plot(model, optimizer, loss_history, current_epoch, model_parameters, save_dir):
+    # Save the trained model
+    s_now = datetime.now().strftime("%Y%m%d_%H%M%S")
+    model_name = f"diffusion_model_loss={loss_history[-1]:.4f}_{s_now}.pth"
+    # `save_model_path` in config should be the **directory** where to save
+    os.makedirs(save_dir, exist_ok=True)
+    model_save_path = os.path.join(save_dir, model_name)
+    #torch.save(model.state_dict(), model_save_path)
+    data_load_save.save_model(model_save_path, model, optimizer, current_epoch, model_parameters)
+    print(f"Model saved to {model_save_path}")
+
+    # 2) Epoch-average loss
+    #batches_per_epoch = len(train_loader)
+    plt.plot(
+        range(len(loss_history)),
+        loss_history, color="red", marker="o", label="Epoch avg"
+    )
+    """plt.plot(
+        np.arange(batches_per_epoch/2, batches_per_epoch*int(sec["num_epochs"]), batches_per_epoch),
+        epoch_avgs, color="red", marker="o", label="Epoch avg"
+    )"""
+
+    plt.xlabel("Batch index")
+    plt.ylabel("Loss")
+    plt.title("Training Loss")
+    plt.legend()
+    plt.yscale("log")        # optional: log scale often helps
+    #plt.show()
+    plt.rcParams["figure.figsize"] = (12,6)
+    plot_filename = f"diffusion_model_loss={loss_history[-1]:.4f}_{s_now}_loss.png"
+    plt.savefig(os.path.join(save_dir, plot_filename))
+
 # --- Training routine ---
 def train_diffusion_model(
-    model, train_data_loader, num_epochs, learning_rate,
+    model, optimizer, train_data_loader, num_epochs, learning_rate,
     num_train_timesteps, sphere_radius,
-    beta_start, beta_end, clip_sample, clip_sample_range, device
+    beta_start, beta_end, clip_sample, clip_sample_range, device, model_parameters, save_model_path
 ):
     scheduler = DDPMScheduler(
         num_train_timesteps=num_train_timesteps,
@@ -107,11 +142,12 @@ def train_diffusion_model(
         clip_sample=clip_sample,
         clip_sample_range=clip_sample_range
     )
-    optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
     criterion = nn.MSELoss()
     model.train().to(device)
     loss_history = []
+    best_loss = checkpoint.get("loss", np.inf)
     for epoch in tqdm(range(num_epochs), desc="Training"):
+        epoch_losses = []
         for batch in train_data_loader:
             batch = batch.to(device)
             noise = torch.randn_like(batch)
@@ -128,13 +164,20 @@ def train_diffusion_model(
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            loss_history.append(loss.item())
-        print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.4f}")
+            epoch_losses.append(loss.item())
+            #print("current loss: ", loss.item())
+        loss_avg = np.mean(epoch_losses)
+        loss_history.append(loss_avg)
+        print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {loss_avg:.4f}")
+
+        if loss_avg < best_loss:
+            best_loss = loss_avg
+            save_with_plot(model, optimizer, loss_history, epoch, model_parameters, sec["save_model_path"])
     return model, loss_history
 
 # --- Revised sampling from Gaussian prior ---
 def sample_diffusion_model(
-    model, num_samples, num_points,
+    model, num_samples:int, num_samples_batch_size:int, num_points,
     num_train_timesteps, num_inference_timesteps,
     beta_start, beta_end,
     clip_sample, clip_sample_range,
@@ -150,13 +193,24 @@ def sample_diffusion_model(
     )
     scheduler.set_timesteps(num_inference_timesteps)
     model.eval()
-    x = torch.randn(num_samples, d, num_points, device=device)
-    with torch.no_grad():
-        for t in scheduler.timesteps:
-            eps = model(x)
-            x = scheduler.step(eps, t, x).prev_sample
-            x= x.clamp(sphere_radius, clip_sample_range-sphere_radius)
-    return x.cpu().numpy()
+    print(f"sample on device {device}")
+
+    
+    batches = np.empty(int(np.ceil(num_samples/num_samples_batch_size)))
+    batches.fill(int(num_samples_batch_size))
+    if num_samples%num_samples_batch_size != 0:
+        batches[-1] = num_samples%num_samples_batch_size
+
+    samples_batched = []
+    for batch_size in tqdm(batches.astype(int), desc="Sampling"):
+        x = torch.randn(batch_size, d, num_points, device=device)
+        with torch.no_grad():
+            for t in scheduler.timesteps:
+                eps = model(x)
+                x = scheduler.step(eps, t, x).prev_sample
+                x= x.clamp(sphere_radius, clip_sample_range-sphere_radius)
+        samples_batched.append(x.cpu().numpy())
+    return np.concatenate(samples_batched)
 
 # --- Dataset Definition ---
 class SpherePackingDataset(Dataset):
@@ -171,31 +225,42 @@ class SpherePackingDataset(Dataset):
 # --- Main script ---
 if __name__ == "__main__":
     config = configparser.ConfigParser()
-    config.read("config.cfg")
+    config.read("config.cfg", encoding="utf-8")
     sec = config["diffusion_model"]
     # Read dimension from config
     d = int(sec["dimension"])
     batch_size = int(sec["batch_size"])
     dataset_path = sec["dataset_path"]
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print("using device: ", device)
 
     # Load data
     from SP.data_generation import SpherePackingDataset
     dataset = SpherePackingDataset(dataset_path)
     train_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
-    # Model init
-    if sec.get("model_type", "pointnet").lower() == "pointnet":
-        model = PointNetPlusPlus(d)
+    # Get Model
+    start_epoch = 0
+    if sec["load_model"]:
+        # Load Model
+        model_class = PointNetPlusPlus if sec.get("model_type", "pointnet").lower() == "pointnet" else SetTransformer
+        model, optimizer, checkpoint = data_load_save.load_model(sec["load_model_path"], model_class, torch.optim.AdamW, learning_rate=float(sec["learning_rate"]), device=device)
+        start_epoch = int(checkpoint["epoch"])
+        model_parameters = checkpoint["model_parameters"]
     else:
-        model = SetTransformer(
-            dim_in=d,
-            dim_hidden=int(sec.get("st_dim_hidden", 128)),
-            num_heads=int(sec.get("st_num_heads", 4)),
-            num_inds=int(sec.get("st_num_inds", 16)),
-            num_isab=int(sec.get("st_num_isab", 2)),
-            dim_out=d
-        )
+        # Model init
+        if sec.get("model_type", "pointnet").lower() == "pointnet":
+            model_parameters = {"d":d}
+            model = PointNetPlusPlus(**model_parameters)
+        else:
+            model_parameters = {"dim_in":d,
+                "dim_hidden":int(sec.get("st_dim_hidden", 128)),
+                "num_heads":int(sec.get("st_num_heads", 4)),
+                "num_inds":int(sec.get("st_num_inds", 16)),
+                "num_isab":int(sec.get("st_num_isab", 2)),
+                "dim_out":d}
+            model = SetTransformer(**model_parameters)
+        optimizer = torch.optim.AdamW(model.parameters(), lr=float(sec["learning_rate"]))
     # report parameter counts
     total_params = sum(p.numel() for p in model.parameters())
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -206,6 +271,7 @@ if __name__ == "__main__":
     # Train
     model, loss_history = train_diffusion_model(
         model,
+        optimizer,
         train_loader,
         int(sec["num_epochs"]),
         float(sec["learning_rate"]),
@@ -215,45 +281,22 @@ if __name__ == "__main__":
         float(sec["beta_end"]),
         sec.getboolean("clip_sample"),
         float(sec["clip_sample_range"]),
-        device
+        device,
+        model_parameters,
+        sec["save_model_path"]
     )
 
-    # Save the trained model
-    from datetime import datetime
-    s_now = datetime.now().strftime("%Y%m%d_%H%M%S")
-    model_name = f"diffusion_model_{s_now}.pth"
-    # `save_model_path` in config should be the **directory** where to save
-    save_dir = sec["save_model_path"]
-    os.makedirs(save_dir, exist_ok=True)
-    model_save_path = os.path.join(save_dir, model_name)
-    torch.save(model.state_dict(), model_save_path)
-    print(f"Model saved to {model_save_path}")
-
-    # 2) Epoch-average loss
-    batches_per_epoch = len(train_loader)
-    epoch_avgs = [
-        np.mean(loss_history[i*batches_per_epoch:(i+1)*batches_per_epoch])
-        for i in range(int(sec["num_epochs"]))
-    ]
-    plt.plot(
-        np.arange(batches_per_epoch/2, batches_per_epoch*int(sec["num_epochs"]), batches_per_epoch),
-        epoch_avgs, color="red", marker="o", label="Epoch avg"
-    )
-
-    plt.xlabel("Batch index")
-    plt.ylabel("Loss")
-    plt.title("Training Loss")
-    plt.legend()
-    plt.yscale("log")        # optional: log scale often helps
-    plt.show()
+    save_with_plot(model, optimizer, loss_history, start_epoch+int(sec["num_epochs"]), model_parameters, sec["save_model_path"])
 
     # Sample new packings
-    num_generate = int(sec.get("num_generate", 10))
+    sample_new_points = int(sec.get("sample_new_points", 10))
+    sample_new_points_batch_size = int(sec.get("sample_new_points_batch_size", 10))
     num_points = int(sec["num_spheres"])
-    print(f"Starting diffusion-based generation of {num_generate} samples...")
+    print(f"Starting diffusion-based generation of {sample_new_points} samples...")
     samples = sample_diffusion_model(
         model,
-        num_generate,
+        sample_new_points,
+        sample_new_points_batch_size,
         num_points,
         int(sec["num_train_timesteps"]),
         int(sec["num_inference_timesteps"]),
@@ -266,10 +309,8 @@ if __name__ == "__main__":
         d
     )
 
-    # Save outputs
-
     s_now = datetime.now().strftime("%Y%m%d_%H%M%S")
-    print(f"Generated {num_generate} samples, saving to {sec['save_generated_path']}")
+    print(f"Generated {sample_new_points} samples, saving to {sec['save_generated_path']}")
     output_save_path = os.path.join(sec["save_generated_path"], f"generated_{s_now}.pt")
     os.makedirs(os.path.dirname(output_save_path), exist_ok=True)
     torch.save(torch.from_numpy(samples), output_save_path)

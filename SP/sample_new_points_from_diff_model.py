@@ -3,6 +3,7 @@ from SP.DiffusionModel_PESC import sample_diffusion_model, SetTransformer, Point
 import torch
 import os
 from datetime import datetime
+from SP import data_load_save
 
 def load_model(sec, filepath):
     d = int(sec["dimension"])
@@ -20,8 +21,9 @@ def load_model(sec, filepath):
             num_isab=int(sec.get("st_num_isab", 2)),
             dim_out=d
         )
-
-    model.load_state_dict(torch.load(filepath))
+    state_dict = torch.load(filepath)
+    print(f"state: {state_dict.keys()}")
+    model.load_state_dict(state_dict)
     return model
 
 if __name__ == "__main__":
@@ -31,7 +33,13 @@ if __name__ == "__main__":
     print(f"device: {device}")
 
     # load model
-    model = load_model(sec, sec2["load_model_path"])
+    #model = load_model(sec, sec2["load_model_path"])
+    model_class = PointNetPlusPlus if sec.get("model_type", "pointnet").lower() == "pointnet" else SetTransformer
+    model, optimizer, file = data_load_save.load_model(
+        sec2["load_model_path"], 
+        model_class,
+        torch.optim.AdamW,
+        learning_rate=float(sec["learning_rate"]), device=device)
     model.to(device)
 
     # Sample new packings

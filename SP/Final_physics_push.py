@@ -34,7 +34,7 @@ if __name__ == "__main__":
     s_now = datetime.now().strftime("%Y-%m-%d_%H%M%S")
     print(f"Running physics_push on dataset {dataset_load_path} with {simulations} simulations.")
     output_dir = cfg.get(sec, "output_filename_path")
-    output_save_path = os.path.join(output_dir, f"physics_push_{s_now}")
+    output_save_path = os.path.join(output_dir, f"physics_push_{s_now}.pt")
     os.makedirs(output_dir, exist_ok=True)
     print(f"Output will be saved to {output_save_path}")
     #os.makedirs(output_save_path, exist_ok=True)
@@ -63,7 +63,7 @@ if __name__ == "__main__":
     best_ratio_value = 0.0
 
     s_now = datetime.now().strftime("%Y-%m-%d_%H%M%S")
-
+    output_dataset = []
     for sim in range(simulations):
         print(f"Simulation: {sim+1}/{simulations}")
 
@@ -110,12 +110,12 @@ if __name__ == "__main__":
 
         # Save valid packings: criterion on final min distance
         print(f"Final min_dist={mn:.4f}")
-        if mn >= 2*radius:
-            new_tensor = torch.tensor(final_centers.T, dtype=torch.float32).unsqueeze(0)
-            initial_dataset = torch.cat((initial_dataset, new_tensor), dim=0)
+        output_dataset.append(final_centers.T)
+        # new_tensor = torch.tensor(final_centers.T, dtype=torch.float32).unsqueeze(0)
 
     # Save updated dataset
-    torch.save(initial_dataset, output_save_path)
+    output_dataset = np.array(output_dataset)
+    torch.save(output_dataset, output_save_path)
     print(f"Saved physics-pushed dataset to {output_save_path}")
 
     
