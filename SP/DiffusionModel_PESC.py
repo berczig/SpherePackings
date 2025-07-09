@@ -82,52 +82,51 @@ class SetTransformer(nn.Module):
         ])
         self.fc_out = nn.Linear(dim_hidden, dim_out or dim_in)
     def forward(self, X):
-        X = X.permute(0, 2, 1)  # (B, N, d)
+        X = X.permute(0, 2, 1)
         for isab in self.isabs:
             X = isab(X)
-        X = self.fc_out(X)      # (B, N, d_out)
-        return X.permute(0, 2, 1)  # (B, d_out, N)
+        X = self.fc_out(X)
+        return X.permute(0, 2, 1)
 
 # --- Distance penalty ---
 def distance_penalty(output: torch.Tensor, radius):
     B, d, N = output.shape
-    coords = output.permute(0, 2, 1)  # (B, N, d)
-    distances = torch.cdist(coords, coords)  # (B, N, N)
-    violation = torch.relu(2 * radius - distances)  # (B, N, N)
-    upper_triangle_mask = torch.triu(
-        torch.ones(B, N, N, dtype=torch.bool, device=distances.device),
-        diagonal=1
-    )
-    violation_masked = violation * upper_triangle_mask
+    coords = output.permute(0, 2, 1)
+    distances = torch.cdist(coords, coords)
+    violation = torch.relu(2 * radius - distances)
+    mask = torch.triu(torch.ones(B, N, N, device=distances.device, dtype=torch.bool), diagonal=1)
+    violation = violation * mask
     num_pairs = N * (N - 1) / 2
-    return (violation_masked**2).sum() / (num_pairs * B)
+    return (violation**2).sum() / (num_pairs * B)
+
+# --- Reflection projection ---
+def reflect(x: torch.Tensor, bmin: torch.Tensor, bmax: torch.Tensor) -> torch.Tensor:
+    x = torch.where(x < bmin, 2*bmin - x, x)
+    x = torch.where(x > bmax, 2*bmax - x, x)
+    return x
 
 # --- Save Model with Loss plot ---
 def save_with_plot(model, optimizer, loss_history, current_epoch, model_parameters, sec):
     save_dir = sec["save_model_path"]
     current_loss = loss_history[-1][2]
     s_now = datetime.now().strftime("%Y%m%d_%H%M%S")
-    model_name = f"diffusion_model_loss={current_loss:.4f}_{s_now}.pth"
     os.makedirs(save_dir, exist_ok=True)
-    model_save_path = os.path.join(save_dir, model_name)
-    data_load_save.save_model(model_save_path, model, optimizer, current_epoch, model_parameters)
-    print(f"Model saved to {model_save_path}")
+    model_name = f"diffusion_model_loss={current_loss:.4f}_{s_now}.pth"
+    path = os.path.join(save_dir, model_name)
+    data_load_save.save_model(path, model, optimizer, current_epoch, model_parameters)
+    print(f"Model saved to {path}")
 
-    plt.plot(range(len(loss_history)), loss_history[:, 0], marker="o", label=f"MSE Loss [{sec['mse_strength']}] ")
-    plt.plot(range(len(loss_history)), loss_history[:, 1], marker="o", label=f"Distance Loss [{sec['distance_penality_strength']}] ")
-    plt.plot(range(len(loss_history)), loss_history[:, 2], marker="o", label="Total Loss")
-    plt.xlabel("Epoch")
-    plt.ylabel("Loss")
-    plt.title("Training Loss")
-    plt.legend(loc='best')
-    plt.yscale("log")
-    plt.rcParams["figure.figsize"] = (12,6)
-    plot_filename = f"diffusion_model_loss={current_loss:.6f}_{s_now}_loss.png"
-    plt.savefig(os.path.join(save_dir, plot_filename))
+    plt.plot(range(len(loss_history)), loss_history[:, 0], marker='o', label=f"MSE [{sec['mse_strength']}] ")
+    plt.plot(range(len(loss_history)), loss_history[:, 1], marker='o', label=f"Distance [{sec['distance_penality_strength']}] ")
+    plt.plot(range(len(loss_history)), loss_history[:, 2], marker='o', label="Total")
+    plt.xlabel("Epoch"); plt.ylabel("Loss"); plt.title("Training Loss"); plt.legend(); plt.yscale("log")
+    plt.rcParams['figure.figsize'] = (12, 6)
+    fname = f"diffusion_loss={current_loss:.6f}_{s_now}.png"
+    plt.savefig(os.path.join(save_dir, fname))
 
 # --- Training routine ---
 def train_diffusion_model(
-    model, optimizer, train_data_loader, num_epochs,
+    model, optimizer, loader, num_epochs,
     num_train_timesteps, sphere_radius, mse_strength,
     distance_penality_strength, beta_start, beta_end,
     clip_sample, clip_sample_range, device,
@@ -135,209 +134,151 @@ def train_diffusion_model(
 ):
     scheduler = DDPMScheduler(
         num_train_timesteps=num_train_timesteps,
-        beta_start=beta_start,
-        beta_end=beta_end,
-        clip_sample=clip_sample,
-        clip_sample_range=clip_sample_range
+        beta_start=beta_start, beta_end=beta_end,
+        clip_sample=clip_sample, clip_sample_range=clip_sample_range
     )
     criterion = nn.MSELoss()
     model.train().to(device)
-    loss_history = []
-    best_loss = np.inf
 
-    # Precompute box constants as tensors
+    # box bounds as tensors
     bmin_t = torch.tensor(sphere_radius, device=device)
     bmax_t = torch.tensor(clip_sample_range - sphere_radius, device=device)
-    center = (bmin_t + bmax_t) * 0.5
-    half   = (bmax_t - bmin_t) * 0.5
 
-    for epoch in tqdm(range(num_epochs), desc="Training"):  # show each epoch
+    best_loss = np.inf
+    loss_history = []
+
+    for epoch in tqdm(range(num_epochs), desc="Training"):
         epoch_losses = []
         epoch_ratio = epoch / num_epochs
-        for batch in train_data_loader:
+        for batch in loader:
             batch = batch.to(device)
             noise = torch.randn_like(batch)
-            timesteps = torch.randint(0, num_train_timesteps, (batch.shape[0],), device=device)
-            noisy = scheduler.add_noise(batch, noise, timesteps)
+            t = torch.randint(0, num_train_timesteps, (batch.size(0),), device=device)
+            noisy = scheduler.add_noise(batch, noise, t)
 
-            predicted_noise = model(noisy)
-            mse_loss = criterion(predicted_noise, noise)
+            eps_pred = model(noisy)
+            mse = criterion(eps_pred, noise)
 
-            # Raw x0 prediction
-            a_bar = scheduler.alphas_cumprod[timesteps].view(-1,1,1).to(device)
-            raw_x0 = (noisy - torch.sqrt(1 - a_bar) * predicted_noise) / torch.sqrt(a_bar)
-            # Smooth box projection
-            x0_pred = center + half * torch.tanh((raw_x0 - center) / half)
+            a_bar = scheduler.alphas_cumprod[t].view(-1,1,1).to(device)
+            raw_x0 = (noisy - torch.sqrt(1 - a_bar) * eps_pred) / torch.sqrt(a_bar)
+            x0_pred = reflect(raw_x0, bmin_t, bmax_t)
 
-            penalty_loss = distance_penalty(x0_pred, sphere_radius)
-            loss = (mse_strength * mse_loss
-                    + distance_penality_strength * epoch_ratio * penalty_loss)
+            pen = distance_penalty(x0_pred, sphere_radius)
+            loss = mse_strength*mse + distance_penality_strength*epoch_ratio*pen
 
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+            optimizer.zero_grad(); loss.backward(); optimizer.step()
+            epoch_losses.append([mse.item(), pen.item(), loss.item()])
 
-            epoch_losses.append([
-                mse_loss.item(), penalty_loss.item(), loss.item()
-            ])
+        avg = np.mean(epoch_losses, axis=0)
+        loss_history.append(avg)
+        print(f"Epoch {epoch+1}/{num_epochs}: MSE={avg[0]:.6f}, Pen={avg[1]:.6f}, Tot={avg[2]:.6f}")
 
-        loss_avg = np.mean(epoch_losses, axis=0)
-        loss_history.append(loss_avg)
-        print(f"Epoch [{epoch+1}/{num_epochs}], MSE={loss_avg[0]:.6f}, Penalty={loss_avg[1]:.6f}, Total={loss_avg[2]:.6f}")
-
-        if loss_avg[2] < best_loss:
-            best_loss = loss_avg[2]
+        if avg[2] < best_loss:
+            best_loss = avg[2]
             save_with_plot(model, optimizer, np.array(loss_history), epoch, model_parameters, {'save_model_path': save_model_path, 'mse_strength': mse_strength, 'distance_penality_strength': distance_penality_strength})
 
     return model, np.array(loss_history)
 
 # --- Sampling routine ---
 def sample_diffusion_model(
-    model, num_samples, num_samples_batch_size, num_points,
+    model, num_samples, batch_size, num_points,
     num_train_timesteps, num_inference_timesteps,
     beta_start, beta_end, clip_sample, clip_sample_range,
     sphere_radius, device, d
 ):
     scheduler = DDPMScheduler(
         num_train_timesteps=num_train_timesteps,
-        beta_start=beta_start,
-        beta_end=beta_end,
-        clip_sample=clip_sample,
-        clip_sample_range=clip_sample_range
+        beta_start=beta_start, beta_end=beta_end,
+        clip_sample=clip_sample, clip_sample_range=clip_sample_range
     )
     scheduler.set_timesteps(num_inference_timesteps)
     model.eval()
 
-    # Precompute box constants
     bmin_t = torch.tensor(sphere_radius, device=device)
     bmax_t = torch.tensor(clip_sample_range - sphere_radius, device=device)
-    center = (bmin_t + bmax_t) * 0.5
-    half   = (bmax_t - bmin_t) * 0.5
 
-    batches = np.full(int(np.ceil(num_samples / num_samples_batch_size)), num_samples_batch_size, dtype=int)
-    if num_samples % num_samples_batch_size != 0:
-        batches[-1] = num_samples % num_samples_batch_size
+    sizes = np.full(int(np.ceil(num_samples/batch_size)), batch_size, dtype=int)
+    if num_samples % batch_size != 0:
+        sizes[-1] = num_samples % batch_size
 
-    samples_batched = []
-    for batch_size in tqdm(batches, desc="Sampling"):
-        x = torch.randn(batch_size, d, num_points, device=device)
+    all_samples = []
+    for bs in tqdm(sizes, desc="Sampling"):
+        x = torch.randn(bs, d, num_points, device=device)
         with torch.no_grad():
             for t in scheduler.timesteps:
                 eps = model(x)
-                x = scheduler.step(eps, t, x).prev_sample
-                # Smooth box projection
-                x = center + half * torch.tanh((x - center) / half)
-        samples_batched.append(x.cpu().numpy())
+                out = scheduler.step(eps, t, x)
+                x = out.prev_sample
+                x = reflect(x, bmin_t, bmax_t)
+        all_samples.append(x.cpu().numpy())
 
-    return np.concatenate(samples_batched)
+    return np.concatenate(all_samples)
 
-# --- Dataset Definition ---
+# --- Dataset ---
 class SpherePackingDataset(Dataset):
     def __init__(self, path: str):
         self.data = torch.load(path)
-        print(f"Loaded dataset {path}, shape {self.data.shape}")
-    def __len__(self):
-        return len(self.data)
-    def __getitem__(self, idx: int):
-        return self.data[idx]
+        print(f"Loaded {path}, shape={self.data.shape}")
+    def __len__(self): return len(self.data)
+    def __getitem__(self, idx): return self.data[idx]
 
-# --- Main script ---
+# --- Main ---
 if __name__ == "__main__":
-    config = configparser.ConfigParser()
-    config.read("config.cfg", encoding="utf-8")
-    sec = config["diffusion_model"]
-    # Read dimension from config
+    cfg = configparser.ConfigParser()
+    cfg.read("config.cfg")
+    sec = cfg["diffusion_model"]
     d = int(sec["dimension"])
-    batch_size = int(sec["batch_size"])
-    dataset_path = sec["dataset_path"]
+    bs = int(sec["batch_size"])
+    path = sec["dataset_path"]
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print("using device:", device)
 
-    # Load data
-    dataset = SpherePackingDataset(dataset_path)
-    train_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+    dataset = SpherePackingDataset(path)
+    loader = DataLoader(dataset, batch_size=bs, shuffle=True)
 
-    # Initialize or load model
     if sec.getboolean("load_model"):
-        model_class = PointNetPlusPlus if sec.get("model_type","pointnet").lower() == "pointnet" else SetTransformer
-        model, optimizer, checkpoint = data_load_save.load_model(
-            sec["load_model_path"], model_class, torch.optim.AdamW,
-            learning_rate=float(sec["learning_rate"]),
-            device=device
-        )
-        start_epoch = int(checkpoint["epoch"])
-        model_parameters = checkpoint["model_parameters"]
+        cls = PointNetPlusPlus if sec.get("model_type","pointnet").lower()=="pointnet" else SetTransformer
+        model, opt, ckpt = data_load_save.load_model(
+            sec["load_model_path"], cls, torch.optim.AdamW,
+            learning_rate=float(sec["learning_rate"]), device=device)
+        start_epoch = int(ckpt["epoch"])
+        params = ckpt["model_parameters"]
     else:
-        if sec.get("model_type","pointnet").lower() == "pointnet":
-            model_parameters = {"d": d}
-            model = PointNetPlusPlus(**model_parameters)
+        if sec.get("model_type","pointnet").lower()=="pointnet":
+            params = {"d": d}
+            model = PointNetPlusPlus(**params)
         else:
-            model_parameters = {
-                "dim_in": d,
-                "dim_hidden": int(sec.get("st_dim_hidden", 128)),
-                "num_heads": int(sec.get("st_num_heads", 4)),
-                "num_inds": int(sec.get("st_num_inds", 16)),
-                "num_isab": int(sec.get("st_num_isab", 2)),
-                "dim_out": d
-            }
-            model = SetTransformer(**model_parameters)
-        optimizer = torch.optim.AdamW(model.parameters(), lr=float(sec["learning_rate"]))
+            params = {"dim_in":d, "dim_hidden":int(sec.get("st_dim_hidden",128)),
+                      "num_heads":int(sec.get("st_num_heads",4)), "num_inds":int(sec.get("st_num_inds",16)),
+                      "num_isab":int(sec.get("st_num_isab",2)), "dim_out":d}
+            model = SetTransformer(**params)
+        opt = torch.optim.AdamW(model.parameters(), lr=float(sec["learning_rate"]))
         start_epoch = 0
 
-    total_params = sum(p.numel() for p in model.parameters())
-    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print(f"Model params: total={total_params}, trainable={trainable_params}")
+    print(f"Params: total={sum(p.numel() for p in model.parameters())}, trainable={sum(p.numel() for p in model.parameters() if p.requires_grad)}")
 
-    # Train
-    model, loss_history = train_diffusion_model(
-        model,
-        optimizer,
-        train_loader,
-        num_epochs=int(sec["num_epochs"]),
-        num_train_timesteps=int(sec["num_train_timesteps"]),
-        sphere_radius=float(sec["sphere_radius"]),
-        mse_strength=float(sec["mse_strength"]),
-        distance_penality_strength=float(sec["distance_penality_strength"]),
-        beta_start=float(sec["beta_start"]),
-        beta_end=float(sec["beta_end"]),
-        clip_sample=sec.getboolean("clip_sample"),
-        clip_sample_range=float(sec["clip_sample_range"]),
-        device=device,
-        model_parameters=model_parameters,
-        save_model_path=sec["save_model_path"]
+    model, lh = train_diffusion_model(
+        model, opt, loader, int(sec["num_epochs"]),
+        int(sec["num_train_timesteps"]), float(sec["sphere_radius"]),
+        float(sec["mse_strength"]), float(sec["distance_penality_strength"]),
+        float(sec["beta_start"]), float(sec["beta_end"]),
+        sec.getboolean("clip_sample"), float(sec["clip_sample_range"]),
+        device, params, sec["save_model_path"]
     )
 
-    # Final save
-    save_with_plot(
-        model, optimizer, loss_history,
-        start_epoch + int(sec["num_epochs"]),
-        model_parameters, sec
-    )
+    save_with_plot(model, opt, lh, start_epoch+int(sec["num_epochs"]), params, sec)
 
-    # Sampling new points
-    num_new = int(sec.get("sample_new_points", 10))
-    batch_new = int(sec.get("sample_new_points_batch_size", 10))
-    num_points = int(sec["num_spheres"])
-    print(f"Generating {num_new} samples...")
-    samples = sample_diffusion_model(
-        model,
-        num_samples=num_new,
-        num_samples_batch_size=batch_new,
-        num_points=num_points,
-        num_train_timesteps=int(sec["num_train_timesteps"]),
-        num_inference_timesteps=int(sec["num_inference_timesteps"]),
-        beta_start=float(sec["beta_start"]),
-        beta_end=float(sec["beta_end"]),
-        clip_sample=sec.getboolean("clip_sample"),
-        clip_sample_range=float(sec["clip_sample_range"]),
-        sphere_radius=float(sec["sphere_radius"]),
-        device=device,
-        d=d
+    nnew = int(sec.get("sample_new_points",10))
+    bnew = int(sec.get("sample_new_points_batch_size",10))
+    npts = int(sec["num_spheres"])
+    print(f"Generating {nnew} samples...")
+    gen = sample_diffusion_model(
+        model, nnew, bnew, npts,
+        int(sec["num_train_timesteps"]), int(sec["num_inference_timesteps"]),
+        float(sec["beta_start"]), float(sec["beta_end"]),
+        sec.getboolean("clip_sample"), float(sec["clip_sample_range"]),
+        float(sec["sphere_radius"]), device, d
     )
-
-    s_now = datetime.now().strftime("%Y%m%d_%H%M%S")
-    out_dir = sec["save_generated_path"]
-    os.makedirs(out_dir, exist_ok=True)
-    output_path = os.path.join(out_dir, f"generated_{s_now}.pt")
-    torch.save(torch.from_numpy(samples), output_path)
-    print(f"Saved generated samples to {output_path}")
+    out = os.path.join(sec["save_generated_path"], f"generated_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pt")
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    torch.save(torch.from_numpy(gen), out)
+    print(f"Saved to {out}")
