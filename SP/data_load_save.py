@@ -67,7 +67,8 @@ def save_model(savepath, model, optimizer, epoch, model_parameters:dict, metadat
         "metadata":metadata
     }
     torch.save(checkpoint, savepath)
-    print(f"##### Save model \n {model} \n to {savepath} with optimizer {optimizer}\n at epoch={epoch} created with model parameters: {model_parameters}\#####")
+    #print(f"##### Save model \n {model} \n to {savepath} with optimizer {optimizer}\n at epoch={epoch} created with model parameters: {model_parameters}\#####")
+    print(f"##### Save model to {savepath} at epoch={epoch} created with model parameters: {model_parameters}\#####")
     print(f"Saved with additional metadata: {metadata}")
 
 def load_data(filepath, model_class):

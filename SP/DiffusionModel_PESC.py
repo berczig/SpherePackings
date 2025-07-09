@@ -9,6 +9,7 @@ from tqdm import tqdm
 import configparser
 from SP import data_load_save
 from datetime import datetime
+from plot_data_points import plot_3d
 
 # --- PointNet++ Components ---
 class PointNetSetAbstraction(nn.Module):
@@ -88,19 +89,26 @@ class SetTransformer(nn.Module):
         return X.permute(0, 2, 1)  # (B, d_out, N)
 
 # --- Distance penalty ---
-def distance_penalty(output, radius):
+def distance_penalty(output:np.array, radius):
     B, d, N = output.shape
-    coords = output.permute(0, 2, 1)
-    distances = torch.cdist(coords, coords)
-    violation = torch.relu(2 * radius - distances)
-    num_pairs = B * N * (N - 1) / 2
-    return (violation**2).sum() / (num_pairs**2)
+    coords = output.permute(0, 2, 1) # B, N, d
+    distances = torch.cdist(coords, coords) # B, N, N
+    violation = torch.relu(2 * radius - distances) # B, N, N
+    upper_triangle_mask = torch.triu(
+        torch.ones(B, N, N, dtype=torch.bool, device=distances.device), 
+        diagonal=1 # Excludes the diagonal elements (self-distances)
+    )
+    violation_masked = violation*upper_triangle_mask
+    num_pairs = N * (N - 1) / 2
+    return (violation_masked**2).sum() / (num_pairs*B)
 
 # --- Save Model with Loss plot ---
-def save_with_plot(model, optimizer, loss_history, current_epoch, model_parameters, save_dir):
+def save_with_plot(model, optimizer, loss_history, current_epoch, model_parameters, sec):
+    save_dir = sec["save_model_path"]
     # Save the trained model
+    current_loss = loss_history[-1][2]
     s_now = datetime.now().strftime("%Y%m%d_%H%M%S")
-    model_name = f"diffusion_model_loss={loss_history[-1]:.4f}_{s_now}.pth"
+    model_name = f"diffusion_model_loss={current_loss:.4f}_{s_now}.pth"
     # `save_model_path` in config should be the **directory** where to save
     os.makedirs(save_dir, exist_ok=True)
     model_save_path = os.path.join(save_dir, model_name)
@@ -110,29 +118,34 @@ def save_with_plot(model, optimizer, loss_history, current_epoch, model_paramete
 
     # 2) Epoch-average loss
     #batches_per_epoch = len(train_loader)
-    plt.plot(
-        range(len(loss_history)),
-        loss_history, color="red", marker="o", label="Epoch avg"
-    )
+    print("shape: ", loss_history[:, 1].shape)
+    distance_penality_strength = sec["distance_penality_strength"]
+    mse_strength = sec["mse_strength"]
+    plt.plot(range(len(loss_history)),
+        loss_history[:, 0], color="red", marker="o", label=f"MSE Loss [{mse_strength}]")
+    plt.plot(range(len(loss_history)),
+        loss_history[:, 1], color="blue", marker="o", label=f"Distance Loss [{distance_penality_strength}]")
+    plt.plot(range(len(loss_history)),
+        loss_history[:, 2], color="yellow", marker="o", label="Loss")
     """plt.plot(
         np.arange(batches_per_epoch/2, batches_per_epoch*int(sec["num_epochs"]), batches_per_epoch),
         epoch_avgs, color="red", marker="o", label="Epoch avg"
     )"""
 
-    plt.xlabel("Batch index")
+    plt.xlabel("Epoch")
     plt.ylabel("Loss")
     plt.title("Training Loss")
-    plt.legend()
+    plt.legend(loc='best')
     plt.yscale("log")        # optional: log scale often helps
     #plt.show()
     plt.rcParams["figure.figsize"] = (12,6)
-    plot_filename = f"diffusion_model_loss={loss_history[-1]:.4f}_{s_now}_loss.png"
+    plot_filename = f"diffusion_model_loss={current_loss:.6f}_{s_now}_loss.png"
     plt.savefig(os.path.join(save_dir, plot_filename))
 
 # --- Training routine ---
 def train_diffusion_model(
     model, optimizer, train_data_loader, num_epochs, learning_rate,
-    num_train_timesteps, sphere_radius,
+    num_train_timesteps, sphere_radius,mse_strength, distance_penality_strength,
     beta_start, beta_end, clip_sample, clip_sample_range, device, model_parameters, save_model_path
 ):
     scheduler = DDPMScheduler(
@@ -145,9 +158,10 @@ def train_diffusion_model(
     criterion = nn.MSELoss()
     model.train().to(device)
     loss_history = []
-    best_loss = checkpoint.get("loss", np.inf)
+    best_loss = np.inf
     for epoch in tqdm(range(num_epochs), desc="Training"):
         epoch_losses = []
+        epoch_ratio = epoch / num_epochs
         for batch in train_data_loader:
             batch = batch.to(device)
             noise = torch.randn_like(batch)
@@ -157,23 +171,24 @@ def train_diffusion_model(
             mse_loss = criterion(predicted_noise, noise)
             a_bar = scheduler.alphas_cumprod[timesteps].view(-1,1,1).to(device)
             x0_pred = (noisy - torch.sqrt(1 - a_bar) * predicted_noise) / torch.sqrt(a_bar)
+            #x0_pred = x0_pred.clamp(sphere_radius, clip_sample_range-sphere_radius)
             penalty_loss = distance_penalty(x0_pred, sphere_radius)
-            l_max = 500
-            l = l_max * (epoch / num_epochs)
-            loss = mse_loss + l * penalty_loss
+            #plot_3d(x0_pred.detach().cpu().numpy())
+            #print("penalty_loss: ", penalty_loss, "mse: ", mse_loss, "l: ", l, "l_max: ", distance_penality_strength)
+            loss = mse_strength*mse_loss + distance_penality_strength*epoch_ratio*penalty_loss
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            epoch_losses.append(loss.item())
+            epoch_losses.append(np.array([mse_loss.item(), penalty_loss.item(), loss.item()]))
             #print("current loss: ", loss.item())
-        loss_avg = np.mean(epoch_losses)
+        loss_avg = np.mean(epoch_losses, axis=0)
         loss_history.append(loss_avg)
-        print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {loss_avg:.4f}")
+        print(f"Epoch [{epoch+1}/{num_epochs}], MSE Loss: {loss_avg[0]:.9f}, Penalty Loss: {loss_avg[1]:.9f}, Loss: {loss_avg[2]:.9f}")
 
-        if loss_avg < best_loss:
-            best_loss = loss_avg
-            save_with_plot(model, optimizer, loss_history, epoch, model_parameters, sec["save_model_path"])
-    return model, loss_history
+        if loss_avg[2] < best_loss:
+            best_loss = loss_avg[2]
+            save_with_plot(model, optimizer, np.array(loss_history), epoch, model_parameters, sec)
+    return model, np.array(loss_history)
 
 # --- Revised sampling from Gaussian prior ---
 def sample_diffusion_model(
@@ -208,7 +223,9 @@ def sample_diffusion_model(
             for t in scheduler.timesteps:
                 eps = model(x)
                 x = scheduler.step(eps, t, x).prev_sample
+                #plot_3d(x.cpu().numpy(), "pre clamp")
                 x= x.clamp(sphere_radius, clip_sample_range-sphere_radius)
+                #plot_3d(x.cpu().numpy(), "after clamp")
         samples_batched.append(x.cpu().numpy())
     return np.concatenate(samples_batched)
 
@@ -241,7 +258,7 @@ if __name__ == "__main__":
 
     # Get Model
     start_epoch = 0
-    if sec["load_model"]:
+    if sec["load_model"]=="True":
         # Load Model
         model_class = PointNetPlusPlus if sec.get("model_type", "pointnet").lower() == "pointnet" else SetTransformer
         model, optimizer, checkpoint = data_load_save.load_model(sec["load_model_path"], model_class, torch.optim.AdamW, learning_rate=float(sec["learning_rate"]), device=device)
@@ -277,6 +294,8 @@ if __name__ == "__main__":
         float(sec["learning_rate"]),
         int(sec["num_train_timesteps"]),
         float(sec["sphere_radius"]),
+        float(sec["mse_strength"]),
+        float(sec["distance_penality_strength"]),
         float(sec["beta_start"]),
         float(sec["beta_end"]),
         sec.getboolean("clip_sample"),
@@ -286,7 +305,7 @@ if __name__ == "__main__":
         sec["save_model_path"]
     )
 
-    save_with_plot(model, optimizer, loss_history, start_epoch+int(sec["num_epochs"]), model_parameters, sec["save_model_path"])
+    save_with_plot(model, optimizer, loss_history, start_epoch+int(sec["num_epochs"]), model_parameters, sec)
 
     # Sample new packings
     sample_new_points = int(sec.get("sample_new_points", 10))
