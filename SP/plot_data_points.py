@@ -82,21 +82,41 @@ def plot_files_combined(files, labels, **kwargs):
     plot(Arrays=min_distances, labels=labels, **kwargs)
     plot(Arrays=avg_distances, labels=labels, title="Average Dist",xlabel="Average Dist",**kwargs)
 
+def plot_3d(dataset, title="plot"):
+    if isinstance(dataset, str):
+        dataset = torch.load(dataset)
+    for data in dataset:
+        ax = plt.axes(projection='3d')
+        xdata, ydata, zdata = data
+        ax.scatter3D(xdata, ydata, zdata, c=zdata)
+        ax.set_xlabel("x")
+        ax.set_ylabel("y")
+        ax.set_zlabel("z")
+        ax.set_title(title)
+        plt.show()
+    
+
+
 if __name__ == "__main__":
+    # plot_files_combined([
+    #     "output/push_simulation_PESC/2025-07-07/dataset_combined_96k.pt",
+    #     "output/generated_sets/generated_20250709_102713.pt",
+    #     "output/generated_sets/generated_20250706_120635.pt",
+    #     "output/generated_sets/generated_20250707_111228.pt",
+    #     "output/generated_sets/generated_20250708_105703.pt",
+    #     "output/generated_sets/generated_20250708_160214.pt",
+    #     "output/fixed_gen_sets/physics_push_2025-07-06_140100.pt"
+    # ], ["Input data", "fixed penality", "After Diff(Pointnet)", "After Diff 2(Transformer)", "After Diff 3(Transformer)", "After Diff 4(Trans, penalty)", "Pointnet pushed"], n_bins=300, plotmode="overlay") 
+    # plot_3d("output/generated_sets/generated_20250709_102713.pt")
     plot_files_combined([
         "output/push_simulation_PESC/2025-07-07/dataset_combined_96k.pt",
-        "output/generated_sets/generated_20250706_120635.pt",
-        "output/generated_sets/generated_20250707_111228.pt",
+        "output/generated_sets/generated_20250709_102713.pt",
+        "output/generated_sets/generated_20250709_120035.pt",
         "output/generated_sets/generated_20250708_105703.pt",
-        "output/fixed_gen_sets/physics_push_2025-07-06_140100.pt"
-    ], ["Input data", "After Diff(Pointnet)", "After Diff 2(Transformer)", "After Diff 3(Transformer)", "Pointnet pushed"], n_bins=300, plotmode="overlay") 
+    ], ["Input data", "fixed penality", "Fine tune", "After Diff 2(Transformer)", "After Diff 3(Transformer)"], n_bins=300, plotmode="overlay") 
+    plot_3d("output/generated_sets/generated_20250709_120035.pt")
 
-    plot_files_combined([
-        "output/push_simulation_PESC/2025-07-03/dataset_combined_sym.pt",
-        "output/generated_sets/generated_20250704_053415.pt",
-        "output/generated_sets/generated_20250706_120635.pt",
-        "output/fixed_gen_sets/physics_push_2025-07-06_140100.pt"
-    ], ["Input data", "After Diff.", "After Diff. Large", "Final push"], n_bins=300) 
+
     
 
     """f1 = "output/push_simulation_PESC/2025-07-03/dataset_combined_sym.pt"
