@@ -161,6 +161,7 @@ def train_diffusion_model(
 
             a_bar = scheduler.alphas_cumprod[t].view(-1,1,1).to(device)
             raw_x0 = (noisy - torch.sqrt(1 - a_bar) * eps_pred) / torch.sqrt(a_bar)
+            # ← reflection instead of tanh
             x0_pred = reflect(raw_x0, bmin_t, bmax_t)
 
             pen = distance_penalty(x0_pred, sphere_radius)
@@ -209,6 +210,7 @@ def sample_diffusion_model(
                 eps = model(x)
                 out = scheduler.step(eps, t, x)
                 x = out.prev_sample
+                # ← reflection instead of tanh
                 x = reflect(x, bmin_t, bmax_t)
         all_samples.append(x.cpu().numpy())
 
