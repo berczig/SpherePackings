@@ -231,7 +231,7 @@ def eliminate_overlaps_box(
 
 def main():
     # Parameters
-    n2, dims2, r2 = 380, 2, 0.02684223042
+    n2, dims2, r2 = 51, 2, 0.07104313811
     box2 = [1.0, 1.0]  # 2D box
 
     # Initialize centers in [r2, box2-r2]^d
@@ -259,7 +259,7 @@ def main():
     )
     anim = anim_c
     if anim is not None:
-        anim.save("./output/push_tests/box_clamp_elim2d.mp4",
+        anim.save("./output/push_tests/box_clamp_elim2d_51spheres.mp4",
                   writer='ffmpeg', fps=30)
     print("Box-clamp final centers (first 5):\n", final_clamp[:5])
 
@@ -271,7 +271,7 @@ def main():
     )
     anim = anim_h
     if anim is not None:
-        anim.save("./output/push_tests/box_stophit_elim2d.mp4",
+        anim.save("./output/push_tests/box_stophit_elim2d_51spheres.mp4",
                   writer='ffmpeg', fps=30)
     print("Box-stophit final centers (first 5):\n", final_hit[:5])
 
