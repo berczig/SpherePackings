@@ -10,6 +10,7 @@ from SP import data_load_save
 from datetime import datetime
 from plot_data_points import plot_3d
 from torchdiffeq import odeint
+from torch.optim.lr_scheduler import CosineAnnealingLR
 
 # --- PointNet++ Components ---
 class PointNetSetAbstraction(nn.Module):
@@ -150,7 +151,7 @@ def save_with_plot(model, optimizer, history, epoch, params, sec):
 
 # --- Training routine (Flow Matching) ---
 def train_flow_model(
-    model, optimizer, loader, num_epochs,
+    model, optimizer, scheduler, loader, num_epochs,
     sphere_radius, mse_strength, dist_strength,
     clip_min, clip_max, device, params, save_path
 ):
@@ -258,9 +259,10 @@ if __name__ == '__main__':
     }
     model = FlowSetTransformer(d, **st_kwargs).to(dev)
     opt   = torch.optim.AdamW(model.parameters(), lr=lr)
+    scheduler = CosineAnnealingLR(opt, T_max=epochs, eta_min=1e-6)
 
     model, hist = train_flow_model(
-        model, opt, loader, epochs,
+        model, opt, scheduler, loader, epochs,
         radius, mse_s, pen_s,
         clip_r, clip_r, dev,
         {'dim_in': d}, save_m
