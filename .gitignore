@@ -116,3 +116,25 @@ Desktop.ini
 # Lock files (optional)
 poetry.lock
 Pipfile.lock
+
+# ---- ignore all PyTorch checkpoints and generated data ----
+# model weights
+#*.pth
+#*.pt
+
+# generated datasets
+/output/generated_sets/
+/output/push_simulation_PESC/
+/output/fixed_gen_sets/
+
+# saved models
+/output/saved_models/
+
+# matplotlib animations
+*.gif
+
+# VS Code workspace (optional)
+.vscode/
+
+# OS files
+.DS_Store

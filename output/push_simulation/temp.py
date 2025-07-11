@@ -1,6 +1,6 @@
 import torch
 
-data = torch.load("/Users/au596283/MLProjects/SpherePacking/output/push_simulation/2025-05-26 14_11_03/dataset.pt")
+data = torch.load("/Users/au596283/MLProjects/SpherePacking/output/push_simulation/2025-05-27 15_38_12/dataset.pt")
 if hasattr(data, 'shape'):
     print("Shape of dataset.pt:", data.shape)
 elif isinstance(data, dict):
