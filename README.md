@@ -60,6 +60,9 @@ Our pipeline adapts the PatternBoost approach into a diffusion-based framework:
 - **`pipeline/`**  
   **(IGNORE for now)** Codebase for unifying the end-to-end pipeline. Under construction.
 
+  **`result_viewer/`**
+  A GUI to display and manage the datasets and models. Under construction.
+
 ## Usage
 
 To run the pipeline for cube packings, follow these steps:
@@ -72,7 +75,22 @@ To run the pipeline for cube packings, follow these steps:
 
 4. Visualize the results with `spheres_in_cube/plot_data_points.py`.
 
+To view the datasets and models run [diffuse_boost/result_viewer/result_Viewer.py](result_Viewer.py)
+
+
+
 ## Initial Results
 
 Initial experimental outputs and visualizations are available in:
+
+## Installation
+```bash
+git clone https://github.com/berczig/SpherePackings.git
+cd SpherePackings
+```
+
+Next install the project as a python package - navigate to the directory containing [pyproject.toml](pyproject.toml) and run
+```
+pip install -e .
+```
 

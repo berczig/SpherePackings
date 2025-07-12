@@ -1,4 +1,0 @@
-sample_index,min_distance,avg_distance,excess
-sample_index,min_distance,avg_distance,excess
-sample_index,min_distance,avg_distance,excess
-sample_index,min_distance,avg_distance,excess

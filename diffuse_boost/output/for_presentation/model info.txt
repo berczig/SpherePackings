@@ -1,0 +1,3 @@
+initial_lr: 0.01
+final_lr: 0.00000005
+{'dim_hidden': 256, 'num_heads': 8, 'num_inds': 16, 'num_isab': 2, 'dim_out': 3}
