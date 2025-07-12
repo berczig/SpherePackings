@@ -18,6 +18,7 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 import configparser
 from spheres_in_Rd.data_generation import SpherePackingDataset
+from spheres_in_Rd import cfg2
 
 # --- PointNet++ Components ---
 class PointNetSetAbstraction(nn.Module):
@@ -296,10 +297,7 @@ def plot_packings_noised_denoised(inputs, noised, output, sample_idx=0):
     plt.show()
 
 if __name__ == "__main__":
-    # --- Read config ---
-    config = configparser.ConfigParser()
-    config.read("config_Rd.cfg")
-    section = config["diffusion_model"]
+    section = cfg2["diffusion_model"]
     # --- Extract parameters ---
 
     batch_size = int(section["batch_size"])

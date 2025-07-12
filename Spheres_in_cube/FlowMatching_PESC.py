@@ -11,6 +11,7 @@ from datetime import datetime
 from plot_data_points import plot_3d
 from torchdiffeq import odeint
 from torch.optim.lr_scheduler import CosineAnnealingLR
+from spheres_in_cube import cfg
 
 # --- PointNet++ Components ---
 class PointNetSetAbstraction(nn.Module):
@@ -225,9 +226,7 @@ class SpherePackingDataset(Dataset):
     def __getitem__(self, idx): return self.data[idx]
 
 if __name__ == '__main__':
-    config = configparser.ConfigParser()
-    config.read('config.cfg', encoding='utf-8')
-    sec = config['flow_matching']
+    sec = cfg['flow_matching']
 
     d      = int(sec['dimension'])
     bs     = int(sec['batch_size'])

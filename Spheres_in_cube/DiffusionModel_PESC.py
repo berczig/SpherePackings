@@ -10,6 +10,7 @@ import configparser
 from spheres_in_cube import data_load_save
 from datetime import datetime
 from plot_data_points import plot_3d
+from spheres_in_cube import cfg
 
 # --- PointNet++ Components ---
 class PointNetSetAbstraction(nn.Module):
@@ -243,9 +244,7 @@ class SpherePackingDataset(Dataset):
 
 # --- Main script ---
 if __name__ == "__main__":
-    config = configparser.ConfigParser()
-    config.read("config.cfg", encoding="utf-8")
-    sec = config["diffusion_model"]
+    sec = cfg["diffusion_model"]
     # Read dimension from config
     d = int(sec["dimension"])
     batch_size = int(sec["batch_size"])

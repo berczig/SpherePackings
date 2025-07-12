@@ -65,7 +65,10 @@ def generate_dataset(num_samples, min_size, filename):
     # Save dataset as a tensor
     dataset_tensor = torch.tensor(dataset, dtype=torch.float32)
 
-    savepath = os.path.join(reffolder, filename)
+    # Save to reffolder/output_Rd
+    output_dir = os.path.join(reffolder, "output_Rd")
+    os.makedirs(output_dir, exist_ok=True)  # Create the directory if it doesn't exist
+    savepath = os.path.join(output_dir, filename)
     print("saving data set as {}".format(savepath))
     torch.save(dataset_tensor, savepath)
 

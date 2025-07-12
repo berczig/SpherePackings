@@ -1007,3 +1007,6 @@ sample_index,min_distance,avg_distance,excess
 num_spheres=89,sphere_radius=0.1138,best_known_diameter=0.22753939547,num_samples=1000,dt=0.03,max_iter=2500,tol=1e-09,boundary_mode=stophit
 ################################################################################
 sample_index,min_distance,avg_distance,excess
+num_spheres=89,sphere_radius=0.1138,best_known_diameter=0.22753939547,num_samples=1000,dt=0.03,max_iter=2500,tol=1e-09,boundary_mode=stophit
+################################################################################
+sample_index,min_distance,avg_distance,excess
