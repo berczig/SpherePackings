@@ -2,13 +2,13 @@
 
 ## Introduction
 
-**DiffuseBoost** is a machine learning pipeline designed to find dense sphere packings in Euclidean space \( \mathbb{R}^d \) and in the unit cube.
+**DiffuseBoost** is a machine learning pipeline designed to find dense sphere packings in Euclidean space $\mathbb{R}^d$ and in the unit cube.
 
 The approach aims to build a diffusion-based version of the **PatternBoost** method introduced by Charton–Ellenberg–Wagner–Williamson: [arXiv:2411.00566](https://arxiv.org/abs/2411.00566).
 
-## Problem A: Dense Packings in \( \mathbb{R}^d \)
+## Problem A: Dense Packings in $\mathbb{R}^d$
 
-This classical problem in geometry seeks the highest possible asymptotic density of non-overlapping equal spheres in \( \mathbb{R}^d \). Best known packings are currently available only in dimensions 1, 2, 3, 8, and 24.
+This classical problem in geometry seeks the highest possible asymptotic density of non-overlapping equal spheres in $\mathbb{R}^d$. Best known packings are currently available only in dimensions 1, 2, 3, 8, and 24.
 
 Machine learning approaches are challenged by the need to approximate asymptotic density using large domains containing a huge number of spheres.
 
@@ -47,7 +47,7 @@ Our pipeline adapts the PatternBoost approach into a diffusion-based framework:
   All parameters are controlled via `config.cfg`.
 
 - **`spheres_in_Rd/`**  
-  Focuses on packings in \( \mathbb{R}^5 \) within a box of side length 10.  
+  Focuses on packings in $\mathbb{R}^5$ within a box of side length 10.  
   Includes partial implementations of lattice constructions (D₅, Q₅, R₅) for comparison.  
   This component is still under active development.
 
@@ -55,7 +55,7 @@ Our pipeline adapts the PatternBoost approach into a diffusion-based framework:
   Contains output files and visualizations for cube packings, including animations from physics push and plotted results.
 
 - **`output_Rd/`**  
-  Shows output files for \( \mathbb{R}^d \) packings (primarily preliminary simulations).
+  Shows output files for $\mathbb{R}^d$ packings (primarily preliminary simulations).
 
 - **`pipeline/`**  
   **(IGNORE for now)** Codebase for unifying the end-to-end pipeline. Under construction.
