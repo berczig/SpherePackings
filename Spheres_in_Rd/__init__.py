@@ -4,7 +4,7 @@ import configparser
 
 # Constants
 reffolder = Path(__file__).parent  # Root folder of the spheres_in_cube module
-CONFIG_FILE = os.path.join(reffolder, "config.cfg")  # Path to config.cfg in spheres_in_cube
+CONFIG_FILE = os.path.join(reffolder, "config_Rd.cfg")  # Path to config_Rd.cfg in spheres_in_Rd
 
 def load_config(file_path):
     """
@@ -20,10 +20,10 @@ def load_config(file_path):
 
 # Load the configuration
 try:
-    cfg = load_config(CONFIG_FILE)  # Load config.cfg from spheres_in_cube folder
+    cfg2 = load_config(CONFIG_FILE)  # Load config_Rd.cfg from spheres_in_Rd folder
 except FileNotFoundError as e:
     print(e)
     exit()
 
 # Expose `cfg` for other modules to use
-__all__ = ["cfg"]
+__all__ = ["cfg2"]

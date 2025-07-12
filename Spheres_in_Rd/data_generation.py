@@ -1,5 +1,5 @@
 import numpy as np; #NumPy package for arrays, random number generation, etc
-from spheres_in_Rd import cfg, reffolder
+from spheres_in_Rd import cfg2, reffolder
 import matplotlib.pyplot as plt
 from spheres_in_Rd.Max_Indep_Sets import MIS_basic, MIS_luby
 import torch
@@ -17,11 +17,11 @@ def sample_poisson_point_process(dimension, bounding_box_width, intensity):
     return ppp
 
 def plot_and_sample_test():
-    points = sample_poisson_point_process(dimension = cfg.getint("ppp_sample_generation", "dimension"), 
-        bounding_box_width = cfg.getfloat("ppp_sample_generation", "bounding_box_width"), 
-        intensity = cfg.getfloat("ppp_sample_generation", "intensity"))
+    points = sample_poisson_point_process(dimension = cfg2.getint("ppp_sample_generation", "dimension"), 
+        bounding_box_width = cfg2.getfloat("ppp_sample_generation", "bounding_box_width"), 
+        intensity = cfg2.getfloat("ppp_sample_generation", "intensity"))
     plt.scatter(points[0], points[1], c="black")
-    thinned_points = MIS_luby(points.T, min_distance = cfg.getfloat("ppp_sample_generation", "sphere_radius"))
+    thinned_points = MIS_luby(points.T, min_distance = cfg2.getfloat("ppp_sample_generation", "sphere_radius"))
     plt.scatter(thinned_points[0], thinned_points[1], c="red")
     # print the number of red points as a caption of the plot
     plt.title(str(len(thinned_points[0])) + " points")
@@ -30,20 +30,20 @@ def plot_and_sample_test():
 def generate_dataset(num_samples, min_size, filename):
     print("generate {} points..".format(num_samples))
     num_big_samples = 0
-    dimension = cfg.getint("ppp_sample_generation", "dimension")
+    dimension = cfg2.getint("ppp_sample_generation", "dimension")
     dataset = np.empty((0, dimension, min_size))
 
     while num_big_samples < num_samples:
         # Sample points from a Poisson point process
         points = sample_poisson_point_process(
             dimension=dimension,
-            bounding_box_width=cfg.getfloat("ppp_sample_generation", "bounding_box_width"),
-            intensity=cfg.getfloat("ppp_sample_generation", "intensity")
+            bounding_box_width=cfg2.getfloat("ppp_sample_generation", "bounding_box_width"),
+            intensity=cfg2.getfloat("ppp_sample_generation", "intensity")
         )
         print("points:",   len(points.T))
 
         # Apply MIS Luby's algorithm to thin points
-        thinned_points = MIS_luby(points.T, min_distance=2*cfg.getfloat("ppp_sample_generation", "sphere_radius"))
+        thinned_points = MIS_luby(points.T, min_distance=2*cfg2.getfloat("ppp_sample_generation", "sphere_radius"))
         print("luby:", thinned_points.shape[1])
         if thinned_points.shape[1] < min_size:
             continue

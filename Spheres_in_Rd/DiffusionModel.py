@@ -298,7 +298,7 @@ def plot_packings_noised_denoised(inputs, noised, output, sample_idx=0):
 if __name__ == "__main__":
     # --- Read config ---
     config = configparser.ConfigParser()
-    config.read("config.cfg")
+    config.read("config_Rd.cfg")
     section = config["diffusion_model"]
     # --- Extract parameters ---
 

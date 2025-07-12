@@ -1,7 +1,7 @@
 import os
 import numpy as np
 import torch
-from SP.plot_data_points import compute_metrics
+from spheres_in_Rd.plot_data_points import compute_metrics
 
 # Concatenate the tensors in the following three symmetrized datasets:
 # output/push_simulation_PESC/2025-06-26/dataset_sym.pt, output/push_simulation_PESC/2025-07-02/dataset_sym.pt and 
