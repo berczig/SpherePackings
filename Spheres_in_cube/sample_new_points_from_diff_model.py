@@ -1,9 +1,9 @@
-from SP import cfg
-from SP.DiffusionModel_PESC import sample_diffusion_model, SetTransformer, PointNetPlusPlus
+from spheres_in_cube import cfg
+from spheres_in_cube.DiffusionModel_PESC import sample_diffusion_model, SetTransformer, PointNetPlusPlus
 import torch
 import os
 from datetime import datetime
-from SP import data_load_save
+from spheres_in_cube import data_load_save
 
 def load_model(sec, filepath):
     d = int(sec["dimension"])

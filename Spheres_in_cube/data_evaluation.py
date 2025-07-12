@@ -4,11 +4,8 @@ from collections import defaultdict, Counter
 import numpy as np
 import os
 from pathlib import Path
-import SP
+import spheres_in_cube as SP
 import matplotlib.pyplot as plt
-
-import SP.animation
-
 
 # -------------------
 # Union-Find Structure

@@ -2,10 +2,10 @@ import os
 import numpy as np
 import torch
 from torch import nn
-from SP.physics_push_PESC import eliminate_overlaps_box
-from SP.data_evaluation import plot_evaluations
-from SP.data_generation import get_data_loader
-from SP import cfg
+from spheres_in_cube.physics_push_PESC import eliminate_overlaps_box
+from spheres_in_cube.data_evaluation import plot_evaluations
+from spheres_in_cube.data_generation_PESC import get_data_loader
+from spheres_in_cube import cfg
 import ast
 from datetime import datetime
 

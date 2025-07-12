@@ -2,15 +2,15 @@ import os
 import torch
 import numpy as np
 from datetime import datetime
-from SP.DiffusionModel import (
+from spheres_in_Rd.DiffusionModel import (
     train_diffusion_model,
     sample_diffusion_model,
     PointNetPlusPlus,
     SetTransformer,
 )
-from SP.physics_push import eliminate_overlaps_batched
-from SP.data_generation import get_data_loader
-from SP import cfg
+from spheres_in_Rd.physics_push import eliminate_overlaps_batched
+from spheres_in_Rd.data_generation import get_data_loader
+from spheres_in_Rd import cfg
 
 def main():
     # 1) Load config

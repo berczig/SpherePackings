@@ -2,8 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from tqdm import tqdm
-import SP
-import SP.data_evaluation
+import spheres_in_Rd as SP
+import spheres_in_Rd.data_evaluation
 
 def shortest_vector_torus(p1, p2, box_size):
     """
@@ -243,7 +243,7 @@ def main():
     # display(HTML(anim_2d.to_jshtml()))
     # Or save it:
     # anim_2d.save('sphere_overlap_2d.gif', writer='pillow', fps=15)
-    anim_2d.save('sphere_overlap_2d.mp4', writer='ffmpeg', fps=15)
+    anim_2d.save('output_Rd/sphere_overlap_2d.mp4', writer='ffmpeg', fps=15)
 
     # If running outside Jupyter, you might need to show it directly (less common for animations)
     plt.show() # This usually shows the static plot after FuncAnimation

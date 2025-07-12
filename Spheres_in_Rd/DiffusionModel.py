@@ -17,6 +17,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 import configparser
+from spheres_in_Rd.data_generation import SpherePackingDataset
 
 # --- PointNet++ Components ---
 class PointNetSetAbstraction(nn.Module):
@@ -324,8 +325,6 @@ if __name__ == "__main__":
     st_num_isab = int(section.get("st_num_isab", 2))
 
     # --- Load and split dataset ---
-    from SP.data_generation import SpherePackingDataset
-
     dataset = SpherePackingDataset(dataset_path)
     total_size = len(dataset)
     train_size = int(0.9 * total_size)

@@ -4,7 +4,7 @@ import torch
 from torch.utils.data import DataLoader, Dataset
 import matplotlib.pyplot as plt
 
-from SP import cfg
+from spheres_in_cube import cfg
 from physics_push_PESC import eliminate_overlaps_box
 
 # -----------------------------------------------------------------------------

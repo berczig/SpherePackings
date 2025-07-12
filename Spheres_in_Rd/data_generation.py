@@ -1,7 +1,7 @@
 import numpy as np; #NumPy package for arrays, random number generation, etc
-from SP import cfg, reffolder
+from spheres_in_Rd import cfg, reffolder
 import matplotlib.pyplot as plt
-from SP.Max_Indep_Sets import MIS_basic, MIS_luby
+from spheres_in_Rd.Max_Indep_Sets import MIS_basic, MIS_luby
 import torch
 from torch.utils.data import DataLoader, Dataset
 import os

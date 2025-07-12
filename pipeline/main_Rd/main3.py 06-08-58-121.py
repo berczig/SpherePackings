@@ -1,9 +1,9 @@
-from SP.physics_push import eliminate_overlaps_batched, main
-from SP.data_evaluation import SphereDatasetEvaluator, plot_evaluations
-from SP.data_generation import get_data_loader
-from SP import cfg
+from spheres_in_Rd.physics_push import eliminate_overlaps_batched, main
+from spheres_in_Rd.data_evaluation import SphereDatasetEvaluator, plot_evaluations
+from spheres_in_Rd.data_generation import get_data_loader
+from spheres_in_Rd import cfg
 import ast
-import SP
+import spheres_in_Rd as SP
 import os
 import numpy as np
 from datetime import datetime

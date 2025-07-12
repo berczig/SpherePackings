@@ -7,7 +7,7 @@ from diffusers import DDPMScheduler
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 import configparser
-from SP import data_load_save
+from spheres_in_cube import data_load_save
 from datetime import datetime
 from plot_data_points import plot_3d
 

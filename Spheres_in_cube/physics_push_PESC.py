@@ -4,8 +4,8 @@ from matplotlib.animation import FuncAnimation
 from tqdm import tqdm
 import types
 
-import SP
-import SP.data_evaluation
+import spheres_in_cube as SP
+import spheres_in_cube.data_evaluation as data_evaluation
 
 # ----------------------------------------
 # 1) TORUS‐WRAPPED OVERLAP‐ELIMINATION
