@@ -46,21 +46,21 @@ Our pipeline adapts the PatternBoost approach into a diffusion-based framework:
   - Plotting tools  
   All parameters are controlled via `config.cfg`.
 
-- **`spheres_in_Rd/`**  
+- **`diffuse_boost/spheres_in_Rd/`**  
   Focuses on packings in $\mathbb{R}^5$ within a box of side length 10.  
   Includes partial implementations of lattice constructions (D₅, Q₅, R₅) for comparison.  
   This component is still under active development.
 
-- **`output/`**  
+- **`diffuse_boost/output/`**  
   Contains output files and visualizations for cube packings, including animations from physics push and plotted results.
 
-- **`output_Rd/`**  
+- **`diffuse_boost/output_Rd/`**  
   Shows output files for $\mathbb{R}^d$ packings (primarily preliminary simulations).
 
-- **`pipeline/`**  
+- **`diffuse_boost/pipeline/`**  
   **(IGNORE for now)** Codebase for unifying the end-to-end pipeline. Under construction.
 
-  **`result_viewer/`**
+  **`diffuse_boost/result_viewer/`**
   A GUI to display and manage the datasets and models. Under construction.
 
 ## Usage
