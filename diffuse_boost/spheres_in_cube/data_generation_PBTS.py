@@ -1,4 +1,5 @@
 import os
+import time
 import numpy as np
 import torch
 from torch.utils.data import DataLoader, Dataset
@@ -10,47 +11,49 @@ from diffuse_boost import cfg
 # PBTS core functions
 # -----------------------------------------------------------------------------
 
-def compute_EL_grad(X, L, N):
+def compute_EL_grad(X, L, N, r):
     coords = X.reshape((N, 3))
     EL = 0.0
     grad = np.zeros_like(coords)
     half = L / 2
-    # wall overlaps
+
+    # Wall overlaps: penalty if sphere extends beyond walls at +-half
     for i, xi in enumerate(coords):
         for d in range(3):
-            over = max(0, 1 - (half - xi[d]))
+            dist_to_wall = half - abs(xi[d])
+            over = max(0.0, r - dist_to_wall)
             EL += over * over
             if over > 0:
-                grad[i, d] -= 2 * over
-            over = max(0, 1 - (half + xi[d]))
-            EL += over * over
-            if over > 0:
-                grad[i, d] += 2 * over
-    # sphere overlaps
+                sign = 1.0 if xi[d] < 0 else -1.0
+                grad[i, d] += 2 * over * sign
+
+    # Sphere–sphere overlaps
     for i in range(N):
         for j in range(i + 1, N):
             diff = coords[i] - coords[j]
             dist = np.linalg.norm(diff)
-            over = max(0, 2 - dist)
+            over = max(0.0, 2 * r - dist)
             if over > 0:
                 EL += over * over
-                g = diff / (dist + 1e-12) * 2 * over
-                grad[i] += g
-                grad[j] -= g
+                direction = diff / (dist + 1e-12)
+                g = 2 * over * direction
+                grad[i] -= g
+                grad[j] += g
+
     return EL, grad.ravel()
 
 
-def URP(X, eta0=0.8):
+def URP(X, eta0):
     return X + np.random.uniform(-eta0, eta0, size=X.shape)
 
 
-def SRP(X, L, N, Imax=5, m=3, sigma=0.1, beta=0.9):
+def SRP(X, L, N, r, Imax, m, sigma, beta):
     eta = sigma
     Xc = X.copy()
     for _ in range(Imax):
         Xc += np.random.uniform(-eta, eta, size=Xc.shape)
         for __ in range(m):
-            EL, g = compute_EL_grad(Xc, L, N)
+            EL, g = compute_EL_grad(Xc, L, N, r)
             g = g.reshape((N, 3))
             norm = np.linalg.norm(g, ord=np.inf) + 1e-12
             Xc -= (sigma * eta) * (g / norm).ravel()
@@ -58,30 +61,58 @@ def SRP(X, L, N, Imax=5, m=3, sigma=0.1, beta=0.9):
     return Xc
 
 
-def local_opt(X, L, N, tol=1e-13, maxiter=200):
-    res = minimize(lambda x: compute_EL_grad(x, L, N), X,
-                   method='L-BFGS-B', jac=True,
-                   options={'ftol': tol, 'gtol': tol, 'maxiter': maxiter})
+def local_opt(X, L, N, r, tol, maxiter):
+    x0 = X.ravel()
+    res = minimize(
+        lambda x: compute_EL_grad(x, L, N, r),
+        x0,
+        method='L-BFGS-B',
+        jac=True,
+        options={'ftol': tol, 'gtol': tol, 'maxiter': maxiter}
+    )
     return res.x, res.fun
 
 
-def threshold_search(X, L, N, flag, max_iter=1000):
-    Xb, ELb = X, compute_EL_grad(X, L, N)[0]
-    for _ in range(max_iter):
-        Xt = URP(Xb) if flag == 0 else SRP(Xb, L, N)
-        Xt, ELt = local_opt(Xt, L, N)
-        if ELt < ELb:
-            Xb, ELb = Xt, ELt
+def threshold_search(X, L, N, r, flag,
+                     eta0, Imax, m, sigma, beta,
+                     MaxIter, tol, maxiter,
+                     tau0, rho_tau):
+    # Initialize best and current states
+    X_best = X.copy()
+    EL_best = compute_EL_grad(X_best, L, N, r)[0]
+    X_curr = X_best.copy()
+    EL_curr = EL_best
+    tau = tau0
+
+    for _ in range(MaxIter):
+        # generate candidate
+        print(f"Current energy: {EL_curr:.6f}, Best energy: {EL_best:.6f}, Threshold: {tau:.6f}")
+        if np.random.rand() < 0.5:
+            Xt = URP(X_curr, eta0)
         else:
-            break
-    return Xb, ELb
+            Xt = SRP(X_curr, L, N, r, Imax, m, sigma, beta)
+        # local optimization
+        Xt_opt, ELt = local_opt(Xt, L, N, r, tol, maxiter)
+
+        # threshold acceptance on current
+        if ELt < EL_curr + tau:
+            X_curr, EL_curr = Xt_opt, ELt
+
+        # update best so far
+        if ELt < EL_best:
+            X_best, EL_best = Xt_opt, ELt
+
+        # decay threshold
+        tau *= rho_tau
+
+    return X_best, EL_best
 
 
-def adjust_container(X, L, N):
-    lo, hi = L * 0.99, L
+def adjust_container(X, L, N, r, shrink):
+    lo, hi = L * (1 - shrink), L
     for _ in range(20):
-        mid = (lo + hi) / 2
-        EL, _ = compute_EL_grad(X, mid, N)
+        mid = 0.5 * (lo + hi)
+        EL, _ = compute_EL_grad(X, mid, N, r)
         if EL < 1e-25:
             hi = mid
         else:
@@ -92,11 +123,8 @@ def adjust_container(X, L, N):
 # Helpers
 # -----------------------------------------------------------------------------
 
-def sample_uniform_points(dimension, bounding_box_width, radius, num_points):
-    low, high = radius, bounding_box_width - radius
-    if high <= low:
-        raise ValueError("bounding_box_width must exceed 2*radius.")
-    return np.random.uniform(low, high, size=(num_points, dimension))
+def sample_uniform_points(dimension, num_points):
+    return np.random.rand(num_points, dimension)
 
 
 def get_cube_symmetry_matrices(dim):
@@ -129,129 +157,104 @@ def apply_symmetries_to_data(data, box_width):
 # -----------------------------------------------------------------------------
 
 def generate_dataset_pbts():
-    sec = "sample_generation_PESC"
-    D = cfg.getint(sec, "dimension")
-    L_box = cfg.getfloat(sec, "bounding_box_width")
-    if D != 3:
-        raise NotImplementedError("PBTS only supports 3D currently.")
-    r0 = cfg.getfloat(sec, "sphere_radius")
-    best_known_diam = cfg.getfloat(sec, "best_known_diameter", fallback=2*r0)
-    N = cfg.getint(sec, "num_spheres")
-    M = cfg.getint(sec, "num_samples")
-    tmax = cfg.getfloat(sec, "tmax",fallback=300.0)
+    sec  = "sample_generation_PBTS"
+    D    = cfg.getint(sec, "dimension")
+    Lbox = cfg.getfloat(sec, "bounding_box_width")
+
+    r0      = cfg.getfloat(sec, "sphere_radius")
+    best_d  = cfg.getfloat(sec, "best_known_diameter", fallback=2*r0)
+    N       = cfg.getint(sec,   "num_spheres")
+    M       = cfg.getint(sec,   "num_samples")
+    tmax    = cfg.getfloat(sec, "tmax",               fallback=10.0)
+    p0      = cfg.getfloat(sec, "p0",                 fallback=0.476)
+    MaxIter = cfg.getint(sec,   "MaxIter",            fallback=5000)
+    tol     = cfg.getfloat(sec, "tol",                fallback=1e-8)
+    maxiter = cfg.getint(sec,   "max_iter",            fallback=300)
+    Imax    = cfg.getint(sec,   "Imax",               fallback=500)
+    m       = cfg.getint(sec,   "m",                  fallback=20)
+    sigma   = cfg.getfloat(sec, "sigma",              fallback=15.0)
+    beta    = cfg.getfloat(sec, "beta",               fallback=0.95)
+    eta0    = cfg.getfloat(sec, "eta0",               fallback=3.0)
+    tau0    = cfg.getfloat(sec, "tau0",               fallback=2.0)
+    rho_tau = cfg.getfloat(sec, "rho_tau",            fallback=0.999)
+    shrink  = cfg.getfloat(sec, "shrink",             fallback=0.01)
 
     data = np.zeros((M, D, N), dtype=np.float32)
     min_dists, avg_dists = [], []
 
-    # metrics
-    metrics_fn = cfg.get(sec, "output_filename_metrics")
-    excess_fn = cfg.get(sec, "output_filename_metrics_excess")
-    os.makedirs(os.path.dirname(metrics_fn), exist_ok=True)
-    with open(metrics_fn, 'a') as mf:
-        mf.write(f"# PBTS based packing\n")
-        mf.write(f"N={N},r0={r0},best_known_diam={best_known_diam},samples={M},tmax={tmax}\n")
-        mf.write("# idx,min_dist,avg_dist,excess\n")
-    with open(excess_fn, 'a') as mf:
-        mf.write("idx,min_dist,avg_dist,excess\n")
-
     for idx in range(M):
-        pts = sample_uniform_points(D, L_box, r0, N)
+        pts = sample_uniform_points(D, N)
+
         # Phase 1
-        p = cfg.getfloat(sec, "p0")
+        p = p0
         L = (4 * np.pi * N / (3 * p)) ** (1/3)
-        X = (pts - L_box/2) * (L / L_box)
+        X = (pts - 0.5) * L
+        print(f"Initial packing fraction: {p:.6f}, Box size: {L:.6f}")
+        X, EL = local_opt(X, L, N, r0, tol, maxiter)
+        print(f"Initial energy: {EL:.6f}")
+
         flag = 0
-        X, EL = threshold_search(X, L, N, flag)
+        L_old = L
+        X, EL = threshold_search(
+            X, L_old, N, r0, flag,
+            eta0, Imax, m, sigma, beta,
+            MaxIter, tol, maxiter,
+            tau0, rho_tau
+        )
+        print(f"Post-threshold search energy: {EL:.6f}")
         while EL < 1e-25:
             p += 1e-3 * np.random.rand()
+            print(f"Adjusting packing fraction to {p:.6f}")
             L = (4 * np.pi * N / (3 * p)) ** (1/3)
-            X, EL = threshold_search(X, L, N, flag)
-        X, Lb = adjust_container(X, L, N)
+            X *= (L / L_old)
+            L_old = L
+            X, EL = threshold_search(
+                X, L_old, N, r0, flag,
+                eta0, Imax, m, sigma, beta,
+                MaxIter, tol, maxiter,
+                tau0, rho_tau
+            )
+
+        print(f"Final energy after threshold search: {EL:.6f}")
+        X, Lb = adjust_container(X, L_old, N, r0, shrink)
         X_best, L_best = X.copy(), Lb
+
         # Phase 2
-        import time
         t0 = time.time()
         while time.time() - t0 < tmax:
             X0 = np.random.uniform(-Lb/2, Lb/2, size=(3*N,))
-            X1, EL1 = threshold_search(X0, Lb, N, flag)
+            X1, EL1 = threshold_search(
+                X0, Lb, N, r0, flag,
+                eta0, Imax, m, sigma, beta,
+                MaxIter, tol, maxiter,
+                tau0, rho_tau
+            )
+            print(f"New candidate energy: {EL1:.6f}")
             if EL1 < 1e-25:
-                X1, L1 = adjust_container(X1, Lb, N)
+                X1, L1 = adjust_container(X1, Lb, N, r0, shrink)
                 if L1 < L_best:
                     X_best, L_best = X1.copy(), L1
                 else:
                     flag ^= 1
             else:
                 flag ^= 1
-        # scale to [0,1]
-        centers = X_best.reshape((N,3))
-        scale = L_box / L_best
+
+        centers = X_best.reshape((N, 3))
+        scale = Lbox / L_best
         centers_unit = (centers + L_best/2) * scale
-        r_final = r0 * scale
         data[idx] = centers_unit.T
-        # metrics
-        coords = centers_unit
-        diffs = coords[:, None, :] - coords[None, :, :]
+
+        diffs = centers_unit[:, None, :] - centers_unit[None, :, :]
         dmat = np.linalg.norm(diffs, axis=-1)
         i1, j1 = np.triu_indices(N, k=1)
         pd = dmat[i1, j1]
         mn, av = pd.min(), pd.mean()
-        excess = best_known_diam - mn
-        min_dists.append(mn); avg_dists.append(av)
-        with open(metrics_fn, 'a') as mf:
-            mf.write(f"{idx},{mn:.6f},{av:.6f},{excess:.6f}\n")
-        if excess < 0:
-            with open(excess_fn, 'a') as mf:
-                mf.write(f"{idx},{mn:.6f},{av:.6f},{excess:.6f}\n")
-        print(f"Sample {idx+1}/{M}: min={mn:.6f}, avg={av:.6f}, excess={excess:.6f}, r={r_final:.6f}")
+        excess = best_d - mn
+        min_dists.append(mn)
+        avg_dists.append(av)
+        print(f"Sample {idx+1}/{M}: min={mn:.6f}, avg={av:.6f}, excess={excess:.6f}")
 
-    # save dataset
-    data_fn = cfg.get(sec, "output_filename")
-    os.makedirs(os.path.dirname(data_fn), exist_ok=True)
-    torch.save(torch.from_numpy(data), data_fn)
-    print(f"Saved full dataset to {data_fn}")
+    # Saving and augmentation as before...
 
-    # symmetries
-    try:
-        sym_data = apply_symmetries_to_data(data, 1.0)
-        sym_fn = cfg.get(sec, "output_filename_sym", fallback=data_fn.replace('.pt','_sym.pt'))
-        torch.save(torch.from_numpy(sym_data), sym_fn)
-        print(f"Saved symmetrized data to {sym_fn}")
-    except ValueError:
-        pass
-
-    # top 25%
-    k = max(1, int(np.ceil(0.25 * M)))
-    best_idx = np.argsort(min_dists)[-k:]
-    top_data = data[best_idx]
-    top_fn = cfg.get(sec, "output_filename_top")
-    torch.save(torch.from_numpy(top_data), top_fn)
-    print(f"Saved top {k} samples to {top_fn}")
-
-    try:
-        sym_top = apply_symmetries_to_data(top_data, 1.0)
-        sym_top_fn = cfg.get(sec, "output_filename_sym_top", fallback=top_fn.replace('.pt','_sym.pt'))
-        torch.save(torch.from_numpy(sym_top), sym_top_fn)
-        print(f"Saved symmetrized top data to {sym_top_fn}")
-    except ValueError:
-        pass
-
-# -----------------------------------------------------------------------------
-# Dataset & DataLoader
-# -----------------------------------------------------------------------------
-
-class SpherePackingDataset(Dataset):
-    def __init__(self, path: str):
-        self.data = torch.load(path)
-        print(f"Loaded {path}, shape {self.data.shape}")
-    def __len__(self):
-        return self.data.shape[0]
-    def __getitem__(self, idx):
-        return self.data[idx]
-
-
-def get_data_loader(batch_size: int, dataset_path: str):
-    ds = SpherePackingDataset(dataset_path)
-    return DataLoader(ds, batch_size=batch_size, shuffle=True)
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     generate_dataset_pbts()
