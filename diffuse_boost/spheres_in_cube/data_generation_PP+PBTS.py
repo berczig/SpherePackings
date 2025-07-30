@@ -4,6 +4,7 @@ import torch
 from torch.utils.data import DataLoader, Dataset
 import itertools
 from scipy.optimize import minimize
+from datetime import datetime
 from diffuse_boost import cfg
 from diffuse_boost.spheres_in_cube.physics_push_PESC import eliminate_overlaps_box
 
@@ -180,7 +181,8 @@ def generate_dataset_push_srp():
     tol = cfg.getfloat(sec, "tol")
     mode = cfg.get(sec, "boundary_mode")
 
-    metrics_fn = cfg.get(sec, "output_filename_metrics", fallback="srp_metrics.csv")
+    timestamp_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S") 
+    metrics_fn = cfg.get(sec, "output_filename_metrics", fallback="srp_metrics.csv").replace("{DATE}", timestamp_str)
     metrics_dir = os.path.dirname(metrics_fn)
     if metrics_dir:
         os.makedirs(metrics_dir, exist_ok=True)
@@ -262,7 +264,7 @@ def generate_dataset_push_srp():
         min_dists.append(best_min)
         print(f"Finished sample {i+1}/{M}, best_min = {best_min:.6f}\n")
 
-    data_fn = cfg.get(sec, "output_filename")
+    data_fn = cfg.get(sec, "output_filename").replace("{DATE}", timestamp_str)
     data_dir = os.path.dirname(data_fn)
     if data_dir:
         os.makedirs(data_dir, exist_ok=True)
@@ -271,7 +273,7 @@ def generate_dataset_push_srp():
 
     try:
         sym_data = apply_symmetries_to_data(data, L)
-        sym_fn = cfg.get(sec, "output_filename_sym", fallback=data_fn.replace('.pt', '_sym.pt'))
+        sym_fn = cfg.get(sec, "output_filename_sym", fallback=data_fn.replace('.pt', '_sym.pt')).replace("{DATE}", timestamp_str)
         sym_dir = os.path.dirname(sym_fn)
         if sym_dir:
             os.makedirs(sym_dir, exist_ok=True)
@@ -283,7 +285,7 @@ def generate_dataset_push_srp():
     k_top = max(1, int(np.ceil(0.25 * M)))
     best_idx = np.argsort(min_dists)[-k_top:]
     top_data = data[best_idx]
-    top_fn = cfg.get(sec, "output_filename_top")
+    top_fn = cfg.get(sec, "output_filename_top").replace("{DATE}", timestamp_str)
     top_dir = os.path.dirname(top_fn)
     if top_dir:
         os.makedirs(top_dir, exist_ok=True)
@@ -292,7 +294,7 @@ def generate_dataset_push_srp():
 
     try:
         sym_top = apply_symmetries_to_data(top_data, L)
-        sym_top_fn = cfg.get(sec, "output_filename_sym_top", fallback=top_fn.replace('.pt', '_sym.pt'))
+        sym_top_fn = cfg.get(sec, "output_filename_sym_top", fallback=top_fn.replace('.pt', '_sym.pt')).replace("{DATE}", timestamp_str)
         sym_top_dir = os.path.dirname(sym_top_fn)
         if sym_top_dir:
             os.makedirs(sym_top_dir, exist_ok=True)
@@ -300,6 +302,15 @@ def generate_dataset_push_srp():
         print(f"Saved symmetrized top dataset to {sym_top_fn}")
     except ValueError as e:
         print(f"Skipping symmetry enrichment for top samples: {e}")
+
+def load_metrics_PP_p_PBTS(filename):
+    data_excess = []
+    with open(filename) as m_file:
+        lines = m_file.readlines()
+        for data_text in lines[1:]:
+            data_string = data_text.split(",")
+            data_excess.append(float(data_string[-1]))
+    return data_excess
 
 if __name__ == "__main__":
     generate_dataset_push_srp()
