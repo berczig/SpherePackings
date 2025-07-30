@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import torch
+import time
 from torch import nn
 from torch.utils.data import DataLoader, Dataset, Subset
 import matplotlib.pyplot as plt
@@ -120,7 +121,7 @@ def distance_penalty(output: torch.Tensor, radius):
     mask     = torch.triu(torch.ones(B,N,N,device=distances.device), diagonal=1).bool()
     vio_mask = violation * mask
     num_pairs= N*(N-1)/2
-    return (vio_mask**2).sum()/(num_pairs*B)
+    return (vio_mask**4).sum()/(num_pairs*B)
 
 # --- Save Model & Loss Plot ---
 def save_with_plot(model, optimizer, history, epoch, params, sec):
@@ -138,6 +139,7 @@ def save_with_plot(model, optimizer, history, epoch, params, sec):
     plt.plot(history[:,2], label="Total Loss")
     plt.yscale('log')
     plt.xlabel('Epoch'); plt.ylabel('Loss'); plt.legend()
+    plt.grid()
     plt.savefig(os.path.join(save_dir, f"flow_loss_{ts}.png"))
 
 # --- Training routine (Flow Matching) ---
@@ -155,7 +157,15 @@ def train_flow_model(
     center = (bmin + bmax)*0.5
     half   = (bmax - bmin)*0.5
 
+    pause_time = 60
+    work_time = 1800
+    pause_timestamp = time.time() + work_time
+
     for epoch in tqdm(range(num_epochs), desc="Training"):
+        if time.time() > pause_timestamp:
+            pause_timestamp = time.time() + work_time
+            print(f"pausing for {pause_time} seconds")
+            time.sleep(pause_time)
         ep_losses=[]
         ratio=epoch/num_epochs
         for x0 in loader:
