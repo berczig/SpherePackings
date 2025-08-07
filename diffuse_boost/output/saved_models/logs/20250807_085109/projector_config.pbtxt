@@ -1,0 +1,6000 @@
+embeddings {
+  tensor_name: "3d_points_epoch_1:00000"
+  tensor_path: "00000/3d_points_epoch_1\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_2:00000"
+  tensor_path: "00000/3d_points_epoch_2\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_3:00000"
+  tensor_path: "00000/3d_points_epoch_3\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_4:00000"
+  tensor_path: "00000/3d_points_epoch_4\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_5:00000"
+  tensor_path: "00000/3d_points_epoch_5\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_6:00000"
+  tensor_path: "00000/3d_points_epoch_6\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_7:00000"
+  tensor_path: "00000/3d_points_epoch_7\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_8:00000"
+  tensor_path: "00000/3d_points_epoch_8\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_9:00000"
+  tensor_path: "00000/3d_points_epoch_9\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_10:00000"
+  tensor_path: "00000/3d_points_epoch_10\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_11:00000"
+  tensor_path: "00000/3d_points_epoch_11\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_12:00000"
+  tensor_path: "00000/3d_points_epoch_12\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_13:00000"
+  tensor_path: "00000/3d_points_epoch_13\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_14:00000"
+  tensor_path: "00000/3d_points_epoch_14\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_15:00000"
+  tensor_path: "00000/3d_points_epoch_15\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_16:00000"
+  tensor_path: "00000/3d_points_epoch_16\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_17:00000"
+  tensor_path: "00000/3d_points_epoch_17\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_18:00000"
+  tensor_path: "00000/3d_points_epoch_18\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_19:00000"
+  tensor_path: "00000/3d_points_epoch_19\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_20:00000"
+  tensor_path: "00000/3d_points_epoch_20\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_21:00000"
+  tensor_path: "00000/3d_points_epoch_21\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_22:00000"
+  tensor_path: "00000/3d_points_epoch_22\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_23:00000"
+  tensor_path: "00000/3d_points_epoch_23\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_24:00000"
+  tensor_path: "00000/3d_points_epoch_24\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_25:00000"
+  tensor_path: "00000/3d_points_epoch_25\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_26:00000"
+  tensor_path: "00000/3d_points_epoch_26\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_27:00000"
+  tensor_path: "00000/3d_points_epoch_27\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_28:00000"
+  tensor_path: "00000/3d_points_epoch_28\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_29:00000"
+  tensor_path: "00000/3d_points_epoch_29\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_30:00000"
+  tensor_path: "00000/3d_points_epoch_30\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_31:00000"
+  tensor_path: "00000/3d_points_epoch_31\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_32:00000"
+  tensor_path: "00000/3d_points_epoch_32\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_33:00000"
+  tensor_path: "00000/3d_points_epoch_33\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_34:00000"
+  tensor_path: "00000/3d_points_epoch_34\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_35:00000"
+  tensor_path: "00000/3d_points_epoch_35\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_36:00000"
+  tensor_path: "00000/3d_points_epoch_36\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_37:00000"
+  tensor_path: "00000/3d_points_epoch_37\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_38:00000"
+  tensor_path: "00000/3d_points_epoch_38\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_39:00000"
+  tensor_path: "00000/3d_points_epoch_39\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_40:00000"
+  tensor_path: "00000/3d_points_epoch_40\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_41:00000"
+  tensor_path: "00000/3d_points_epoch_41\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_42:00000"
+  tensor_path: "00000/3d_points_epoch_42\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_43:00000"
+  tensor_path: "00000/3d_points_epoch_43\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_44:00000"
+  tensor_path: "00000/3d_points_epoch_44\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_45:00000"
+  tensor_path: "00000/3d_points_epoch_45\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_46:00000"
+  tensor_path: "00000/3d_points_epoch_46\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_47:00000"
+  tensor_path: "00000/3d_points_epoch_47\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_48:00000"
+  tensor_path: "00000/3d_points_epoch_48\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_49:00000"
+  tensor_path: "00000/3d_points_epoch_49\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_50:00000"
+  tensor_path: "00000/3d_points_epoch_50\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_51:00000"
+  tensor_path: "00000/3d_points_epoch_51\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_52:00000"
+  tensor_path: "00000/3d_points_epoch_52\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_53:00000"
+  tensor_path: "00000/3d_points_epoch_53\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_54:00000"
+  tensor_path: "00000/3d_points_epoch_54\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_55:00000"
+  tensor_path: "00000/3d_points_epoch_55\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_56:00000"
+  tensor_path: "00000/3d_points_epoch_56\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_57:00000"
+  tensor_path: "00000/3d_points_epoch_57\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_58:00000"
+  tensor_path: "00000/3d_points_epoch_58\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_59:00000"
+  tensor_path: "00000/3d_points_epoch_59\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_60:00000"
+  tensor_path: "00000/3d_points_epoch_60\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_61:00000"
+  tensor_path: "00000/3d_points_epoch_61\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_62:00000"
+  tensor_path: "00000/3d_points_epoch_62\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_63:00000"
+  tensor_path: "00000/3d_points_epoch_63\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_64:00000"
+  tensor_path: "00000/3d_points_epoch_64\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_65:00000"
+  tensor_path: "00000/3d_points_epoch_65\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_66:00000"
+  tensor_path: "00000/3d_points_epoch_66\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_67:00000"
+  tensor_path: "00000/3d_points_epoch_67\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_68:00000"
+  tensor_path: "00000/3d_points_epoch_68\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_69:00000"
+  tensor_path: "00000/3d_points_epoch_69\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_70:00000"
+  tensor_path: "00000/3d_points_epoch_70\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_71:00000"
+  tensor_path: "00000/3d_points_epoch_71\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_72:00000"
+  tensor_path: "00000/3d_points_epoch_72\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_73:00000"
+  tensor_path: "00000/3d_points_epoch_73\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_74:00000"
+  tensor_path: "00000/3d_points_epoch_74\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_75:00000"
+  tensor_path: "00000/3d_points_epoch_75\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_76:00000"
+  tensor_path: "00000/3d_points_epoch_76\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_77:00000"
+  tensor_path: "00000/3d_points_epoch_77\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_78:00000"
+  tensor_path: "00000/3d_points_epoch_78\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_79:00000"
+  tensor_path: "00000/3d_points_epoch_79\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_80:00000"
+  tensor_path: "00000/3d_points_epoch_80\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_81:00000"
+  tensor_path: "00000/3d_points_epoch_81\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_82:00000"
+  tensor_path: "00000/3d_points_epoch_82\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_83:00000"
+  tensor_path: "00000/3d_points_epoch_83\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_84:00000"
+  tensor_path: "00000/3d_points_epoch_84\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_85:00000"
+  tensor_path: "00000/3d_points_epoch_85\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_86:00000"
+  tensor_path: "00000/3d_points_epoch_86\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_87:00000"
+  tensor_path: "00000/3d_points_epoch_87\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_88:00000"
+  tensor_path: "00000/3d_points_epoch_88\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_89:00000"
+  tensor_path: "00000/3d_points_epoch_89\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_90:00000"
+  tensor_path: "00000/3d_points_epoch_90\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_91:00000"
+  tensor_path: "00000/3d_points_epoch_91\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_92:00000"
+  tensor_path: "00000/3d_points_epoch_92\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_93:00000"
+  tensor_path: "00000/3d_points_epoch_93\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_94:00000"
+  tensor_path: "00000/3d_points_epoch_94\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_95:00000"
+  tensor_path: "00000/3d_points_epoch_95\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_96:00000"
+  tensor_path: "00000/3d_points_epoch_96\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_97:00000"
+  tensor_path: "00000/3d_points_epoch_97\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_98:00000"
+  tensor_path: "00000/3d_points_epoch_98\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_99:00000"
+  tensor_path: "00000/3d_points_epoch_99\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_100:00000"
+  tensor_path: "00000/3d_points_epoch_100\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_101:00000"
+  tensor_path: "00000/3d_points_epoch_101\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_102:00000"
+  tensor_path: "00000/3d_points_epoch_102\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_103:00000"
+  tensor_path: "00000/3d_points_epoch_103\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_104:00000"
+  tensor_path: "00000/3d_points_epoch_104\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_105:00000"
+  tensor_path: "00000/3d_points_epoch_105\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_106:00000"
+  tensor_path: "00000/3d_points_epoch_106\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_107:00000"
+  tensor_path: "00000/3d_points_epoch_107\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_108:00000"
+  tensor_path: "00000/3d_points_epoch_108\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_109:00000"
+  tensor_path: "00000/3d_points_epoch_109\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_110:00000"
+  tensor_path: "00000/3d_points_epoch_110\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_111:00000"
+  tensor_path: "00000/3d_points_epoch_111\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_112:00000"
+  tensor_path: "00000/3d_points_epoch_112\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_113:00000"
+  tensor_path: "00000/3d_points_epoch_113\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_114:00000"
+  tensor_path: "00000/3d_points_epoch_114\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_115:00000"
+  tensor_path: "00000/3d_points_epoch_115\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_116:00000"
+  tensor_path: "00000/3d_points_epoch_116\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_117:00000"
+  tensor_path: "00000/3d_points_epoch_117\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_118:00000"
+  tensor_path: "00000/3d_points_epoch_118\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_119:00000"
+  tensor_path: "00000/3d_points_epoch_119\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_120:00000"
+  tensor_path: "00000/3d_points_epoch_120\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_121:00000"
+  tensor_path: "00000/3d_points_epoch_121\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_122:00000"
+  tensor_path: "00000/3d_points_epoch_122\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_123:00000"
+  tensor_path: "00000/3d_points_epoch_123\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_124:00000"
+  tensor_path: "00000/3d_points_epoch_124\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_125:00000"
+  tensor_path: "00000/3d_points_epoch_125\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_126:00000"
+  tensor_path: "00000/3d_points_epoch_126\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_127:00000"
+  tensor_path: "00000/3d_points_epoch_127\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_128:00000"
+  tensor_path: "00000/3d_points_epoch_128\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_129:00000"
+  tensor_path: "00000/3d_points_epoch_129\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_130:00000"
+  tensor_path: "00000/3d_points_epoch_130\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_131:00000"
+  tensor_path: "00000/3d_points_epoch_131\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_132:00000"
+  tensor_path: "00000/3d_points_epoch_132\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_133:00000"
+  tensor_path: "00000/3d_points_epoch_133\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_134:00000"
+  tensor_path: "00000/3d_points_epoch_134\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_135:00000"
+  tensor_path: "00000/3d_points_epoch_135\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_136:00000"
+  tensor_path: "00000/3d_points_epoch_136\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_137:00000"
+  tensor_path: "00000/3d_points_epoch_137\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_138:00000"
+  tensor_path: "00000/3d_points_epoch_138\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_139:00000"
+  tensor_path: "00000/3d_points_epoch_139\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_140:00000"
+  tensor_path: "00000/3d_points_epoch_140\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_141:00000"
+  tensor_path: "00000/3d_points_epoch_141\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_142:00000"
+  tensor_path: "00000/3d_points_epoch_142\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_143:00000"
+  tensor_path: "00000/3d_points_epoch_143\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_144:00000"
+  tensor_path: "00000/3d_points_epoch_144\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_145:00000"
+  tensor_path: "00000/3d_points_epoch_145\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_146:00000"
+  tensor_path: "00000/3d_points_epoch_146\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_147:00000"
+  tensor_path: "00000/3d_points_epoch_147\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_148:00000"
+  tensor_path: "00000/3d_points_epoch_148\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_149:00000"
+  tensor_path: "00000/3d_points_epoch_149\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_150:00000"
+  tensor_path: "00000/3d_points_epoch_150\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_151:00000"
+  tensor_path: "00000/3d_points_epoch_151\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_152:00000"
+  tensor_path: "00000/3d_points_epoch_152\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_153:00000"
+  tensor_path: "00000/3d_points_epoch_153\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_154:00000"
+  tensor_path: "00000/3d_points_epoch_154\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_155:00000"
+  tensor_path: "00000/3d_points_epoch_155\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_156:00000"
+  tensor_path: "00000/3d_points_epoch_156\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_157:00000"
+  tensor_path: "00000/3d_points_epoch_157\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_158:00000"
+  tensor_path: "00000/3d_points_epoch_158\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_159:00000"
+  tensor_path: "00000/3d_points_epoch_159\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_160:00000"
+  tensor_path: "00000/3d_points_epoch_160\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_161:00000"
+  tensor_path: "00000/3d_points_epoch_161\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_162:00000"
+  tensor_path: "00000/3d_points_epoch_162\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_163:00000"
+  tensor_path: "00000/3d_points_epoch_163\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_164:00000"
+  tensor_path: "00000/3d_points_epoch_164\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_165:00000"
+  tensor_path: "00000/3d_points_epoch_165\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_166:00000"
+  tensor_path: "00000/3d_points_epoch_166\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_167:00000"
+  tensor_path: "00000/3d_points_epoch_167\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_168:00000"
+  tensor_path: "00000/3d_points_epoch_168\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_169:00000"
+  tensor_path: "00000/3d_points_epoch_169\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_170:00000"
+  tensor_path: "00000/3d_points_epoch_170\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_171:00000"
+  tensor_path: "00000/3d_points_epoch_171\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_172:00000"
+  tensor_path: "00000/3d_points_epoch_172\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_173:00000"
+  tensor_path: "00000/3d_points_epoch_173\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_174:00000"
+  tensor_path: "00000/3d_points_epoch_174\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_175:00000"
+  tensor_path: "00000/3d_points_epoch_175\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_176:00000"
+  tensor_path: "00000/3d_points_epoch_176\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_177:00000"
+  tensor_path: "00000/3d_points_epoch_177\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_178:00000"
+  tensor_path: "00000/3d_points_epoch_178\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_179:00000"
+  tensor_path: "00000/3d_points_epoch_179\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_180:00000"
+  tensor_path: "00000/3d_points_epoch_180\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_181:00000"
+  tensor_path: "00000/3d_points_epoch_181\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_182:00000"
+  tensor_path: "00000/3d_points_epoch_182\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_183:00000"
+  tensor_path: "00000/3d_points_epoch_183\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_184:00000"
+  tensor_path: "00000/3d_points_epoch_184\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_185:00000"
+  tensor_path: "00000/3d_points_epoch_185\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_186:00000"
+  tensor_path: "00000/3d_points_epoch_186\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_187:00000"
+  tensor_path: "00000/3d_points_epoch_187\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_188:00000"
+  tensor_path: "00000/3d_points_epoch_188\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_189:00000"
+  tensor_path: "00000/3d_points_epoch_189\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_190:00000"
+  tensor_path: "00000/3d_points_epoch_190\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_191:00000"
+  tensor_path: "00000/3d_points_epoch_191\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_192:00000"
+  tensor_path: "00000/3d_points_epoch_192\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_193:00000"
+  tensor_path: "00000/3d_points_epoch_193\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_194:00000"
+  tensor_path: "00000/3d_points_epoch_194\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_195:00000"
+  tensor_path: "00000/3d_points_epoch_195\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_196:00000"
+  tensor_path: "00000/3d_points_epoch_196\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_197:00000"
+  tensor_path: "00000/3d_points_epoch_197\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_198:00000"
+  tensor_path: "00000/3d_points_epoch_198\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_199:00000"
+  tensor_path: "00000/3d_points_epoch_199\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_200:00000"
+  tensor_path: "00000/3d_points_epoch_200\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_201:00000"
+  tensor_path: "00000/3d_points_epoch_201\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_202:00000"
+  tensor_path: "00000/3d_points_epoch_202\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_203:00000"
+  tensor_path: "00000/3d_points_epoch_203\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_204:00000"
+  tensor_path: "00000/3d_points_epoch_204\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_205:00000"
+  tensor_path: "00000/3d_points_epoch_205\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_206:00000"
+  tensor_path: "00000/3d_points_epoch_206\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_207:00000"
+  tensor_path: "00000/3d_points_epoch_207\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_208:00000"
+  tensor_path: "00000/3d_points_epoch_208\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_209:00000"
+  tensor_path: "00000/3d_points_epoch_209\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_210:00000"
+  tensor_path: "00000/3d_points_epoch_210\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_211:00000"
+  tensor_path: "00000/3d_points_epoch_211\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_212:00000"
+  tensor_path: "00000/3d_points_epoch_212\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_213:00000"
+  tensor_path: "00000/3d_points_epoch_213\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_214:00000"
+  tensor_path: "00000/3d_points_epoch_214\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_215:00000"
+  tensor_path: "00000/3d_points_epoch_215\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_216:00000"
+  tensor_path: "00000/3d_points_epoch_216\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_217:00000"
+  tensor_path: "00000/3d_points_epoch_217\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_218:00000"
+  tensor_path: "00000/3d_points_epoch_218\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_219:00000"
+  tensor_path: "00000/3d_points_epoch_219\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_220:00000"
+  tensor_path: "00000/3d_points_epoch_220\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_221:00000"
+  tensor_path: "00000/3d_points_epoch_221\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_222:00000"
+  tensor_path: "00000/3d_points_epoch_222\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_223:00000"
+  tensor_path: "00000/3d_points_epoch_223\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_224:00000"
+  tensor_path: "00000/3d_points_epoch_224\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_225:00000"
+  tensor_path: "00000/3d_points_epoch_225\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_226:00000"
+  tensor_path: "00000/3d_points_epoch_226\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_227:00000"
+  tensor_path: "00000/3d_points_epoch_227\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_228:00000"
+  tensor_path: "00000/3d_points_epoch_228\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_229:00000"
+  tensor_path: "00000/3d_points_epoch_229\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_230:00000"
+  tensor_path: "00000/3d_points_epoch_230\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_231:00000"
+  tensor_path: "00000/3d_points_epoch_231\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_232:00000"
+  tensor_path: "00000/3d_points_epoch_232\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_233:00000"
+  tensor_path: "00000/3d_points_epoch_233\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_234:00000"
+  tensor_path: "00000/3d_points_epoch_234\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_235:00000"
+  tensor_path: "00000/3d_points_epoch_235\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_236:00000"
+  tensor_path: "00000/3d_points_epoch_236\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_237:00000"
+  tensor_path: "00000/3d_points_epoch_237\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_238:00000"
+  tensor_path: "00000/3d_points_epoch_238\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_239:00000"
+  tensor_path: "00000/3d_points_epoch_239\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_240:00000"
+  tensor_path: "00000/3d_points_epoch_240\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_241:00000"
+  tensor_path: "00000/3d_points_epoch_241\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_242:00000"
+  tensor_path: "00000/3d_points_epoch_242\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_243:00000"
+  tensor_path: "00000/3d_points_epoch_243\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_244:00000"
+  tensor_path: "00000/3d_points_epoch_244\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_245:00000"
+  tensor_path: "00000/3d_points_epoch_245\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_246:00000"
+  tensor_path: "00000/3d_points_epoch_246\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_247:00000"
+  tensor_path: "00000/3d_points_epoch_247\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_248:00000"
+  tensor_path: "00000/3d_points_epoch_248\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_249:00000"
+  tensor_path: "00000/3d_points_epoch_249\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_250:00000"
+  tensor_path: "00000/3d_points_epoch_250\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_251:00000"
+  tensor_path: "00000/3d_points_epoch_251\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_252:00000"
+  tensor_path: "00000/3d_points_epoch_252\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_253:00000"
+  tensor_path: "00000/3d_points_epoch_253\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_254:00000"
+  tensor_path: "00000/3d_points_epoch_254\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_255:00000"
+  tensor_path: "00000/3d_points_epoch_255\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_256:00000"
+  tensor_path: "00000/3d_points_epoch_256\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_257:00000"
+  tensor_path: "00000/3d_points_epoch_257\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_258:00000"
+  tensor_path: "00000/3d_points_epoch_258\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_259:00000"
+  tensor_path: "00000/3d_points_epoch_259\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_260:00000"
+  tensor_path: "00000/3d_points_epoch_260\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_261:00000"
+  tensor_path: "00000/3d_points_epoch_261\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_262:00000"
+  tensor_path: "00000/3d_points_epoch_262\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_263:00000"
+  tensor_path: "00000/3d_points_epoch_263\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_264:00000"
+  tensor_path: "00000/3d_points_epoch_264\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_265:00000"
+  tensor_path: "00000/3d_points_epoch_265\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_266:00000"
+  tensor_path: "00000/3d_points_epoch_266\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_267:00000"
+  tensor_path: "00000/3d_points_epoch_267\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_268:00000"
+  tensor_path: "00000/3d_points_epoch_268\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_269:00000"
+  tensor_path: "00000/3d_points_epoch_269\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_270:00000"
+  tensor_path: "00000/3d_points_epoch_270\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_271:00000"
+  tensor_path: "00000/3d_points_epoch_271\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_272:00000"
+  tensor_path: "00000/3d_points_epoch_272\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_273:00000"
+  tensor_path: "00000/3d_points_epoch_273\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_274:00000"
+  tensor_path: "00000/3d_points_epoch_274\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_275:00000"
+  tensor_path: "00000/3d_points_epoch_275\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_276:00000"
+  tensor_path: "00000/3d_points_epoch_276\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_277:00000"
+  tensor_path: "00000/3d_points_epoch_277\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_278:00000"
+  tensor_path: "00000/3d_points_epoch_278\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_279:00000"
+  tensor_path: "00000/3d_points_epoch_279\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_280:00000"
+  tensor_path: "00000/3d_points_epoch_280\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_281:00000"
+  tensor_path: "00000/3d_points_epoch_281\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_282:00000"
+  tensor_path: "00000/3d_points_epoch_282\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_283:00000"
+  tensor_path: "00000/3d_points_epoch_283\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_284:00000"
+  tensor_path: "00000/3d_points_epoch_284\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_285:00000"
+  tensor_path: "00000/3d_points_epoch_285\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_286:00000"
+  tensor_path: "00000/3d_points_epoch_286\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_287:00000"
+  tensor_path: "00000/3d_points_epoch_287\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_288:00000"
+  tensor_path: "00000/3d_points_epoch_288\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_289:00000"
+  tensor_path: "00000/3d_points_epoch_289\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_290:00000"
+  tensor_path: "00000/3d_points_epoch_290\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_291:00000"
+  tensor_path: "00000/3d_points_epoch_291\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_292:00000"
+  tensor_path: "00000/3d_points_epoch_292\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_293:00000"
+  tensor_path: "00000/3d_points_epoch_293\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_294:00000"
+  tensor_path: "00000/3d_points_epoch_294\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_295:00000"
+  tensor_path: "00000/3d_points_epoch_295\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_296:00000"
+  tensor_path: "00000/3d_points_epoch_296\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_297:00000"
+  tensor_path: "00000/3d_points_epoch_297\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_298:00000"
+  tensor_path: "00000/3d_points_epoch_298\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_299:00000"
+  tensor_path: "00000/3d_points_epoch_299\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_300:00000"
+  tensor_path: "00000/3d_points_epoch_300\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_301:00000"
+  tensor_path: "00000/3d_points_epoch_301\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_302:00000"
+  tensor_path: "00000/3d_points_epoch_302\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_303:00000"
+  tensor_path: "00000/3d_points_epoch_303\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_304:00000"
+  tensor_path: "00000/3d_points_epoch_304\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_305:00000"
+  tensor_path: "00000/3d_points_epoch_305\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_306:00000"
+  tensor_path: "00000/3d_points_epoch_306\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_307:00000"
+  tensor_path: "00000/3d_points_epoch_307\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_308:00000"
+  tensor_path: "00000/3d_points_epoch_308\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_309:00000"
+  tensor_path: "00000/3d_points_epoch_309\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_310:00000"
+  tensor_path: "00000/3d_points_epoch_310\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_311:00000"
+  tensor_path: "00000/3d_points_epoch_311\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_312:00000"
+  tensor_path: "00000/3d_points_epoch_312\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_313:00000"
+  tensor_path: "00000/3d_points_epoch_313\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_314:00000"
+  tensor_path: "00000/3d_points_epoch_314\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_315:00000"
+  tensor_path: "00000/3d_points_epoch_315\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_316:00000"
+  tensor_path: "00000/3d_points_epoch_316\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_317:00000"
+  tensor_path: "00000/3d_points_epoch_317\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_318:00000"
+  tensor_path: "00000/3d_points_epoch_318\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_319:00000"
+  tensor_path: "00000/3d_points_epoch_319\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_320:00000"
+  tensor_path: "00000/3d_points_epoch_320\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_321:00000"
+  tensor_path: "00000/3d_points_epoch_321\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_322:00000"
+  tensor_path: "00000/3d_points_epoch_322\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_323:00000"
+  tensor_path: "00000/3d_points_epoch_323\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_324:00000"
+  tensor_path: "00000/3d_points_epoch_324\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_325:00000"
+  tensor_path: "00000/3d_points_epoch_325\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_326:00000"
+  tensor_path: "00000/3d_points_epoch_326\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_327:00000"
+  tensor_path: "00000/3d_points_epoch_327\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_328:00000"
+  tensor_path: "00000/3d_points_epoch_328\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_329:00000"
+  tensor_path: "00000/3d_points_epoch_329\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_330:00000"
+  tensor_path: "00000/3d_points_epoch_330\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_331:00000"
+  tensor_path: "00000/3d_points_epoch_331\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_332:00000"
+  tensor_path: "00000/3d_points_epoch_332\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_333:00000"
+  tensor_path: "00000/3d_points_epoch_333\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_334:00000"
+  tensor_path: "00000/3d_points_epoch_334\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_335:00000"
+  tensor_path: "00000/3d_points_epoch_335\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_336:00000"
+  tensor_path: "00000/3d_points_epoch_336\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_337:00000"
+  tensor_path: "00000/3d_points_epoch_337\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_338:00000"
+  tensor_path: "00000/3d_points_epoch_338\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_339:00000"
+  tensor_path: "00000/3d_points_epoch_339\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_340:00000"
+  tensor_path: "00000/3d_points_epoch_340\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_341:00000"
+  tensor_path: "00000/3d_points_epoch_341\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_342:00000"
+  tensor_path: "00000/3d_points_epoch_342\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_343:00000"
+  tensor_path: "00000/3d_points_epoch_343\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_344:00000"
+  tensor_path: "00000/3d_points_epoch_344\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_345:00000"
+  tensor_path: "00000/3d_points_epoch_345\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_346:00000"
+  tensor_path: "00000/3d_points_epoch_346\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_347:00000"
+  tensor_path: "00000/3d_points_epoch_347\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_348:00000"
+  tensor_path: "00000/3d_points_epoch_348\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_349:00000"
+  tensor_path: "00000/3d_points_epoch_349\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_350:00000"
+  tensor_path: "00000/3d_points_epoch_350\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_351:00000"
+  tensor_path: "00000/3d_points_epoch_351\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_352:00000"
+  tensor_path: "00000/3d_points_epoch_352\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_353:00000"
+  tensor_path: "00000/3d_points_epoch_353\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_354:00000"
+  tensor_path: "00000/3d_points_epoch_354\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_355:00000"
+  tensor_path: "00000/3d_points_epoch_355\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_356:00000"
+  tensor_path: "00000/3d_points_epoch_356\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_357:00000"
+  tensor_path: "00000/3d_points_epoch_357\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_358:00000"
+  tensor_path: "00000/3d_points_epoch_358\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_359:00000"
+  tensor_path: "00000/3d_points_epoch_359\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_360:00000"
+  tensor_path: "00000/3d_points_epoch_360\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_361:00000"
+  tensor_path: "00000/3d_points_epoch_361\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_362:00000"
+  tensor_path: "00000/3d_points_epoch_362\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_363:00000"
+  tensor_path: "00000/3d_points_epoch_363\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_364:00000"
+  tensor_path: "00000/3d_points_epoch_364\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_365:00000"
+  tensor_path: "00000/3d_points_epoch_365\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_366:00000"
+  tensor_path: "00000/3d_points_epoch_366\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_367:00000"
+  tensor_path: "00000/3d_points_epoch_367\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_368:00000"
+  tensor_path: "00000/3d_points_epoch_368\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_369:00000"
+  tensor_path: "00000/3d_points_epoch_369\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_370:00000"
+  tensor_path: "00000/3d_points_epoch_370\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_371:00000"
+  tensor_path: "00000/3d_points_epoch_371\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_372:00000"
+  tensor_path: "00000/3d_points_epoch_372\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_373:00000"
+  tensor_path: "00000/3d_points_epoch_373\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_374:00000"
+  tensor_path: "00000/3d_points_epoch_374\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_375:00000"
+  tensor_path: "00000/3d_points_epoch_375\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_376:00000"
+  tensor_path: "00000/3d_points_epoch_376\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_377:00000"
+  tensor_path: "00000/3d_points_epoch_377\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_378:00000"
+  tensor_path: "00000/3d_points_epoch_378\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_379:00000"
+  tensor_path: "00000/3d_points_epoch_379\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_380:00000"
+  tensor_path: "00000/3d_points_epoch_380\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_381:00000"
+  tensor_path: "00000/3d_points_epoch_381\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_382:00000"
+  tensor_path: "00000/3d_points_epoch_382\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_383:00000"
+  tensor_path: "00000/3d_points_epoch_383\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_384:00000"
+  tensor_path: "00000/3d_points_epoch_384\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_385:00000"
+  tensor_path: "00000/3d_points_epoch_385\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_386:00000"
+  tensor_path: "00000/3d_points_epoch_386\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_387:00000"
+  tensor_path: "00000/3d_points_epoch_387\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_388:00000"
+  tensor_path: "00000/3d_points_epoch_388\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_389:00000"
+  tensor_path: "00000/3d_points_epoch_389\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_390:00000"
+  tensor_path: "00000/3d_points_epoch_390\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_391:00000"
+  tensor_path: "00000/3d_points_epoch_391\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_392:00000"
+  tensor_path: "00000/3d_points_epoch_392\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_393:00000"
+  tensor_path: "00000/3d_points_epoch_393\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_394:00000"
+  tensor_path: "00000/3d_points_epoch_394\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_395:00000"
+  tensor_path: "00000/3d_points_epoch_395\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_396:00000"
+  tensor_path: "00000/3d_points_epoch_396\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_397:00000"
+  tensor_path: "00000/3d_points_epoch_397\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_398:00000"
+  tensor_path: "00000/3d_points_epoch_398\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_399:00000"
+  tensor_path: "00000/3d_points_epoch_399\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_400:00000"
+  tensor_path: "00000/3d_points_epoch_400\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_401:00000"
+  tensor_path: "00000/3d_points_epoch_401\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_402:00000"
+  tensor_path: "00000/3d_points_epoch_402\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_403:00000"
+  tensor_path: "00000/3d_points_epoch_403\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_404:00000"
+  tensor_path: "00000/3d_points_epoch_404\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_405:00000"
+  tensor_path: "00000/3d_points_epoch_405\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_406:00000"
+  tensor_path: "00000/3d_points_epoch_406\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_407:00000"
+  tensor_path: "00000/3d_points_epoch_407\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_408:00000"
+  tensor_path: "00000/3d_points_epoch_408\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_409:00000"
+  tensor_path: "00000/3d_points_epoch_409\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_410:00000"
+  tensor_path: "00000/3d_points_epoch_410\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_411:00000"
+  tensor_path: "00000/3d_points_epoch_411\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_412:00000"
+  tensor_path: "00000/3d_points_epoch_412\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_413:00000"
+  tensor_path: "00000/3d_points_epoch_413\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_414:00000"
+  tensor_path: "00000/3d_points_epoch_414\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_415:00000"
+  tensor_path: "00000/3d_points_epoch_415\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_416:00000"
+  tensor_path: "00000/3d_points_epoch_416\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_417:00000"
+  tensor_path: "00000/3d_points_epoch_417\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_418:00000"
+  tensor_path: "00000/3d_points_epoch_418\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_419:00000"
+  tensor_path: "00000/3d_points_epoch_419\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_420:00000"
+  tensor_path: "00000/3d_points_epoch_420\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_421:00000"
+  tensor_path: "00000/3d_points_epoch_421\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_422:00000"
+  tensor_path: "00000/3d_points_epoch_422\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_423:00000"
+  tensor_path: "00000/3d_points_epoch_423\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_424:00000"
+  tensor_path: "00000/3d_points_epoch_424\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_425:00000"
+  tensor_path: "00000/3d_points_epoch_425\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_426:00000"
+  tensor_path: "00000/3d_points_epoch_426\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_427:00000"
+  tensor_path: "00000/3d_points_epoch_427\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_428:00000"
+  tensor_path: "00000/3d_points_epoch_428\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_429:00000"
+  tensor_path: "00000/3d_points_epoch_429\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_430:00000"
+  tensor_path: "00000/3d_points_epoch_430\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_431:00000"
+  tensor_path: "00000/3d_points_epoch_431\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_432:00000"
+  tensor_path: "00000/3d_points_epoch_432\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_433:00000"
+  tensor_path: "00000/3d_points_epoch_433\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_434:00000"
+  tensor_path: "00000/3d_points_epoch_434\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_435:00000"
+  tensor_path: "00000/3d_points_epoch_435\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_436:00000"
+  tensor_path: "00000/3d_points_epoch_436\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_437:00000"
+  tensor_path: "00000/3d_points_epoch_437\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_438:00000"
+  tensor_path: "00000/3d_points_epoch_438\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_439:00000"
+  tensor_path: "00000/3d_points_epoch_439\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_440:00000"
+  tensor_path: "00000/3d_points_epoch_440\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_441:00000"
+  tensor_path: "00000/3d_points_epoch_441\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_442:00000"
+  tensor_path: "00000/3d_points_epoch_442\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_443:00000"
+  tensor_path: "00000/3d_points_epoch_443\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_444:00000"
+  tensor_path: "00000/3d_points_epoch_444\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_445:00000"
+  tensor_path: "00000/3d_points_epoch_445\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_446:00000"
+  tensor_path: "00000/3d_points_epoch_446\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_447:00000"
+  tensor_path: "00000/3d_points_epoch_447\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_448:00000"
+  tensor_path: "00000/3d_points_epoch_448\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_449:00000"
+  tensor_path: "00000/3d_points_epoch_449\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_450:00000"
+  tensor_path: "00000/3d_points_epoch_450\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_451:00000"
+  tensor_path: "00000/3d_points_epoch_451\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_452:00000"
+  tensor_path: "00000/3d_points_epoch_452\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_453:00000"
+  tensor_path: "00000/3d_points_epoch_453\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_454:00000"
+  tensor_path: "00000/3d_points_epoch_454\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_455:00000"
+  tensor_path: "00000/3d_points_epoch_455\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_456:00000"
+  tensor_path: "00000/3d_points_epoch_456\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_457:00000"
+  tensor_path: "00000/3d_points_epoch_457\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_458:00000"
+  tensor_path: "00000/3d_points_epoch_458\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_459:00000"
+  tensor_path: "00000/3d_points_epoch_459\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_460:00000"
+  tensor_path: "00000/3d_points_epoch_460\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_461:00000"
+  tensor_path: "00000/3d_points_epoch_461\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_462:00000"
+  tensor_path: "00000/3d_points_epoch_462\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_463:00000"
+  tensor_path: "00000/3d_points_epoch_463\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_464:00000"
+  tensor_path: "00000/3d_points_epoch_464\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_465:00000"
+  tensor_path: "00000/3d_points_epoch_465\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_466:00000"
+  tensor_path: "00000/3d_points_epoch_466\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_467:00000"
+  tensor_path: "00000/3d_points_epoch_467\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_468:00000"
+  tensor_path: "00000/3d_points_epoch_468\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_469:00000"
+  tensor_path: "00000/3d_points_epoch_469\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_470:00000"
+  tensor_path: "00000/3d_points_epoch_470\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_471:00000"
+  tensor_path: "00000/3d_points_epoch_471\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_472:00000"
+  tensor_path: "00000/3d_points_epoch_472\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_473:00000"
+  tensor_path: "00000/3d_points_epoch_473\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_474:00000"
+  tensor_path: "00000/3d_points_epoch_474\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_475:00000"
+  tensor_path: "00000/3d_points_epoch_475\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_476:00000"
+  tensor_path: "00000/3d_points_epoch_476\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_477:00000"
+  tensor_path: "00000/3d_points_epoch_477\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_478:00000"
+  tensor_path: "00000/3d_points_epoch_478\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_479:00000"
+  tensor_path: "00000/3d_points_epoch_479\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_480:00000"
+  tensor_path: "00000/3d_points_epoch_480\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_481:00000"
+  tensor_path: "00000/3d_points_epoch_481\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_482:00000"
+  tensor_path: "00000/3d_points_epoch_482\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_483:00000"
+  tensor_path: "00000/3d_points_epoch_483\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_484:00000"
+  tensor_path: "00000/3d_points_epoch_484\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_485:00000"
+  tensor_path: "00000/3d_points_epoch_485\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_486:00000"
+  tensor_path: "00000/3d_points_epoch_486\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_487:00000"
+  tensor_path: "00000/3d_points_epoch_487\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_488:00000"
+  tensor_path: "00000/3d_points_epoch_488\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_489:00000"
+  tensor_path: "00000/3d_points_epoch_489\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_490:00000"
+  tensor_path: "00000/3d_points_epoch_490\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_491:00000"
+  tensor_path: "00000/3d_points_epoch_491\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_492:00000"
+  tensor_path: "00000/3d_points_epoch_492\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_493:00000"
+  tensor_path: "00000/3d_points_epoch_493\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_494:00000"
+  tensor_path: "00000/3d_points_epoch_494\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_495:00000"
+  tensor_path: "00000/3d_points_epoch_495\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_496:00000"
+  tensor_path: "00000/3d_points_epoch_496\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_497:00000"
+  tensor_path: "00000/3d_points_epoch_497\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_498:00000"
+  tensor_path: "00000/3d_points_epoch_498\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_499:00000"
+  tensor_path: "00000/3d_points_epoch_499\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_500:00000"
+  tensor_path: "00000/3d_points_epoch_500\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_501:00000"
+  tensor_path: "00000/3d_points_epoch_501\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_502:00000"
+  tensor_path: "00000/3d_points_epoch_502\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_503:00000"
+  tensor_path: "00000/3d_points_epoch_503\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_504:00000"
+  tensor_path: "00000/3d_points_epoch_504\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_505:00000"
+  tensor_path: "00000/3d_points_epoch_505\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_506:00000"
+  tensor_path: "00000/3d_points_epoch_506\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_507:00000"
+  tensor_path: "00000/3d_points_epoch_507\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_508:00000"
+  tensor_path: "00000/3d_points_epoch_508\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_509:00000"
+  tensor_path: "00000/3d_points_epoch_509\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_510:00000"
+  tensor_path: "00000/3d_points_epoch_510\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_511:00000"
+  tensor_path: "00000/3d_points_epoch_511\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_512:00000"
+  tensor_path: "00000/3d_points_epoch_512\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_513:00000"
+  tensor_path: "00000/3d_points_epoch_513\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_514:00000"
+  tensor_path: "00000/3d_points_epoch_514\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_515:00000"
+  tensor_path: "00000/3d_points_epoch_515\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_516:00000"
+  tensor_path: "00000/3d_points_epoch_516\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_517:00000"
+  tensor_path: "00000/3d_points_epoch_517\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_518:00000"
+  tensor_path: "00000/3d_points_epoch_518\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_519:00000"
+  tensor_path: "00000/3d_points_epoch_519\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_520:00000"
+  tensor_path: "00000/3d_points_epoch_520\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_521:00000"
+  tensor_path: "00000/3d_points_epoch_521\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_522:00000"
+  tensor_path: "00000/3d_points_epoch_522\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_523:00000"
+  tensor_path: "00000/3d_points_epoch_523\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_524:00000"
+  tensor_path: "00000/3d_points_epoch_524\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_525:00000"
+  tensor_path: "00000/3d_points_epoch_525\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_526:00000"
+  tensor_path: "00000/3d_points_epoch_526\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_527:00000"
+  tensor_path: "00000/3d_points_epoch_527\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_528:00000"
+  tensor_path: "00000/3d_points_epoch_528\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_529:00000"
+  tensor_path: "00000/3d_points_epoch_529\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_530:00000"
+  tensor_path: "00000/3d_points_epoch_530\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_531:00000"
+  tensor_path: "00000/3d_points_epoch_531\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_532:00000"
+  tensor_path: "00000/3d_points_epoch_532\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_533:00000"
+  tensor_path: "00000/3d_points_epoch_533\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_534:00000"
+  tensor_path: "00000/3d_points_epoch_534\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_535:00000"
+  tensor_path: "00000/3d_points_epoch_535\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_536:00000"
+  tensor_path: "00000/3d_points_epoch_536\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_537:00000"
+  tensor_path: "00000/3d_points_epoch_537\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_538:00000"
+  tensor_path: "00000/3d_points_epoch_538\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_539:00000"
+  tensor_path: "00000/3d_points_epoch_539\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_540:00000"
+  tensor_path: "00000/3d_points_epoch_540\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_541:00000"
+  tensor_path: "00000/3d_points_epoch_541\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_542:00000"
+  tensor_path: "00000/3d_points_epoch_542\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_543:00000"
+  tensor_path: "00000/3d_points_epoch_543\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_544:00000"
+  tensor_path: "00000/3d_points_epoch_544\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_545:00000"
+  tensor_path: "00000/3d_points_epoch_545\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_546:00000"
+  tensor_path: "00000/3d_points_epoch_546\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_547:00000"
+  tensor_path: "00000/3d_points_epoch_547\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_548:00000"
+  tensor_path: "00000/3d_points_epoch_548\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_549:00000"
+  tensor_path: "00000/3d_points_epoch_549\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_550:00000"
+  tensor_path: "00000/3d_points_epoch_550\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_551:00000"
+  tensor_path: "00000/3d_points_epoch_551\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_552:00000"
+  tensor_path: "00000/3d_points_epoch_552\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_553:00000"
+  tensor_path: "00000/3d_points_epoch_553\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_554:00000"
+  tensor_path: "00000/3d_points_epoch_554\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_555:00000"
+  tensor_path: "00000/3d_points_epoch_555\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_556:00000"
+  tensor_path: "00000/3d_points_epoch_556\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_557:00000"
+  tensor_path: "00000/3d_points_epoch_557\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_558:00000"
+  tensor_path: "00000/3d_points_epoch_558\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_559:00000"
+  tensor_path: "00000/3d_points_epoch_559\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_560:00000"
+  tensor_path: "00000/3d_points_epoch_560\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_561:00000"
+  tensor_path: "00000/3d_points_epoch_561\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_562:00000"
+  tensor_path: "00000/3d_points_epoch_562\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_563:00000"
+  tensor_path: "00000/3d_points_epoch_563\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_564:00000"
+  tensor_path: "00000/3d_points_epoch_564\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_565:00000"
+  tensor_path: "00000/3d_points_epoch_565\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_566:00000"
+  tensor_path: "00000/3d_points_epoch_566\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_567:00000"
+  tensor_path: "00000/3d_points_epoch_567\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_568:00000"
+  tensor_path: "00000/3d_points_epoch_568\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_569:00000"
+  tensor_path: "00000/3d_points_epoch_569\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_570:00000"
+  tensor_path: "00000/3d_points_epoch_570\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_571:00000"
+  tensor_path: "00000/3d_points_epoch_571\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_572:00000"
+  tensor_path: "00000/3d_points_epoch_572\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_573:00000"
+  tensor_path: "00000/3d_points_epoch_573\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_574:00000"
+  tensor_path: "00000/3d_points_epoch_574\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_575:00000"
+  tensor_path: "00000/3d_points_epoch_575\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_576:00000"
+  tensor_path: "00000/3d_points_epoch_576\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_577:00000"
+  tensor_path: "00000/3d_points_epoch_577\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_578:00000"
+  tensor_path: "00000/3d_points_epoch_578\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_579:00000"
+  tensor_path: "00000/3d_points_epoch_579\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_580:00000"
+  tensor_path: "00000/3d_points_epoch_580\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_581:00000"
+  tensor_path: "00000/3d_points_epoch_581\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_582:00000"
+  tensor_path: "00000/3d_points_epoch_582\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_583:00000"
+  tensor_path: "00000/3d_points_epoch_583\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_584:00000"
+  tensor_path: "00000/3d_points_epoch_584\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_585:00000"
+  tensor_path: "00000/3d_points_epoch_585\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_586:00000"
+  tensor_path: "00000/3d_points_epoch_586\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_587:00000"
+  tensor_path: "00000/3d_points_epoch_587\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_588:00000"
+  tensor_path: "00000/3d_points_epoch_588\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_589:00000"
+  tensor_path: "00000/3d_points_epoch_589\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_590:00000"
+  tensor_path: "00000/3d_points_epoch_590\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_591:00000"
+  tensor_path: "00000/3d_points_epoch_591\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_592:00000"
+  tensor_path: "00000/3d_points_epoch_592\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_593:00000"
+  tensor_path: "00000/3d_points_epoch_593\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_594:00000"
+  tensor_path: "00000/3d_points_epoch_594\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_595:00000"
+  tensor_path: "00000/3d_points_epoch_595\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_596:00000"
+  tensor_path: "00000/3d_points_epoch_596\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_597:00000"
+  tensor_path: "00000/3d_points_epoch_597\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_598:00000"
+  tensor_path: "00000/3d_points_epoch_598\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_599:00000"
+  tensor_path: "00000/3d_points_epoch_599\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_600:00000"
+  tensor_path: "00000/3d_points_epoch_600\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_601:00000"
+  tensor_path: "00000/3d_points_epoch_601\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_602:00000"
+  tensor_path: "00000/3d_points_epoch_602\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_603:00000"
+  tensor_path: "00000/3d_points_epoch_603\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_604:00000"
+  tensor_path: "00000/3d_points_epoch_604\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_605:00000"
+  tensor_path: "00000/3d_points_epoch_605\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_606:00000"
+  tensor_path: "00000/3d_points_epoch_606\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_607:00000"
+  tensor_path: "00000/3d_points_epoch_607\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_608:00000"
+  tensor_path: "00000/3d_points_epoch_608\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_609:00000"
+  tensor_path: "00000/3d_points_epoch_609\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_610:00000"
+  tensor_path: "00000/3d_points_epoch_610\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_611:00000"
+  tensor_path: "00000/3d_points_epoch_611\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_612:00000"
+  tensor_path: "00000/3d_points_epoch_612\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_613:00000"
+  tensor_path: "00000/3d_points_epoch_613\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_614:00000"
+  tensor_path: "00000/3d_points_epoch_614\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_615:00000"
+  tensor_path: "00000/3d_points_epoch_615\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_616:00000"
+  tensor_path: "00000/3d_points_epoch_616\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_617:00000"
+  tensor_path: "00000/3d_points_epoch_617\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_618:00000"
+  tensor_path: "00000/3d_points_epoch_618\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_619:00000"
+  tensor_path: "00000/3d_points_epoch_619\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_620:00000"
+  tensor_path: "00000/3d_points_epoch_620\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_621:00000"
+  tensor_path: "00000/3d_points_epoch_621\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_622:00000"
+  tensor_path: "00000/3d_points_epoch_622\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_623:00000"
+  tensor_path: "00000/3d_points_epoch_623\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_624:00000"
+  tensor_path: "00000/3d_points_epoch_624\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_625:00000"
+  tensor_path: "00000/3d_points_epoch_625\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_626:00000"
+  tensor_path: "00000/3d_points_epoch_626\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_627:00000"
+  tensor_path: "00000/3d_points_epoch_627\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_628:00000"
+  tensor_path: "00000/3d_points_epoch_628\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_629:00000"
+  tensor_path: "00000/3d_points_epoch_629\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_630:00000"
+  tensor_path: "00000/3d_points_epoch_630\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_631:00000"
+  tensor_path: "00000/3d_points_epoch_631\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_632:00000"
+  tensor_path: "00000/3d_points_epoch_632\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_633:00000"
+  tensor_path: "00000/3d_points_epoch_633\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_634:00000"
+  tensor_path: "00000/3d_points_epoch_634\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_635:00000"
+  tensor_path: "00000/3d_points_epoch_635\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_636:00000"
+  tensor_path: "00000/3d_points_epoch_636\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_637:00000"
+  tensor_path: "00000/3d_points_epoch_637\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_638:00000"
+  tensor_path: "00000/3d_points_epoch_638\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_639:00000"
+  tensor_path: "00000/3d_points_epoch_639\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_640:00000"
+  tensor_path: "00000/3d_points_epoch_640\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_641:00000"
+  tensor_path: "00000/3d_points_epoch_641\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_642:00000"
+  tensor_path: "00000/3d_points_epoch_642\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_643:00000"
+  tensor_path: "00000/3d_points_epoch_643\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_644:00000"
+  tensor_path: "00000/3d_points_epoch_644\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_645:00000"
+  tensor_path: "00000/3d_points_epoch_645\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_646:00000"
+  tensor_path: "00000/3d_points_epoch_646\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_647:00000"
+  tensor_path: "00000/3d_points_epoch_647\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_648:00000"
+  tensor_path: "00000/3d_points_epoch_648\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_649:00000"
+  tensor_path: "00000/3d_points_epoch_649\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_650:00000"
+  tensor_path: "00000/3d_points_epoch_650\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_651:00000"
+  tensor_path: "00000/3d_points_epoch_651\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_652:00000"
+  tensor_path: "00000/3d_points_epoch_652\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_653:00000"
+  tensor_path: "00000/3d_points_epoch_653\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_654:00000"
+  tensor_path: "00000/3d_points_epoch_654\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_655:00000"
+  tensor_path: "00000/3d_points_epoch_655\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_656:00000"
+  tensor_path: "00000/3d_points_epoch_656\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_657:00000"
+  tensor_path: "00000/3d_points_epoch_657\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_658:00000"
+  tensor_path: "00000/3d_points_epoch_658\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_659:00000"
+  tensor_path: "00000/3d_points_epoch_659\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_660:00000"
+  tensor_path: "00000/3d_points_epoch_660\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_661:00000"
+  tensor_path: "00000/3d_points_epoch_661\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_662:00000"
+  tensor_path: "00000/3d_points_epoch_662\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_663:00000"
+  tensor_path: "00000/3d_points_epoch_663\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_664:00000"
+  tensor_path: "00000/3d_points_epoch_664\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_665:00000"
+  tensor_path: "00000/3d_points_epoch_665\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_666:00000"
+  tensor_path: "00000/3d_points_epoch_666\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_667:00000"
+  tensor_path: "00000/3d_points_epoch_667\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_668:00000"
+  tensor_path: "00000/3d_points_epoch_668\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_669:00000"
+  tensor_path: "00000/3d_points_epoch_669\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_670:00000"
+  tensor_path: "00000/3d_points_epoch_670\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_671:00000"
+  tensor_path: "00000/3d_points_epoch_671\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_672:00000"
+  tensor_path: "00000/3d_points_epoch_672\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_673:00000"
+  tensor_path: "00000/3d_points_epoch_673\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_674:00000"
+  tensor_path: "00000/3d_points_epoch_674\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_675:00000"
+  tensor_path: "00000/3d_points_epoch_675\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_676:00000"
+  tensor_path: "00000/3d_points_epoch_676\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_677:00000"
+  tensor_path: "00000/3d_points_epoch_677\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_678:00000"
+  tensor_path: "00000/3d_points_epoch_678\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_679:00000"
+  tensor_path: "00000/3d_points_epoch_679\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_680:00000"
+  tensor_path: "00000/3d_points_epoch_680\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_681:00000"
+  tensor_path: "00000/3d_points_epoch_681\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_682:00000"
+  tensor_path: "00000/3d_points_epoch_682\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_683:00000"
+  tensor_path: "00000/3d_points_epoch_683\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_684:00000"
+  tensor_path: "00000/3d_points_epoch_684\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_685:00000"
+  tensor_path: "00000/3d_points_epoch_685\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_686:00000"
+  tensor_path: "00000/3d_points_epoch_686\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_687:00000"
+  tensor_path: "00000/3d_points_epoch_687\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_688:00000"
+  tensor_path: "00000/3d_points_epoch_688\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_689:00000"
+  tensor_path: "00000/3d_points_epoch_689\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_690:00000"
+  tensor_path: "00000/3d_points_epoch_690\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_691:00000"
+  tensor_path: "00000/3d_points_epoch_691\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_692:00000"
+  tensor_path: "00000/3d_points_epoch_692\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_693:00000"
+  tensor_path: "00000/3d_points_epoch_693\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_694:00000"
+  tensor_path: "00000/3d_points_epoch_694\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_695:00000"
+  tensor_path: "00000/3d_points_epoch_695\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_696:00000"
+  tensor_path: "00000/3d_points_epoch_696\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_697:00000"
+  tensor_path: "00000/3d_points_epoch_697\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_698:00000"
+  tensor_path: "00000/3d_points_epoch_698\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_699:00000"
+  tensor_path: "00000/3d_points_epoch_699\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_700:00000"
+  tensor_path: "00000/3d_points_epoch_700\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_701:00000"
+  tensor_path: "00000/3d_points_epoch_701\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_702:00000"
+  tensor_path: "00000/3d_points_epoch_702\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_703:00000"
+  tensor_path: "00000/3d_points_epoch_703\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_704:00000"
+  tensor_path: "00000/3d_points_epoch_704\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_705:00000"
+  tensor_path: "00000/3d_points_epoch_705\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_706:00000"
+  tensor_path: "00000/3d_points_epoch_706\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_707:00000"
+  tensor_path: "00000/3d_points_epoch_707\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_708:00000"
+  tensor_path: "00000/3d_points_epoch_708\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_709:00000"
+  tensor_path: "00000/3d_points_epoch_709\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_710:00000"
+  tensor_path: "00000/3d_points_epoch_710\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_711:00000"
+  tensor_path: "00000/3d_points_epoch_711\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_712:00000"
+  tensor_path: "00000/3d_points_epoch_712\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_713:00000"
+  tensor_path: "00000/3d_points_epoch_713\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_714:00000"
+  tensor_path: "00000/3d_points_epoch_714\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_715:00000"
+  tensor_path: "00000/3d_points_epoch_715\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_716:00000"
+  tensor_path: "00000/3d_points_epoch_716\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_717:00000"
+  tensor_path: "00000/3d_points_epoch_717\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_718:00000"
+  tensor_path: "00000/3d_points_epoch_718\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_719:00000"
+  tensor_path: "00000/3d_points_epoch_719\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_720:00000"
+  tensor_path: "00000/3d_points_epoch_720\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_721:00000"
+  tensor_path: "00000/3d_points_epoch_721\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_722:00000"
+  tensor_path: "00000/3d_points_epoch_722\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_723:00000"
+  tensor_path: "00000/3d_points_epoch_723\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_724:00000"
+  tensor_path: "00000/3d_points_epoch_724\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_725:00000"
+  tensor_path: "00000/3d_points_epoch_725\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_726:00000"
+  tensor_path: "00000/3d_points_epoch_726\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_727:00000"
+  tensor_path: "00000/3d_points_epoch_727\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_728:00000"
+  tensor_path: "00000/3d_points_epoch_728\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_729:00000"
+  tensor_path: "00000/3d_points_epoch_729\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_730:00000"
+  tensor_path: "00000/3d_points_epoch_730\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_731:00000"
+  tensor_path: "00000/3d_points_epoch_731\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_732:00000"
+  tensor_path: "00000/3d_points_epoch_732\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_733:00000"
+  tensor_path: "00000/3d_points_epoch_733\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_734:00000"
+  tensor_path: "00000/3d_points_epoch_734\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_735:00000"
+  tensor_path: "00000/3d_points_epoch_735\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_736:00000"
+  tensor_path: "00000/3d_points_epoch_736\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_737:00000"
+  tensor_path: "00000/3d_points_epoch_737\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_738:00000"
+  tensor_path: "00000/3d_points_epoch_738\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_739:00000"
+  tensor_path: "00000/3d_points_epoch_739\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_740:00000"
+  tensor_path: "00000/3d_points_epoch_740\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_741:00000"
+  tensor_path: "00000/3d_points_epoch_741\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_742:00000"
+  tensor_path: "00000/3d_points_epoch_742\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_743:00000"
+  tensor_path: "00000/3d_points_epoch_743\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_744:00000"
+  tensor_path: "00000/3d_points_epoch_744\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_745:00000"
+  tensor_path: "00000/3d_points_epoch_745\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_746:00000"
+  tensor_path: "00000/3d_points_epoch_746\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_747:00000"
+  tensor_path: "00000/3d_points_epoch_747\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_748:00000"
+  tensor_path: "00000/3d_points_epoch_748\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_749:00000"
+  tensor_path: "00000/3d_points_epoch_749\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_750:00000"
+  tensor_path: "00000/3d_points_epoch_750\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_751:00000"
+  tensor_path: "00000/3d_points_epoch_751\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_752:00000"
+  tensor_path: "00000/3d_points_epoch_752\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_753:00000"
+  tensor_path: "00000/3d_points_epoch_753\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_754:00000"
+  tensor_path: "00000/3d_points_epoch_754\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_755:00000"
+  tensor_path: "00000/3d_points_epoch_755\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_756:00000"
+  tensor_path: "00000/3d_points_epoch_756\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_757:00000"
+  tensor_path: "00000/3d_points_epoch_757\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_758:00000"
+  tensor_path: "00000/3d_points_epoch_758\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_759:00000"
+  tensor_path: "00000/3d_points_epoch_759\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_760:00000"
+  tensor_path: "00000/3d_points_epoch_760\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_761:00000"
+  tensor_path: "00000/3d_points_epoch_761\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_762:00000"
+  tensor_path: "00000/3d_points_epoch_762\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_763:00000"
+  tensor_path: "00000/3d_points_epoch_763\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_764:00000"
+  tensor_path: "00000/3d_points_epoch_764\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_765:00000"
+  tensor_path: "00000/3d_points_epoch_765\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_766:00000"
+  tensor_path: "00000/3d_points_epoch_766\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_767:00000"
+  tensor_path: "00000/3d_points_epoch_767\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_768:00000"
+  tensor_path: "00000/3d_points_epoch_768\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_769:00000"
+  tensor_path: "00000/3d_points_epoch_769\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_770:00000"
+  tensor_path: "00000/3d_points_epoch_770\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_771:00000"
+  tensor_path: "00000/3d_points_epoch_771\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_772:00000"
+  tensor_path: "00000/3d_points_epoch_772\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_773:00000"
+  tensor_path: "00000/3d_points_epoch_773\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_774:00000"
+  tensor_path: "00000/3d_points_epoch_774\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_775:00000"
+  tensor_path: "00000/3d_points_epoch_775\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_776:00000"
+  tensor_path: "00000/3d_points_epoch_776\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_777:00000"
+  tensor_path: "00000/3d_points_epoch_777\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_778:00000"
+  tensor_path: "00000/3d_points_epoch_778\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_779:00000"
+  tensor_path: "00000/3d_points_epoch_779\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_780:00000"
+  tensor_path: "00000/3d_points_epoch_780\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_781:00000"
+  tensor_path: "00000/3d_points_epoch_781\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_782:00000"
+  tensor_path: "00000/3d_points_epoch_782\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_783:00000"
+  tensor_path: "00000/3d_points_epoch_783\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_784:00000"
+  tensor_path: "00000/3d_points_epoch_784\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_785:00000"
+  tensor_path: "00000/3d_points_epoch_785\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_786:00000"
+  tensor_path: "00000/3d_points_epoch_786\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_787:00000"
+  tensor_path: "00000/3d_points_epoch_787\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_788:00000"
+  tensor_path: "00000/3d_points_epoch_788\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_789:00000"
+  tensor_path: "00000/3d_points_epoch_789\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_790:00000"
+  tensor_path: "00000/3d_points_epoch_790\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_791:00000"
+  tensor_path: "00000/3d_points_epoch_791\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_792:00000"
+  tensor_path: "00000/3d_points_epoch_792\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_793:00000"
+  tensor_path: "00000/3d_points_epoch_793\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_794:00000"
+  tensor_path: "00000/3d_points_epoch_794\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_795:00000"
+  tensor_path: "00000/3d_points_epoch_795\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_796:00000"
+  tensor_path: "00000/3d_points_epoch_796\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_797:00000"
+  tensor_path: "00000/3d_points_epoch_797\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_798:00000"
+  tensor_path: "00000/3d_points_epoch_798\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_799:00000"
+  tensor_path: "00000/3d_points_epoch_799\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_800:00000"
+  tensor_path: "00000/3d_points_epoch_800\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_801:00000"
+  tensor_path: "00000/3d_points_epoch_801\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_802:00000"
+  tensor_path: "00000/3d_points_epoch_802\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_803:00000"
+  tensor_path: "00000/3d_points_epoch_803\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_804:00000"
+  tensor_path: "00000/3d_points_epoch_804\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_805:00000"
+  tensor_path: "00000/3d_points_epoch_805\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_806:00000"
+  tensor_path: "00000/3d_points_epoch_806\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_807:00000"
+  tensor_path: "00000/3d_points_epoch_807\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_808:00000"
+  tensor_path: "00000/3d_points_epoch_808\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_809:00000"
+  tensor_path: "00000/3d_points_epoch_809\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_810:00000"
+  tensor_path: "00000/3d_points_epoch_810\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_811:00000"
+  tensor_path: "00000/3d_points_epoch_811\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_812:00000"
+  tensor_path: "00000/3d_points_epoch_812\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_813:00000"
+  tensor_path: "00000/3d_points_epoch_813\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_814:00000"
+  tensor_path: "00000/3d_points_epoch_814\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_815:00000"
+  tensor_path: "00000/3d_points_epoch_815\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_816:00000"
+  tensor_path: "00000/3d_points_epoch_816\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_817:00000"
+  tensor_path: "00000/3d_points_epoch_817\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_818:00000"
+  tensor_path: "00000/3d_points_epoch_818\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_819:00000"
+  tensor_path: "00000/3d_points_epoch_819\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_820:00000"
+  tensor_path: "00000/3d_points_epoch_820\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_821:00000"
+  tensor_path: "00000/3d_points_epoch_821\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_822:00000"
+  tensor_path: "00000/3d_points_epoch_822\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_823:00000"
+  tensor_path: "00000/3d_points_epoch_823\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_824:00000"
+  tensor_path: "00000/3d_points_epoch_824\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_825:00000"
+  tensor_path: "00000/3d_points_epoch_825\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_826:00000"
+  tensor_path: "00000/3d_points_epoch_826\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_827:00000"
+  tensor_path: "00000/3d_points_epoch_827\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_828:00000"
+  tensor_path: "00000/3d_points_epoch_828\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_829:00000"
+  tensor_path: "00000/3d_points_epoch_829\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_830:00000"
+  tensor_path: "00000/3d_points_epoch_830\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_831:00000"
+  tensor_path: "00000/3d_points_epoch_831\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_832:00000"
+  tensor_path: "00000/3d_points_epoch_832\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_833:00000"
+  tensor_path: "00000/3d_points_epoch_833\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_834:00000"
+  tensor_path: "00000/3d_points_epoch_834\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_835:00000"
+  tensor_path: "00000/3d_points_epoch_835\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_836:00000"
+  tensor_path: "00000/3d_points_epoch_836\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_837:00000"
+  tensor_path: "00000/3d_points_epoch_837\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_838:00000"
+  tensor_path: "00000/3d_points_epoch_838\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_839:00000"
+  tensor_path: "00000/3d_points_epoch_839\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_840:00000"
+  tensor_path: "00000/3d_points_epoch_840\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_841:00000"
+  tensor_path: "00000/3d_points_epoch_841\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_842:00000"
+  tensor_path: "00000/3d_points_epoch_842\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_843:00000"
+  tensor_path: "00000/3d_points_epoch_843\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_844:00000"
+  tensor_path: "00000/3d_points_epoch_844\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_845:00000"
+  tensor_path: "00000/3d_points_epoch_845\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_846:00000"
+  tensor_path: "00000/3d_points_epoch_846\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_847:00000"
+  tensor_path: "00000/3d_points_epoch_847\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_848:00000"
+  tensor_path: "00000/3d_points_epoch_848\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_849:00000"
+  tensor_path: "00000/3d_points_epoch_849\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_850:00000"
+  tensor_path: "00000/3d_points_epoch_850\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_851:00000"
+  tensor_path: "00000/3d_points_epoch_851\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_852:00000"
+  tensor_path: "00000/3d_points_epoch_852\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_853:00000"
+  tensor_path: "00000/3d_points_epoch_853\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_854:00000"
+  tensor_path: "00000/3d_points_epoch_854\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_855:00000"
+  tensor_path: "00000/3d_points_epoch_855\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_856:00000"
+  tensor_path: "00000/3d_points_epoch_856\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_857:00000"
+  tensor_path: "00000/3d_points_epoch_857\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_858:00000"
+  tensor_path: "00000/3d_points_epoch_858\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_859:00000"
+  tensor_path: "00000/3d_points_epoch_859\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_860:00000"
+  tensor_path: "00000/3d_points_epoch_860\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_861:00000"
+  tensor_path: "00000/3d_points_epoch_861\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_862:00000"
+  tensor_path: "00000/3d_points_epoch_862\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_863:00000"
+  tensor_path: "00000/3d_points_epoch_863\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_864:00000"
+  tensor_path: "00000/3d_points_epoch_864\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_865:00000"
+  tensor_path: "00000/3d_points_epoch_865\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_866:00000"
+  tensor_path: "00000/3d_points_epoch_866\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_867:00000"
+  tensor_path: "00000/3d_points_epoch_867\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_868:00000"
+  tensor_path: "00000/3d_points_epoch_868\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_869:00000"
+  tensor_path: "00000/3d_points_epoch_869\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_870:00000"
+  tensor_path: "00000/3d_points_epoch_870\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_871:00000"
+  tensor_path: "00000/3d_points_epoch_871\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_872:00000"
+  tensor_path: "00000/3d_points_epoch_872\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_873:00000"
+  tensor_path: "00000/3d_points_epoch_873\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_874:00000"
+  tensor_path: "00000/3d_points_epoch_874\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_875:00000"
+  tensor_path: "00000/3d_points_epoch_875\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_876:00000"
+  tensor_path: "00000/3d_points_epoch_876\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_877:00000"
+  tensor_path: "00000/3d_points_epoch_877\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_878:00000"
+  tensor_path: "00000/3d_points_epoch_878\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_879:00000"
+  tensor_path: "00000/3d_points_epoch_879\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_880:00000"
+  tensor_path: "00000/3d_points_epoch_880\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_881:00000"
+  tensor_path: "00000/3d_points_epoch_881\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_882:00000"
+  tensor_path: "00000/3d_points_epoch_882\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_883:00000"
+  tensor_path: "00000/3d_points_epoch_883\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_884:00000"
+  tensor_path: "00000/3d_points_epoch_884\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_885:00000"
+  tensor_path: "00000/3d_points_epoch_885\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_886:00000"
+  tensor_path: "00000/3d_points_epoch_886\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_887:00000"
+  tensor_path: "00000/3d_points_epoch_887\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_888:00000"
+  tensor_path: "00000/3d_points_epoch_888\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_889:00000"
+  tensor_path: "00000/3d_points_epoch_889\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_890:00000"
+  tensor_path: "00000/3d_points_epoch_890\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_891:00000"
+  tensor_path: "00000/3d_points_epoch_891\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_892:00000"
+  tensor_path: "00000/3d_points_epoch_892\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_893:00000"
+  tensor_path: "00000/3d_points_epoch_893\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_894:00000"
+  tensor_path: "00000/3d_points_epoch_894\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_895:00000"
+  tensor_path: "00000/3d_points_epoch_895\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_896:00000"
+  tensor_path: "00000/3d_points_epoch_896\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_897:00000"
+  tensor_path: "00000/3d_points_epoch_897\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_898:00000"
+  tensor_path: "00000/3d_points_epoch_898\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_899:00000"
+  tensor_path: "00000/3d_points_epoch_899\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_900:00000"
+  tensor_path: "00000/3d_points_epoch_900\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_901:00000"
+  tensor_path: "00000/3d_points_epoch_901\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_902:00000"
+  tensor_path: "00000/3d_points_epoch_902\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_903:00000"
+  tensor_path: "00000/3d_points_epoch_903\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_904:00000"
+  tensor_path: "00000/3d_points_epoch_904\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_905:00000"
+  tensor_path: "00000/3d_points_epoch_905\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_906:00000"
+  tensor_path: "00000/3d_points_epoch_906\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_907:00000"
+  tensor_path: "00000/3d_points_epoch_907\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_908:00000"
+  tensor_path: "00000/3d_points_epoch_908\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_909:00000"
+  tensor_path: "00000/3d_points_epoch_909\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_910:00000"
+  tensor_path: "00000/3d_points_epoch_910\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_911:00000"
+  tensor_path: "00000/3d_points_epoch_911\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_912:00000"
+  tensor_path: "00000/3d_points_epoch_912\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_913:00000"
+  tensor_path: "00000/3d_points_epoch_913\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_914:00000"
+  tensor_path: "00000/3d_points_epoch_914\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_915:00000"
+  tensor_path: "00000/3d_points_epoch_915\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_916:00000"
+  tensor_path: "00000/3d_points_epoch_916\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_917:00000"
+  tensor_path: "00000/3d_points_epoch_917\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_918:00000"
+  tensor_path: "00000/3d_points_epoch_918\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_919:00000"
+  tensor_path: "00000/3d_points_epoch_919\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_920:00000"
+  tensor_path: "00000/3d_points_epoch_920\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_921:00000"
+  tensor_path: "00000/3d_points_epoch_921\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_922:00000"
+  tensor_path: "00000/3d_points_epoch_922\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_923:00000"
+  tensor_path: "00000/3d_points_epoch_923\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_924:00000"
+  tensor_path: "00000/3d_points_epoch_924\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_925:00000"
+  tensor_path: "00000/3d_points_epoch_925\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_926:00000"
+  tensor_path: "00000/3d_points_epoch_926\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_927:00000"
+  tensor_path: "00000/3d_points_epoch_927\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_928:00000"
+  tensor_path: "00000/3d_points_epoch_928\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_929:00000"
+  tensor_path: "00000/3d_points_epoch_929\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_930:00000"
+  tensor_path: "00000/3d_points_epoch_930\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_931:00000"
+  tensor_path: "00000/3d_points_epoch_931\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_932:00000"
+  tensor_path: "00000/3d_points_epoch_932\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_933:00000"
+  tensor_path: "00000/3d_points_epoch_933\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_934:00000"
+  tensor_path: "00000/3d_points_epoch_934\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_935:00000"
+  tensor_path: "00000/3d_points_epoch_935\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_936:00000"
+  tensor_path: "00000/3d_points_epoch_936\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_937:00000"
+  tensor_path: "00000/3d_points_epoch_937\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_938:00000"
+  tensor_path: "00000/3d_points_epoch_938\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_939:00000"
+  tensor_path: "00000/3d_points_epoch_939\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_940:00000"
+  tensor_path: "00000/3d_points_epoch_940\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_941:00000"
+  tensor_path: "00000/3d_points_epoch_941\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_942:00000"
+  tensor_path: "00000/3d_points_epoch_942\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_943:00000"
+  tensor_path: "00000/3d_points_epoch_943\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_944:00000"
+  tensor_path: "00000/3d_points_epoch_944\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_945:00000"
+  tensor_path: "00000/3d_points_epoch_945\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_946:00000"
+  tensor_path: "00000/3d_points_epoch_946\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_947:00000"
+  tensor_path: "00000/3d_points_epoch_947\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_948:00000"
+  tensor_path: "00000/3d_points_epoch_948\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_949:00000"
+  tensor_path: "00000/3d_points_epoch_949\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_950:00000"
+  tensor_path: "00000/3d_points_epoch_950\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_951:00000"
+  tensor_path: "00000/3d_points_epoch_951\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_952:00000"
+  tensor_path: "00000/3d_points_epoch_952\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_953:00000"
+  tensor_path: "00000/3d_points_epoch_953\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_954:00000"
+  tensor_path: "00000/3d_points_epoch_954\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_955:00000"
+  tensor_path: "00000/3d_points_epoch_955\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_956:00000"
+  tensor_path: "00000/3d_points_epoch_956\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_957:00000"
+  tensor_path: "00000/3d_points_epoch_957\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_958:00000"
+  tensor_path: "00000/3d_points_epoch_958\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_959:00000"
+  tensor_path: "00000/3d_points_epoch_959\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_960:00000"
+  tensor_path: "00000/3d_points_epoch_960\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_961:00000"
+  tensor_path: "00000/3d_points_epoch_961\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_962:00000"
+  tensor_path: "00000/3d_points_epoch_962\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_963:00000"
+  tensor_path: "00000/3d_points_epoch_963\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_964:00000"
+  tensor_path: "00000/3d_points_epoch_964\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_965:00000"
+  tensor_path: "00000/3d_points_epoch_965\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_966:00000"
+  tensor_path: "00000/3d_points_epoch_966\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_967:00000"
+  tensor_path: "00000/3d_points_epoch_967\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_968:00000"
+  tensor_path: "00000/3d_points_epoch_968\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_969:00000"
+  tensor_path: "00000/3d_points_epoch_969\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_970:00000"
+  tensor_path: "00000/3d_points_epoch_970\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_971:00000"
+  tensor_path: "00000/3d_points_epoch_971\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_972:00000"
+  tensor_path: "00000/3d_points_epoch_972\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_973:00000"
+  tensor_path: "00000/3d_points_epoch_973\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_974:00000"
+  tensor_path: "00000/3d_points_epoch_974\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_975:00000"
+  tensor_path: "00000/3d_points_epoch_975\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_976:00000"
+  tensor_path: "00000/3d_points_epoch_976\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_977:00000"
+  tensor_path: "00000/3d_points_epoch_977\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_978:00000"
+  tensor_path: "00000/3d_points_epoch_978\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_979:00000"
+  tensor_path: "00000/3d_points_epoch_979\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_980:00000"
+  tensor_path: "00000/3d_points_epoch_980\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_981:00000"
+  tensor_path: "00000/3d_points_epoch_981\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_982:00000"
+  tensor_path: "00000/3d_points_epoch_982\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_983:00000"
+  tensor_path: "00000/3d_points_epoch_983\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_984:00000"
+  tensor_path: "00000/3d_points_epoch_984\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_985:00000"
+  tensor_path: "00000/3d_points_epoch_985\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_986:00000"
+  tensor_path: "00000/3d_points_epoch_986\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_987:00000"
+  tensor_path: "00000/3d_points_epoch_987\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_988:00000"
+  tensor_path: "00000/3d_points_epoch_988\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_989:00000"
+  tensor_path: "00000/3d_points_epoch_989\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_990:00000"
+  tensor_path: "00000/3d_points_epoch_990\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_991:00000"
+  tensor_path: "00000/3d_points_epoch_991\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_992:00000"
+  tensor_path: "00000/3d_points_epoch_992\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_993:00000"
+  tensor_path: "00000/3d_points_epoch_993\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_994:00000"
+  tensor_path: "00000/3d_points_epoch_994\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_995:00000"
+  tensor_path: "00000/3d_points_epoch_995\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_996:00000"
+  tensor_path: "00000/3d_points_epoch_996\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_997:00000"
+  tensor_path: "00000/3d_points_epoch_997\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_998:00000"
+  tensor_path: "00000/3d_points_epoch_998\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_999:00000"
+  tensor_path: "00000/3d_points_epoch_999\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1000:00000"
+  tensor_path: "00000/3d_points_epoch_1000\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1001:00000"
+  tensor_path: "00000/3d_points_epoch_1001\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1002:00000"
+  tensor_path: "00000/3d_points_epoch_1002\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1003:00000"
+  tensor_path: "00000/3d_points_epoch_1003\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1004:00000"
+  tensor_path: "00000/3d_points_epoch_1004\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1005:00000"
+  tensor_path: "00000/3d_points_epoch_1005\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1006:00000"
+  tensor_path: "00000/3d_points_epoch_1006\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1007:00000"
+  tensor_path: "00000/3d_points_epoch_1007\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1008:00000"
+  tensor_path: "00000/3d_points_epoch_1008\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1009:00000"
+  tensor_path: "00000/3d_points_epoch_1009\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1010:00000"
+  tensor_path: "00000/3d_points_epoch_1010\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1011:00000"
+  tensor_path: "00000/3d_points_epoch_1011\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1012:00000"
+  tensor_path: "00000/3d_points_epoch_1012\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1013:00000"
+  tensor_path: "00000/3d_points_epoch_1013\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1014:00000"
+  tensor_path: "00000/3d_points_epoch_1014\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1015:00000"
+  tensor_path: "00000/3d_points_epoch_1015\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1016:00000"
+  tensor_path: "00000/3d_points_epoch_1016\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1017:00000"
+  tensor_path: "00000/3d_points_epoch_1017\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1018:00000"
+  tensor_path: "00000/3d_points_epoch_1018\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1019:00000"
+  tensor_path: "00000/3d_points_epoch_1019\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1020:00000"
+  tensor_path: "00000/3d_points_epoch_1020\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1021:00000"
+  tensor_path: "00000/3d_points_epoch_1021\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1022:00000"
+  tensor_path: "00000/3d_points_epoch_1022\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1023:00000"
+  tensor_path: "00000/3d_points_epoch_1023\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1024:00000"
+  tensor_path: "00000/3d_points_epoch_1024\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1025:00000"
+  tensor_path: "00000/3d_points_epoch_1025\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1026:00000"
+  tensor_path: "00000/3d_points_epoch_1026\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1027:00000"
+  tensor_path: "00000/3d_points_epoch_1027\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1028:00000"
+  tensor_path: "00000/3d_points_epoch_1028\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1029:00000"
+  tensor_path: "00000/3d_points_epoch_1029\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1030:00000"
+  tensor_path: "00000/3d_points_epoch_1030\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1031:00000"
+  tensor_path: "00000/3d_points_epoch_1031\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1032:00000"
+  tensor_path: "00000/3d_points_epoch_1032\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1033:00000"
+  tensor_path: "00000/3d_points_epoch_1033\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1034:00000"
+  tensor_path: "00000/3d_points_epoch_1034\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1035:00000"
+  tensor_path: "00000/3d_points_epoch_1035\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1036:00000"
+  tensor_path: "00000/3d_points_epoch_1036\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1037:00000"
+  tensor_path: "00000/3d_points_epoch_1037\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1038:00000"
+  tensor_path: "00000/3d_points_epoch_1038\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1039:00000"
+  tensor_path: "00000/3d_points_epoch_1039\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1040:00000"
+  tensor_path: "00000/3d_points_epoch_1040\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1041:00000"
+  tensor_path: "00000/3d_points_epoch_1041\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1042:00000"
+  tensor_path: "00000/3d_points_epoch_1042\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1043:00000"
+  tensor_path: "00000/3d_points_epoch_1043\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1044:00000"
+  tensor_path: "00000/3d_points_epoch_1044\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1045:00000"
+  tensor_path: "00000/3d_points_epoch_1045\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1046:00000"
+  tensor_path: "00000/3d_points_epoch_1046\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1047:00000"
+  tensor_path: "00000/3d_points_epoch_1047\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1048:00000"
+  tensor_path: "00000/3d_points_epoch_1048\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1049:00000"
+  tensor_path: "00000/3d_points_epoch_1049\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1050:00000"
+  tensor_path: "00000/3d_points_epoch_1050\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1051:00000"
+  tensor_path: "00000/3d_points_epoch_1051\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1052:00000"
+  tensor_path: "00000/3d_points_epoch_1052\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1053:00000"
+  tensor_path: "00000/3d_points_epoch_1053\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1054:00000"
+  tensor_path: "00000/3d_points_epoch_1054\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1055:00000"
+  tensor_path: "00000/3d_points_epoch_1055\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1056:00000"
+  tensor_path: "00000/3d_points_epoch_1056\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1057:00000"
+  tensor_path: "00000/3d_points_epoch_1057\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1058:00000"
+  tensor_path: "00000/3d_points_epoch_1058\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1059:00000"
+  tensor_path: "00000/3d_points_epoch_1059\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1060:00000"
+  tensor_path: "00000/3d_points_epoch_1060\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1061:00000"
+  tensor_path: "00000/3d_points_epoch_1061\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1062:00000"
+  tensor_path: "00000/3d_points_epoch_1062\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1063:00000"
+  tensor_path: "00000/3d_points_epoch_1063\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1064:00000"
+  tensor_path: "00000/3d_points_epoch_1064\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1065:00000"
+  tensor_path: "00000/3d_points_epoch_1065\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1066:00000"
+  tensor_path: "00000/3d_points_epoch_1066\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1067:00000"
+  tensor_path: "00000/3d_points_epoch_1067\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1068:00000"
+  tensor_path: "00000/3d_points_epoch_1068\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1069:00000"
+  tensor_path: "00000/3d_points_epoch_1069\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1070:00000"
+  tensor_path: "00000/3d_points_epoch_1070\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1071:00000"
+  tensor_path: "00000/3d_points_epoch_1071\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1072:00000"
+  tensor_path: "00000/3d_points_epoch_1072\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1073:00000"
+  tensor_path: "00000/3d_points_epoch_1073\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1074:00000"
+  tensor_path: "00000/3d_points_epoch_1074\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1075:00000"
+  tensor_path: "00000/3d_points_epoch_1075\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1076:00000"
+  tensor_path: "00000/3d_points_epoch_1076\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1077:00000"
+  tensor_path: "00000/3d_points_epoch_1077\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1078:00000"
+  tensor_path: "00000/3d_points_epoch_1078\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1079:00000"
+  tensor_path: "00000/3d_points_epoch_1079\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1080:00000"
+  tensor_path: "00000/3d_points_epoch_1080\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1081:00000"
+  tensor_path: "00000/3d_points_epoch_1081\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1082:00000"
+  tensor_path: "00000/3d_points_epoch_1082\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1083:00000"
+  tensor_path: "00000/3d_points_epoch_1083\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1084:00000"
+  tensor_path: "00000/3d_points_epoch_1084\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1085:00000"
+  tensor_path: "00000/3d_points_epoch_1085\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1086:00000"
+  tensor_path: "00000/3d_points_epoch_1086\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1087:00000"
+  tensor_path: "00000/3d_points_epoch_1087\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1088:00000"
+  tensor_path: "00000/3d_points_epoch_1088\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1089:00000"
+  tensor_path: "00000/3d_points_epoch_1089\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1090:00000"
+  tensor_path: "00000/3d_points_epoch_1090\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1091:00000"
+  tensor_path: "00000/3d_points_epoch_1091\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1092:00000"
+  tensor_path: "00000/3d_points_epoch_1092\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1093:00000"
+  tensor_path: "00000/3d_points_epoch_1093\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1094:00000"
+  tensor_path: "00000/3d_points_epoch_1094\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1095:00000"
+  tensor_path: "00000/3d_points_epoch_1095\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1096:00000"
+  tensor_path: "00000/3d_points_epoch_1096\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1097:00000"
+  tensor_path: "00000/3d_points_epoch_1097\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1098:00000"
+  tensor_path: "00000/3d_points_epoch_1098\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1099:00000"
+  tensor_path: "00000/3d_points_epoch_1099\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1100:00000"
+  tensor_path: "00000/3d_points_epoch_1100\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1101:00000"
+  tensor_path: "00000/3d_points_epoch_1101\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1102:00000"
+  tensor_path: "00000/3d_points_epoch_1102\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1103:00000"
+  tensor_path: "00000/3d_points_epoch_1103\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1104:00000"
+  tensor_path: "00000/3d_points_epoch_1104\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1105:00000"
+  tensor_path: "00000/3d_points_epoch_1105\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1106:00000"
+  tensor_path: "00000/3d_points_epoch_1106\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1107:00000"
+  tensor_path: "00000/3d_points_epoch_1107\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1108:00000"
+  tensor_path: "00000/3d_points_epoch_1108\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1109:00000"
+  tensor_path: "00000/3d_points_epoch_1109\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1110:00000"
+  tensor_path: "00000/3d_points_epoch_1110\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1111:00000"
+  tensor_path: "00000/3d_points_epoch_1111\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1112:00000"
+  tensor_path: "00000/3d_points_epoch_1112\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1113:00000"
+  tensor_path: "00000/3d_points_epoch_1113\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1114:00000"
+  tensor_path: "00000/3d_points_epoch_1114\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1115:00000"
+  tensor_path: "00000/3d_points_epoch_1115\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1116:00000"
+  tensor_path: "00000/3d_points_epoch_1116\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1117:00000"
+  tensor_path: "00000/3d_points_epoch_1117\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1118:00000"
+  tensor_path: "00000/3d_points_epoch_1118\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1119:00000"
+  tensor_path: "00000/3d_points_epoch_1119\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1120:00000"
+  tensor_path: "00000/3d_points_epoch_1120\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1121:00000"
+  tensor_path: "00000/3d_points_epoch_1121\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1122:00000"
+  tensor_path: "00000/3d_points_epoch_1122\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1123:00000"
+  tensor_path: "00000/3d_points_epoch_1123\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1124:00000"
+  tensor_path: "00000/3d_points_epoch_1124\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1125:00000"
+  tensor_path: "00000/3d_points_epoch_1125\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1126:00000"
+  tensor_path: "00000/3d_points_epoch_1126\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1127:00000"
+  tensor_path: "00000/3d_points_epoch_1127\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1128:00000"
+  tensor_path: "00000/3d_points_epoch_1128\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1129:00000"
+  tensor_path: "00000/3d_points_epoch_1129\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1130:00000"
+  tensor_path: "00000/3d_points_epoch_1130\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1131:00000"
+  tensor_path: "00000/3d_points_epoch_1131\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1132:00000"
+  tensor_path: "00000/3d_points_epoch_1132\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1133:00000"
+  tensor_path: "00000/3d_points_epoch_1133\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1134:00000"
+  tensor_path: "00000/3d_points_epoch_1134\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1135:00000"
+  tensor_path: "00000/3d_points_epoch_1135\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1136:00000"
+  tensor_path: "00000/3d_points_epoch_1136\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1137:00000"
+  tensor_path: "00000/3d_points_epoch_1137\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1138:00000"
+  tensor_path: "00000/3d_points_epoch_1138\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1139:00000"
+  tensor_path: "00000/3d_points_epoch_1139\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1140:00000"
+  tensor_path: "00000/3d_points_epoch_1140\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1141:00000"
+  tensor_path: "00000/3d_points_epoch_1141\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1142:00000"
+  tensor_path: "00000/3d_points_epoch_1142\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1143:00000"
+  tensor_path: "00000/3d_points_epoch_1143\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1144:00000"
+  tensor_path: "00000/3d_points_epoch_1144\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1145:00000"
+  tensor_path: "00000/3d_points_epoch_1145\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1146:00000"
+  tensor_path: "00000/3d_points_epoch_1146\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1147:00000"
+  tensor_path: "00000/3d_points_epoch_1147\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1148:00000"
+  tensor_path: "00000/3d_points_epoch_1148\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1149:00000"
+  tensor_path: "00000/3d_points_epoch_1149\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1150:00000"
+  tensor_path: "00000/3d_points_epoch_1150\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1151:00000"
+  tensor_path: "00000/3d_points_epoch_1151\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1152:00000"
+  tensor_path: "00000/3d_points_epoch_1152\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1153:00000"
+  tensor_path: "00000/3d_points_epoch_1153\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1154:00000"
+  tensor_path: "00000/3d_points_epoch_1154\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1155:00000"
+  tensor_path: "00000/3d_points_epoch_1155\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1156:00000"
+  tensor_path: "00000/3d_points_epoch_1156\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1157:00000"
+  tensor_path: "00000/3d_points_epoch_1157\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1158:00000"
+  tensor_path: "00000/3d_points_epoch_1158\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1159:00000"
+  tensor_path: "00000/3d_points_epoch_1159\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1160:00000"
+  tensor_path: "00000/3d_points_epoch_1160\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1161:00000"
+  tensor_path: "00000/3d_points_epoch_1161\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1162:00000"
+  tensor_path: "00000/3d_points_epoch_1162\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1163:00000"
+  tensor_path: "00000/3d_points_epoch_1163\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1164:00000"
+  tensor_path: "00000/3d_points_epoch_1164\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1165:00000"
+  tensor_path: "00000/3d_points_epoch_1165\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1166:00000"
+  tensor_path: "00000/3d_points_epoch_1166\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1167:00000"
+  tensor_path: "00000/3d_points_epoch_1167\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1168:00000"
+  tensor_path: "00000/3d_points_epoch_1168\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1169:00000"
+  tensor_path: "00000/3d_points_epoch_1169\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1170:00000"
+  tensor_path: "00000/3d_points_epoch_1170\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1171:00000"
+  tensor_path: "00000/3d_points_epoch_1171\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1172:00000"
+  tensor_path: "00000/3d_points_epoch_1172\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1173:00000"
+  tensor_path: "00000/3d_points_epoch_1173\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1174:00000"
+  tensor_path: "00000/3d_points_epoch_1174\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1175:00000"
+  tensor_path: "00000/3d_points_epoch_1175\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1176:00000"
+  tensor_path: "00000/3d_points_epoch_1176\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1177:00000"
+  tensor_path: "00000/3d_points_epoch_1177\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1178:00000"
+  tensor_path: "00000/3d_points_epoch_1178\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1179:00000"
+  tensor_path: "00000/3d_points_epoch_1179\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1180:00000"
+  tensor_path: "00000/3d_points_epoch_1180\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1181:00000"
+  tensor_path: "00000/3d_points_epoch_1181\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1182:00000"
+  tensor_path: "00000/3d_points_epoch_1182\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1183:00000"
+  tensor_path: "00000/3d_points_epoch_1183\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1184:00000"
+  tensor_path: "00000/3d_points_epoch_1184\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1185:00000"
+  tensor_path: "00000/3d_points_epoch_1185\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1186:00000"
+  tensor_path: "00000/3d_points_epoch_1186\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1187:00000"
+  tensor_path: "00000/3d_points_epoch_1187\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1188:00000"
+  tensor_path: "00000/3d_points_epoch_1188\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1189:00000"
+  tensor_path: "00000/3d_points_epoch_1189\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1190:00000"
+  tensor_path: "00000/3d_points_epoch_1190\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1191:00000"
+  tensor_path: "00000/3d_points_epoch_1191\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1192:00000"
+  tensor_path: "00000/3d_points_epoch_1192\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1193:00000"
+  tensor_path: "00000/3d_points_epoch_1193\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1194:00000"
+  tensor_path: "00000/3d_points_epoch_1194\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1195:00000"
+  tensor_path: "00000/3d_points_epoch_1195\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1196:00000"
+  tensor_path: "00000/3d_points_epoch_1196\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1197:00000"
+  tensor_path: "00000/3d_points_epoch_1197\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1198:00000"
+  tensor_path: "00000/3d_points_epoch_1198\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1199:00000"
+  tensor_path: "00000/3d_points_epoch_1199\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1200:00000"
+  tensor_path: "00000/3d_points_epoch_1200\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1201:00000"
+  tensor_path: "00000/3d_points_epoch_1201\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1202:00000"
+  tensor_path: "00000/3d_points_epoch_1202\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1203:00000"
+  tensor_path: "00000/3d_points_epoch_1203\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1204:00000"
+  tensor_path: "00000/3d_points_epoch_1204\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1205:00000"
+  tensor_path: "00000/3d_points_epoch_1205\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1206:00000"
+  tensor_path: "00000/3d_points_epoch_1206\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1207:00000"
+  tensor_path: "00000/3d_points_epoch_1207\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1208:00000"
+  tensor_path: "00000/3d_points_epoch_1208\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1209:00000"
+  tensor_path: "00000/3d_points_epoch_1209\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1210:00000"
+  tensor_path: "00000/3d_points_epoch_1210\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1211:00000"
+  tensor_path: "00000/3d_points_epoch_1211\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1212:00000"
+  tensor_path: "00000/3d_points_epoch_1212\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1213:00000"
+  tensor_path: "00000/3d_points_epoch_1213\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1214:00000"
+  tensor_path: "00000/3d_points_epoch_1214\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1215:00000"
+  tensor_path: "00000/3d_points_epoch_1215\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1216:00000"
+  tensor_path: "00000/3d_points_epoch_1216\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1217:00000"
+  tensor_path: "00000/3d_points_epoch_1217\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1218:00000"
+  tensor_path: "00000/3d_points_epoch_1218\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1219:00000"
+  tensor_path: "00000/3d_points_epoch_1219\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1220:00000"
+  tensor_path: "00000/3d_points_epoch_1220\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1221:00000"
+  tensor_path: "00000/3d_points_epoch_1221\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1222:00000"
+  tensor_path: "00000/3d_points_epoch_1222\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1223:00000"
+  tensor_path: "00000/3d_points_epoch_1223\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1224:00000"
+  tensor_path: "00000/3d_points_epoch_1224\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1225:00000"
+  tensor_path: "00000/3d_points_epoch_1225\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1226:00000"
+  tensor_path: "00000/3d_points_epoch_1226\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1227:00000"
+  tensor_path: "00000/3d_points_epoch_1227\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1228:00000"
+  tensor_path: "00000/3d_points_epoch_1228\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1229:00000"
+  tensor_path: "00000/3d_points_epoch_1229\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1230:00000"
+  tensor_path: "00000/3d_points_epoch_1230\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1231:00000"
+  tensor_path: "00000/3d_points_epoch_1231\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1232:00000"
+  tensor_path: "00000/3d_points_epoch_1232\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1233:00000"
+  tensor_path: "00000/3d_points_epoch_1233\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1234:00000"
+  tensor_path: "00000/3d_points_epoch_1234\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1235:00000"
+  tensor_path: "00000/3d_points_epoch_1235\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1236:00000"
+  tensor_path: "00000/3d_points_epoch_1236\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1237:00000"
+  tensor_path: "00000/3d_points_epoch_1237\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1238:00000"
+  tensor_path: "00000/3d_points_epoch_1238\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1239:00000"
+  tensor_path: "00000/3d_points_epoch_1239\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1240:00000"
+  tensor_path: "00000/3d_points_epoch_1240\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1241:00000"
+  tensor_path: "00000/3d_points_epoch_1241\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1242:00000"
+  tensor_path: "00000/3d_points_epoch_1242\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1243:00000"
+  tensor_path: "00000/3d_points_epoch_1243\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1244:00000"
+  tensor_path: "00000/3d_points_epoch_1244\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1245:00000"
+  tensor_path: "00000/3d_points_epoch_1245\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1246:00000"
+  tensor_path: "00000/3d_points_epoch_1246\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1247:00000"
+  tensor_path: "00000/3d_points_epoch_1247\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1248:00000"
+  tensor_path: "00000/3d_points_epoch_1248\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1249:00000"
+  tensor_path: "00000/3d_points_epoch_1249\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1250:00000"
+  tensor_path: "00000/3d_points_epoch_1250\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1251:00000"
+  tensor_path: "00000/3d_points_epoch_1251\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1252:00000"
+  tensor_path: "00000/3d_points_epoch_1252\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1253:00000"
+  tensor_path: "00000/3d_points_epoch_1253\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1254:00000"
+  tensor_path: "00000/3d_points_epoch_1254\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1255:00000"
+  tensor_path: "00000/3d_points_epoch_1255\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1256:00000"
+  tensor_path: "00000/3d_points_epoch_1256\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1257:00000"
+  tensor_path: "00000/3d_points_epoch_1257\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1258:00000"
+  tensor_path: "00000/3d_points_epoch_1258\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1259:00000"
+  tensor_path: "00000/3d_points_epoch_1259\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1260:00000"
+  tensor_path: "00000/3d_points_epoch_1260\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1261:00000"
+  tensor_path: "00000/3d_points_epoch_1261\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1262:00000"
+  tensor_path: "00000/3d_points_epoch_1262\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1263:00000"
+  tensor_path: "00000/3d_points_epoch_1263\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1264:00000"
+  tensor_path: "00000/3d_points_epoch_1264\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1265:00000"
+  tensor_path: "00000/3d_points_epoch_1265\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1266:00000"
+  tensor_path: "00000/3d_points_epoch_1266\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1267:00000"
+  tensor_path: "00000/3d_points_epoch_1267\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1268:00000"
+  tensor_path: "00000/3d_points_epoch_1268\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1269:00000"
+  tensor_path: "00000/3d_points_epoch_1269\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1270:00000"
+  tensor_path: "00000/3d_points_epoch_1270\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1271:00000"
+  tensor_path: "00000/3d_points_epoch_1271\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1272:00000"
+  tensor_path: "00000/3d_points_epoch_1272\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1273:00000"
+  tensor_path: "00000/3d_points_epoch_1273\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1274:00000"
+  tensor_path: "00000/3d_points_epoch_1274\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1275:00000"
+  tensor_path: "00000/3d_points_epoch_1275\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1276:00000"
+  tensor_path: "00000/3d_points_epoch_1276\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1277:00000"
+  tensor_path: "00000/3d_points_epoch_1277\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1278:00000"
+  tensor_path: "00000/3d_points_epoch_1278\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1279:00000"
+  tensor_path: "00000/3d_points_epoch_1279\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1280:00000"
+  tensor_path: "00000/3d_points_epoch_1280\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1281:00000"
+  tensor_path: "00000/3d_points_epoch_1281\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1282:00000"
+  tensor_path: "00000/3d_points_epoch_1282\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1283:00000"
+  tensor_path: "00000/3d_points_epoch_1283\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1284:00000"
+  tensor_path: "00000/3d_points_epoch_1284\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1285:00000"
+  tensor_path: "00000/3d_points_epoch_1285\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1286:00000"
+  tensor_path: "00000/3d_points_epoch_1286\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1287:00000"
+  tensor_path: "00000/3d_points_epoch_1287\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1288:00000"
+  tensor_path: "00000/3d_points_epoch_1288\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1289:00000"
+  tensor_path: "00000/3d_points_epoch_1289\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1290:00000"
+  tensor_path: "00000/3d_points_epoch_1290\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1291:00000"
+  tensor_path: "00000/3d_points_epoch_1291\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1292:00000"
+  tensor_path: "00000/3d_points_epoch_1292\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1293:00000"
+  tensor_path: "00000/3d_points_epoch_1293\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1294:00000"
+  tensor_path: "00000/3d_points_epoch_1294\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1295:00000"
+  tensor_path: "00000/3d_points_epoch_1295\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1296:00000"
+  tensor_path: "00000/3d_points_epoch_1296\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1297:00000"
+  tensor_path: "00000/3d_points_epoch_1297\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1298:00000"
+  tensor_path: "00000/3d_points_epoch_1298\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1299:00000"
+  tensor_path: "00000/3d_points_epoch_1299\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1300:00000"
+  tensor_path: "00000/3d_points_epoch_1300\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1301:00000"
+  tensor_path: "00000/3d_points_epoch_1301\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1302:00000"
+  tensor_path: "00000/3d_points_epoch_1302\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1303:00000"
+  tensor_path: "00000/3d_points_epoch_1303\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1304:00000"
+  tensor_path: "00000/3d_points_epoch_1304\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1305:00000"
+  tensor_path: "00000/3d_points_epoch_1305\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1306:00000"
+  tensor_path: "00000/3d_points_epoch_1306\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1307:00000"
+  tensor_path: "00000/3d_points_epoch_1307\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1308:00000"
+  tensor_path: "00000/3d_points_epoch_1308\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1309:00000"
+  tensor_path: "00000/3d_points_epoch_1309\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1310:00000"
+  tensor_path: "00000/3d_points_epoch_1310\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1311:00000"
+  tensor_path: "00000/3d_points_epoch_1311\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1312:00000"
+  tensor_path: "00000/3d_points_epoch_1312\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1313:00000"
+  tensor_path: "00000/3d_points_epoch_1313\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1314:00000"
+  tensor_path: "00000/3d_points_epoch_1314\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1315:00000"
+  tensor_path: "00000/3d_points_epoch_1315\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1316:00000"
+  tensor_path: "00000/3d_points_epoch_1316\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1317:00000"
+  tensor_path: "00000/3d_points_epoch_1317\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1318:00000"
+  tensor_path: "00000/3d_points_epoch_1318\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1319:00000"
+  tensor_path: "00000/3d_points_epoch_1319\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1320:00000"
+  tensor_path: "00000/3d_points_epoch_1320\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1321:00000"
+  tensor_path: "00000/3d_points_epoch_1321\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1322:00000"
+  tensor_path: "00000/3d_points_epoch_1322\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1323:00000"
+  tensor_path: "00000/3d_points_epoch_1323\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1324:00000"
+  tensor_path: "00000/3d_points_epoch_1324\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1325:00000"
+  tensor_path: "00000/3d_points_epoch_1325\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1326:00000"
+  tensor_path: "00000/3d_points_epoch_1326\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1327:00000"
+  tensor_path: "00000/3d_points_epoch_1327\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1328:00000"
+  tensor_path: "00000/3d_points_epoch_1328\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1329:00000"
+  tensor_path: "00000/3d_points_epoch_1329\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1330:00000"
+  tensor_path: "00000/3d_points_epoch_1330\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1331:00000"
+  tensor_path: "00000/3d_points_epoch_1331\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1332:00000"
+  tensor_path: "00000/3d_points_epoch_1332\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1333:00000"
+  tensor_path: "00000/3d_points_epoch_1333\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1334:00000"
+  tensor_path: "00000/3d_points_epoch_1334\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1335:00000"
+  tensor_path: "00000/3d_points_epoch_1335\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1336:00000"
+  tensor_path: "00000/3d_points_epoch_1336\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1337:00000"
+  tensor_path: "00000/3d_points_epoch_1337\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1338:00000"
+  tensor_path: "00000/3d_points_epoch_1338\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1339:00000"
+  tensor_path: "00000/3d_points_epoch_1339\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1340:00000"
+  tensor_path: "00000/3d_points_epoch_1340\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1341:00000"
+  tensor_path: "00000/3d_points_epoch_1341\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1342:00000"
+  tensor_path: "00000/3d_points_epoch_1342\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1343:00000"
+  tensor_path: "00000/3d_points_epoch_1343\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1344:00000"
+  tensor_path: "00000/3d_points_epoch_1344\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1345:00000"
+  tensor_path: "00000/3d_points_epoch_1345\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1346:00000"
+  tensor_path: "00000/3d_points_epoch_1346\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1347:00000"
+  tensor_path: "00000/3d_points_epoch_1347\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1348:00000"
+  tensor_path: "00000/3d_points_epoch_1348\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1349:00000"
+  tensor_path: "00000/3d_points_epoch_1349\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1350:00000"
+  tensor_path: "00000/3d_points_epoch_1350\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1351:00000"
+  tensor_path: "00000/3d_points_epoch_1351\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1352:00000"
+  tensor_path: "00000/3d_points_epoch_1352\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1353:00000"
+  tensor_path: "00000/3d_points_epoch_1353\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1354:00000"
+  tensor_path: "00000/3d_points_epoch_1354\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1355:00000"
+  tensor_path: "00000/3d_points_epoch_1355\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1356:00000"
+  tensor_path: "00000/3d_points_epoch_1356\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1357:00000"
+  tensor_path: "00000/3d_points_epoch_1357\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1358:00000"
+  tensor_path: "00000/3d_points_epoch_1358\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1359:00000"
+  tensor_path: "00000/3d_points_epoch_1359\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1360:00000"
+  tensor_path: "00000/3d_points_epoch_1360\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1361:00000"
+  tensor_path: "00000/3d_points_epoch_1361\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1362:00000"
+  tensor_path: "00000/3d_points_epoch_1362\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1363:00000"
+  tensor_path: "00000/3d_points_epoch_1363\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1364:00000"
+  tensor_path: "00000/3d_points_epoch_1364\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1365:00000"
+  tensor_path: "00000/3d_points_epoch_1365\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1366:00000"
+  tensor_path: "00000/3d_points_epoch_1366\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1367:00000"
+  tensor_path: "00000/3d_points_epoch_1367\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1368:00000"
+  tensor_path: "00000/3d_points_epoch_1368\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1369:00000"
+  tensor_path: "00000/3d_points_epoch_1369\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1370:00000"
+  tensor_path: "00000/3d_points_epoch_1370\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1371:00000"
+  tensor_path: "00000/3d_points_epoch_1371\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1372:00000"
+  tensor_path: "00000/3d_points_epoch_1372\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1373:00000"
+  tensor_path: "00000/3d_points_epoch_1373\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1374:00000"
+  tensor_path: "00000/3d_points_epoch_1374\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1375:00000"
+  tensor_path: "00000/3d_points_epoch_1375\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1376:00000"
+  tensor_path: "00000/3d_points_epoch_1376\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1377:00000"
+  tensor_path: "00000/3d_points_epoch_1377\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1378:00000"
+  tensor_path: "00000/3d_points_epoch_1378\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1379:00000"
+  tensor_path: "00000/3d_points_epoch_1379\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1380:00000"
+  tensor_path: "00000/3d_points_epoch_1380\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1381:00000"
+  tensor_path: "00000/3d_points_epoch_1381\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1382:00000"
+  tensor_path: "00000/3d_points_epoch_1382\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1383:00000"
+  tensor_path: "00000/3d_points_epoch_1383\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1384:00000"
+  tensor_path: "00000/3d_points_epoch_1384\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1385:00000"
+  tensor_path: "00000/3d_points_epoch_1385\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1386:00000"
+  tensor_path: "00000/3d_points_epoch_1386\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1387:00000"
+  tensor_path: "00000/3d_points_epoch_1387\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1388:00000"
+  tensor_path: "00000/3d_points_epoch_1388\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1389:00000"
+  tensor_path: "00000/3d_points_epoch_1389\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1390:00000"
+  tensor_path: "00000/3d_points_epoch_1390\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1391:00000"
+  tensor_path: "00000/3d_points_epoch_1391\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1392:00000"
+  tensor_path: "00000/3d_points_epoch_1392\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1393:00000"
+  tensor_path: "00000/3d_points_epoch_1393\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1394:00000"
+  tensor_path: "00000/3d_points_epoch_1394\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1395:00000"
+  tensor_path: "00000/3d_points_epoch_1395\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1396:00000"
+  tensor_path: "00000/3d_points_epoch_1396\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1397:00000"
+  tensor_path: "00000/3d_points_epoch_1397\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1398:00000"
+  tensor_path: "00000/3d_points_epoch_1398\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1399:00000"
+  tensor_path: "00000/3d_points_epoch_1399\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1400:00000"
+  tensor_path: "00000/3d_points_epoch_1400\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1401:00000"
+  tensor_path: "00000/3d_points_epoch_1401\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1402:00000"
+  tensor_path: "00000/3d_points_epoch_1402\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1403:00000"
+  tensor_path: "00000/3d_points_epoch_1403\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1404:00000"
+  tensor_path: "00000/3d_points_epoch_1404\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1405:00000"
+  tensor_path: "00000/3d_points_epoch_1405\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1406:00000"
+  tensor_path: "00000/3d_points_epoch_1406\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1407:00000"
+  tensor_path: "00000/3d_points_epoch_1407\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1408:00000"
+  tensor_path: "00000/3d_points_epoch_1408\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1409:00000"
+  tensor_path: "00000/3d_points_epoch_1409\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1410:00000"
+  tensor_path: "00000/3d_points_epoch_1410\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1411:00000"
+  tensor_path: "00000/3d_points_epoch_1411\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1412:00000"
+  tensor_path: "00000/3d_points_epoch_1412\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1413:00000"
+  tensor_path: "00000/3d_points_epoch_1413\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1414:00000"
+  tensor_path: "00000/3d_points_epoch_1414\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1415:00000"
+  tensor_path: "00000/3d_points_epoch_1415\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1416:00000"
+  tensor_path: "00000/3d_points_epoch_1416\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1417:00000"
+  tensor_path: "00000/3d_points_epoch_1417\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1418:00000"
+  tensor_path: "00000/3d_points_epoch_1418\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1419:00000"
+  tensor_path: "00000/3d_points_epoch_1419\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1420:00000"
+  tensor_path: "00000/3d_points_epoch_1420\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1421:00000"
+  tensor_path: "00000/3d_points_epoch_1421\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1422:00000"
+  tensor_path: "00000/3d_points_epoch_1422\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1423:00000"
+  tensor_path: "00000/3d_points_epoch_1423\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1424:00000"
+  tensor_path: "00000/3d_points_epoch_1424\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1425:00000"
+  tensor_path: "00000/3d_points_epoch_1425\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1426:00000"
+  tensor_path: "00000/3d_points_epoch_1426\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1427:00000"
+  tensor_path: "00000/3d_points_epoch_1427\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1428:00000"
+  tensor_path: "00000/3d_points_epoch_1428\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1429:00000"
+  tensor_path: "00000/3d_points_epoch_1429\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1430:00000"
+  tensor_path: "00000/3d_points_epoch_1430\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1431:00000"
+  tensor_path: "00000/3d_points_epoch_1431\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1432:00000"
+  tensor_path: "00000/3d_points_epoch_1432\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1433:00000"
+  tensor_path: "00000/3d_points_epoch_1433\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1434:00000"
+  tensor_path: "00000/3d_points_epoch_1434\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1435:00000"
+  tensor_path: "00000/3d_points_epoch_1435\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1436:00000"
+  tensor_path: "00000/3d_points_epoch_1436\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1437:00000"
+  tensor_path: "00000/3d_points_epoch_1437\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1438:00000"
+  tensor_path: "00000/3d_points_epoch_1438\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1439:00000"
+  tensor_path: "00000/3d_points_epoch_1439\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1440:00000"
+  tensor_path: "00000/3d_points_epoch_1440\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1441:00000"
+  tensor_path: "00000/3d_points_epoch_1441\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1442:00000"
+  tensor_path: "00000/3d_points_epoch_1442\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1443:00000"
+  tensor_path: "00000/3d_points_epoch_1443\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1444:00000"
+  tensor_path: "00000/3d_points_epoch_1444\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1445:00000"
+  tensor_path: "00000/3d_points_epoch_1445\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1446:00000"
+  tensor_path: "00000/3d_points_epoch_1446\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1447:00000"
+  tensor_path: "00000/3d_points_epoch_1447\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1448:00000"
+  tensor_path: "00000/3d_points_epoch_1448\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1449:00000"
+  tensor_path: "00000/3d_points_epoch_1449\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1450:00000"
+  tensor_path: "00000/3d_points_epoch_1450\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1451:00000"
+  tensor_path: "00000/3d_points_epoch_1451\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1452:00000"
+  tensor_path: "00000/3d_points_epoch_1452\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1453:00000"
+  tensor_path: "00000/3d_points_epoch_1453\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1454:00000"
+  tensor_path: "00000/3d_points_epoch_1454\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1455:00000"
+  tensor_path: "00000/3d_points_epoch_1455\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1456:00000"
+  tensor_path: "00000/3d_points_epoch_1456\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1457:00000"
+  tensor_path: "00000/3d_points_epoch_1457\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1458:00000"
+  tensor_path: "00000/3d_points_epoch_1458\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1459:00000"
+  tensor_path: "00000/3d_points_epoch_1459\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1460:00000"
+  tensor_path: "00000/3d_points_epoch_1460\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1461:00000"
+  tensor_path: "00000/3d_points_epoch_1461\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1462:00000"
+  tensor_path: "00000/3d_points_epoch_1462\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1463:00000"
+  tensor_path: "00000/3d_points_epoch_1463\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1464:00000"
+  tensor_path: "00000/3d_points_epoch_1464\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1465:00000"
+  tensor_path: "00000/3d_points_epoch_1465\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1466:00000"
+  tensor_path: "00000/3d_points_epoch_1466\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1467:00000"
+  tensor_path: "00000/3d_points_epoch_1467\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1468:00000"
+  tensor_path: "00000/3d_points_epoch_1468\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1469:00000"
+  tensor_path: "00000/3d_points_epoch_1469\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1470:00000"
+  tensor_path: "00000/3d_points_epoch_1470\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1471:00000"
+  tensor_path: "00000/3d_points_epoch_1471\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1472:00000"
+  tensor_path: "00000/3d_points_epoch_1472\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1473:00000"
+  tensor_path: "00000/3d_points_epoch_1473\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1474:00000"
+  tensor_path: "00000/3d_points_epoch_1474\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1475:00000"
+  tensor_path: "00000/3d_points_epoch_1475\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1476:00000"
+  tensor_path: "00000/3d_points_epoch_1476\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1477:00000"
+  tensor_path: "00000/3d_points_epoch_1477\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1478:00000"
+  tensor_path: "00000/3d_points_epoch_1478\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1479:00000"
+  tensor_path: "00000/3d_points_epoch_1479\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1480:00000"
+  tensor_path: "00000/3d_points_epoch_1480\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1481:00000"
+  tensor_path: "00000/3d_points_epoch_1481\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1482:00000"
+  tensor_path: "00000/3d_points_epoch_1482\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1483:00000"
+  tensor_path: "00000/3d_points_epoch_1483\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1484:00000"
+  tensor_path: "00000/3d_points_epoch_1484\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1485:00000"
+  tensor_path: "00000/3d_points_epoch_1485\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1486:00000"
+  tensor_path: "00000/3d_points_epoch_1486\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1487:00000"
+  tensor_path: "00000/3d_points_epoch_1487\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1488:00000"
+  tensor_path: "00000/3d_points_epoch_1488\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1489:00000"
+  tensor_path: "00000/3d_points_epoch_1489\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1490:00000"
+  tensor_path: "00000/3d_points_epoch_1490\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1491:00000"
+  tensor_path: "00000/3d_points_epoch_1491\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1492:00000"
+  tensor_path: "00000/3d_points_epoch_1492\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1493:00000"
+  tensor_path: "00000/3d_points_epoch_1493\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1494:00000"
+  tensor_path: "00000/3d_points_epoch_1494\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1495:00000"
+  tensor_path: "00000/3d_points_epoch_1495\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1496:00000"
+  tensor_path: "00000/3d_points_epoch_1496\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1497:00000"
+  tensor_path: "00000/3d_points_epoch_1497\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1498:00000"
+  tensor_path: "00000/3d_points_epoch_1498\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1499:00000"
+  tensor_path: "00000/3d_points_epoch_1499\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "3d_points_epoch_1500:00000"
+  tensor_path: "00000/3d_points_epoch_1500\\tensors.tsv"
+}
