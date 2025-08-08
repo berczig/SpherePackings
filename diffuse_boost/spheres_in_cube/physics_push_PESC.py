@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from tqdm import tqdm
-import types
+from numba import jit
 
 import diffuse_boost.spheres_in_Rd
 import diffuse_boost.spheres_in_Rd.data_evaluation
@@ -12,10 +12,34 @@ import diffuse_boost
 # 1) TORUS‐WRAPPED OVERLAP‐ELIMINATION
 # ----------------------------------------
 
+@jit(nopython=True, cache=True)
 def shortest_vector_torus(p1, p2, box_size):
     delta = p1 - p2
     box = np.array(box_size, float)
     return delta - box * np.round(delta / box)
+
+
+@jit(nopython=True, cache=True)
+def _torus_step_jit(n, d, centers, box, target_sq, radius):
+
+    moves = np.zeros_like(centers)
+    max_ov = 0.0
+    for i in range(n):
+        for j in range(i + 1, n):
+            vec = shortest_vector_torus(centers[i], centers[j], box)
+            dist_sq = np.dot(vec, vec)
+            if dist_sq < target_sq and dist_sq > 1e-12:
+                dist = np.sqrt(dist_sq)
+                overlap = 2 * radius - dist
+                if overlap > max_ov:
+                    max_ov = overlap
+                
+                direction = vec / dist
+                mag = ((1 + overlap)**2 - 1) / 2.0
+                moves[i] += direction * mag
+                moves[j] -= direction * mag
+                
+    return moves, max_ov
 
 def eliminate_overlaps_torus(
     initial_centers, radius, box_size,
@@ -31,25 +55,8 @@ def eliminate_overlaps_torus(
     for it in bar:
         if visualize and d == 2:
             history.append(centers.copy())
-
-        moves = np.zeros_like(centers)
-        max_ov = 0.0
-        any_overlap = False
-
-        # compute pairwise forces
-        for i in range(n):
-            for j in range(i+1, n):
-                vec = shortest_vector_torus(centers[i], centers[j], box)
-                dist_sq = np.dot(vec, vec)
-                if dist_sq < target_sq and dist_sq > 1e-12:
-                    any_overlap = True
-                    dist = np.sqrt(dist_sq)
-                    overlap = 2*radius - dist
-                    max_ov = max(max_ov, overlap)
-                    direction = vec / dist
-                    mag = ((1+overlap)**2 - 1)/2.0
-                    moves[i] +=  direction * mag
-                    moves[j] += -direction * mag
+        
+        moves, max_ov = _torus_step_jit(n, d, centers, box, target_sq, radius)
 
         # convergence check
         if max_ov < tol:
@@ -103,6 +110,68 @@ def eliminate_overlaps_torus(
 # 2) BOX‐CONSTRAINED OVERLAP‐ELIMINATION
 # ----------------------------------------
 
+
+@jit(nopython=True, cache=True)
+def _box_step_jit(n, d, centers, target_sq, radius, dt, 
+                  box_min, box_max, boundary_flag):
+
+    moves = np.zeros_like(centers)
+    max_ov = 0.0
+
+    for i in range(n):
+        for j in range(i + 1, n):
+            vec = centers[i] - centers[j]
+            dist_sq = np.dot(vec, vec)
+            if dist_sq < target_sq and dist_sq > 1e-12:
+                dist = np.sqrt(dist_sq)
+                overlap = 2 * radius - dist
+                #if overlap > max_ov:
+                #    max_ov = overlap
+                max_ov = max(max_ov, overlap)
+                direction = vec / dist
+                mag = ((1 + overlap)**2 - 1) / 2.0
+                moves[i] += direction * mag
+                moves[j] -= direction * mag
+
+    new_centers = centers.copy()
+    for idx in range(n):
+        mv = dt * moves[idx]
+        orig = new_centers[idx]
+        tentative = orig + mv
+
+        # boundary_flag: 0 for "clamp", 1 for "stophit"
+        if boundary_flag == 0: # clamp # keep center in [r, L-r]
+            new_centers[idx] = np.minimum(np.maximum(tentative, box_min), box_max)
+        else: # stophit # if fully inside, take it
+            is_inside = True
+            for dim in range(d):
+                if not (box_min[dim] <= tentative[dim] <= box_max[dim]):
+                    is_inside = False
+                    break
+            
+            if is_inside: 
+                new_centers[idx] = tentative
+            else:
+                length = np.linalg.norm(mv)
+                if length < 1e-12:
+                    continue
+                dir_unit = mv / length
+                
+                t_hit = length
+                for dim in range(d):
+                    if dir_unit[dim] > 1e-9: # Moving towards max boundary
+                        t = (box_max[dim] - orig[dim]) / dir_unit[dim]
+                        if t < t_hit: t_hit = t
+                    elif dir_unit[dim] < -1e-9: # Moving towards min boundary
+                        t = (box_min[dim] - orig[dim]) / dir_unit[dim]
+                        if t < t_hit: t_hit = t
+                
+                final_pos = orig + dir_unit * t_hit
+                # Final clamp to handle any floating point inaccuracies
+                new_centers[idx] = np.minimum(np.maximum(final_pos, box_min), box_max)
+
+    return new_centers, max_ov
+
 def eliminate_overlaps_box(
     initial_centers, radius, box_size,
     max_iter=100, dt=0.2, tol=1e-5,
@@ -112,9 +181,11 @@ def eliminate_overlaps_box(
     n, d = centers.shape
 
     full_box = np.array(box_size, float)
-    box_min = radius
-    box_max = full_box - radius
+    box_min_arr = np.full(d, radius)
+    box_max_arr = full_box - radius
     target_sq = (2*radius)**2
+
+    boundary_flag = 0 if boundary_mode == "clamp" else 1
 
     history = []
     bar = tqdm(range(max_iter), desc=f"Box({boundary_mode})")
@@ -122,22 +193,8 @@ def eliminate_overlaps_box(
         if visualize and d == 2:
             history.append(centers.copy())
 
-        moves = np.zeros_like(centers)
-        max_ov = 0.0
-
-        # compute pairwise forces
-        for i in range(n):
-            for j in range(i+1, n):
-                vec = centers[i] - centers[j]
-                dist_sq = np.dot(vec, vec)
-                if dist_sq < target_sq and dist_sq > 1e-12:
-                    dist = np.sqrt(dist_sq)
-                    overlap = 2*radius - dist
-                    max_ov = max(max_ov, overlap)
-                    direction = vec / dist
-                    mag = ((1+overlap)**2 - 1)/2.0
-                    moves[i] +=  direction * mag
-                    moves[j] += -direction * mag
+        centers, max_ov = _box_step_jit(n, d, centers, target_sq, radius, dt, 
+                                        box_min_arr, box_max_arr, boundary_flag)
 
         # convergence check
         if max_ov < tol:
@@ -145,43 +202,6 @@ def eliminate_overlaps_box(
             if visualize and d == 2:
                 history.append(centers.copy())
             break
-
-        # apply moves + boundary handling
-        for idx in range(n):
-            mv = dt * moves[idx]
-            orig = centers[idx]
-            tentative = orig + mv
-
-            if boundary_mode == "clamp":
-                # keep center in [r, L-r]
-                centers[idx] = np.minimum(
-                    np.maximum(tentative, box_min),
-                    box_max
-                )
-
-            else:  # stophit
-                # if fully inside, take it
-                if np.all(tentative >= box_min) and np.all(tentative <= box_max):
-                    centers[idx] = tentative
-                else:
-                    length = np.linalg.norm(mv)
-                    if length < 1e-12:
-                        continue
-                    dir_unit = mv / length
-                    ts = []
-                    for dim in range(d):
-                        if dir_unit[dim] > 0:
-                            ts.append((box_max[dim] - orig[dim]) / dir_unit[dim])
-                        elif dir_unit[dim] < 0:
-                            ts.append((box_min - orig[dim]) / dir_unit[dim])
-                    # move at most full step
-                    t_hit = min([t for t in ts if t>0] + [length])
-                    new_pos = orig + dir_unit * t_hit
-                    # clamp any tiny overshoot
-                    centers[idx] = np.minimum(
-                        np.maximum(new_pos, box_min),
-                        box_max
-                    )
 
         bar.set_postfix({"max_overlap": f"{max_ov:.2e}"})
 
