@@ -1,7 +1,7 @@
 # Conditional Flow Matching for sphere packings with lattice sources
 
 #The Conditional Flow Model builds directly on your original flow-matching code but adds a 
-# ey idea: instead of always flowing from Gaussian noise to good packings, it learns flows 
+# key idea: instead of always flowing from Gaussian noise to good packings, it learns flows 
 # conditioned on a structured lattice source arrangement (SC, BCC, FCC, HCP, with 
 # jitter/rotation). To handle the fact that packings are unordered sets, it uses Sinkhorn 
 # optimal transport matching (or cheaper alternatives) to align lattice points with target 
@@ -22,6 +22,7 @@ if platform.system() == "Darwin" and os.environ.get("SPHEREPACK_DISABLE_KMP_HACK
     os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
 import time, math, random
+import warnings
 import torch                 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -38,6 +39,9 @@ from diffuse_boost.spheres_in_cube import data_load_save
 from diffuse_boost import cfg
 from diffuse_boost.spheres_in_cube.DiffusionModel_PESC import SetTransformer
 from plot_data_points import plot_3d
+
+# Simple debug flag to print sanity checks occasionally
+DEBUG_SANITY = True
 
 # -----------------------------------------------------------
 # Utils
@@ -191,20 +195,37 @@ def sample_lattice_batch(
 def sinkhorn_soft_matching(x_src, x_tgt, epsilon=0.05, iters=80):
     """
     x_src, x_tgt: (B,d,N)
-    returns P: (B,N,N) row-stochastic aligning src rows to tgt cols
+    returns P: (B,N,N) **row-stochastic** aligning src rows to tgt cols
     """
     B, d, N = x_src.shape
     xs = x_src.permute(0,2,1)  # (B,N,d)
     xt = x_tgt.permute(0,2,1)
     C = torch.cdist(xs, xt).pow(2)  # (B,N,N)
-    K = torch.exp(-C / epsilon).clamp_min(1e-9)
-    u = torch.full((B, N), 1.0/N, device=x_src.device)
-    v = torch.full((B, N), 1.0/N, device=x_src.device)
+    K = torch.exp(-C / max(epsilon, 1e-6)).clamp_min(1e-9)
+
+    # target row/col marginals ≈ 1 (we'll normalize rows at the end)
+    u = torch.ones(B, N, device=x_src.device)
+    v = torch.ones(B, N, device=x_src.device)
     for _ in range(iters):
-        u = 1.0 / (K @ v.unsqueeze(-1)).squeeze(-1).clamp_min(1e-9)
-        v = 1.0 / ((K.transpose(1,2) @ u.unsqueeze(-1)).squeeze(-1)).clamp_min(1e-9)
-    P = u.unsqueeze(-1) * K * v.unsqueeze(-2)
-    return P / (P.sum(dim=(1,2), keepdim=True) + 1e-9)
+        Kv = (K @ v.unsqueeze(-1)).squeeze(-1).clamp_min(1e-9)
+        u = 1.0 / Kv
+        KTu = (K.transpose(1,2) @ u.unsqueeze(-1)).squeeze(-1).clamp_min(1e-9)
+        v = 1.0 / KTu
+
+    P = u.unsqueeze(-1) * K * v.unsqueeze(-2)  # (B,N,N)
+    # Ensure row-stochastic (sums to 1 along last dim)
+    P = P / (P.sum(dim=-1, keepdim=True) + 1e-9)
+
+    if DEBUG_SANITY:
+        with torch.no_grad():
+            rs = P.sum(-1)  # (B,N)
+            cs = P.sum(-2)  # (B,N)
+            if not torch.isfinite(P).all():
+                warnings.warn("Non-finite values in Sinkhorn P")
+            # Print once per call (mean ± std)
+            print(f"[Sinkhorn] rows {rs.mean():.3f}±{rs.std():.3f} | cols {cs.mean():.3f}±{cs.std():.3f}")
+
+    return P
 
 # -----------------------------------------------------------
 # Local geometry features (kNN)
@@ -227,8 +248,8 @@ def local_geom_features(x, k=8):
     returns feats: (B, 2d+2, N)
       - centered coords
       - vec to kNN barycenter
-      - mean kNN distance
-      - min  kNN distance
+      - mean kNN distance (excluding self)
+      - min  kNN distance (excluding self)
     """
     B, d, N = x.shape
     k = max(1, min(k, N - 1))
@@ -245,11 +266,12 @@ def local_geom_features(x, k=8):
     bary = nb.mean(dim=2)                  # (B,N,d)
     vec_to_bary = (bary - xp).permute(0, 2, 1)  # (B,d,N)
 
-    # distances for stats
-    dmat = pairwise_dists(x)               # (B,N,N)
-    d_sorted, _ = torch.sort(dmat, dim=-1) # (B,N,N)
+    # distances for stats (exclude self)
+    dmat = pairwise_dists(x)                                # (B,N,N)
+    dmat = dmat + torch.eye(N, device=x.device).unsqueeze(0) * 1e9  # mask self
+    d_sorted, _ = torch.sort(dmat, dim=-1)
     mean_k = d_sorted[:, :, :k].mean(dim=-1)  # (B,N)
-    min_k  = d_sorted[:, :, 0]                # (B,N) nearest neighbor
+    min_k  = d_sorted[:, :, 0]                # (B,N) nearest neighbor distance
 
     feats = torch.cat([
         xc,                              # (B,d,N)
@@ -453,7 +475,9 @@ def train_flow_model_optionB(
     boundary_strength=1.0,
     boundary_warmup=True, boundary_schedule_center=0.5, boundary_schedule_sharpness=8.0,
     # --- schedules for collision penalty ---
-    pen_schedule_center=0.5, pen_schedule_sharpness=8.0
+    pen_schedule_center=0.5, pen_schedule_sharpness=8.0,
+    # --- scheduler (optional) ---
+    scheduler=None
 ):
     model.train().to(device)
     mse = nn.MSELoss(reduction='none')
@@ -480,17 +504,22 @@ def train_flow_model_optionB(
                 jitter=lattice_jitter, rotate=lattice_rotate, mix_kinds=(lattice_kind=='mix')
             )
 
-            # Soft OT matching (align good→source)
+            # Soft OT matching (align good→source); expect row-stochastic P
             P = sinkhorn_soft_matching(x_src, x0, epsilon=epsilon_sinkhorn, iters=iters_sinkhorn)  # (B,N,N)
+            if not torch.isfinite(P).all():
+                raise RuntimeError("NaNs/Infs in Sinkhorn matrix P")
             x0_matched = torch.bmm(x0, P.transpose(1,2))  # (B,d,N)
 
             # t sampling
             if t_beta is None:
-                t = torch.rand(B, device=device); weight_t = torch.ones(B, device=device)
+                t = torch.rand(B, device=device)
+                weight_t = torch.ones(B, device=device)
             else:
                 a,b = t_beta
                 beta_dist = torch.distributions.Beta(a, b)
                 t = beta_dist.sample((B,)).to(device)
+                # Clamp away from edges to stabilize
+                t = t.clamp(1e-3, 1-1e-3)
                 weight_t = (1.0 / torch.exp(beta_dist.log_prob(t)).clamp_min(1e-6)) if t_importance_weight else torch.ones(B, device=device)
 
             # straight path lattice->good (t=1 is lattice)
@@ -499,6 +528,11 @@ def train_flow_model_optionB(
 
             # predict velocity
             u_pred = model(t, x_t, x_src, metas)  # (B,d,N)
+
+            # quick NaN guards
+            for tens, name in [(x_t, "x_t"), (u_pred, "u_pred"), (x_src, "x_src"), (x0_matched, "x0_matched")]:
+                if not torch.isfinite(tens).all():
+                    raise RuntimeError(f"Non-finite values detected in {name}")
 
             # FM loss
             fm_per  = ((u_pred - u_star)**2).mean(dim=(1,2))
@@ -532,6 +566,10 @@ def train_flow_model_optionB(
             gn_list.append(float(gnorm))
             bnd_list.append(float(pen_bnd))
 
+        # Step LR scheduler per-epoch (if provided)
+        if scheduler is not None:
+            scheduler.step()
+
         avg = np.mean(ep_losses, axis=0)
         gavg= np.mean(gn_list)
         bavg= np.mean(bnd_list)
@@ -552,27 +590,38 @@ def sample_flow_model_optionB(
     model, num_samples, batch_size, num_points, device,
     sphere_radius, cube_min, cube_max, dim=3,
     lattice_kind='mix', lattice_jitter=0.02, lattice_rotate=True,
-    guided_gamma=0.0, ode_atol=1e-5, ode_rtol=1e-5, k_local=8
+    guided_gamma=0.0, ode_atol=1e-6, ode_rtol=1e-6, k_local=8,
+    ode_method='rk4', ode_n_steps=128
 ):
     model.eval()
     samples, meta_log = [], []
 
-    def vf_plain(t, x, x_src, metas):
-        # t is a scalar from odeint; expand to batch size
-        t_scalar = torch.as_tensor(t, device=device)
-        B = x.shape[0]
-        t_batch = t_scalar.expand(B)  # shape (B,)
-        return model(t_batch, x, x_src, metas, context_dropout_p=0.0)
+    def _sanitize_x(x):
+        # Pull any NaNs/Infs back into the box interior
+        x = torch.nan_to_num(
+            x,
+            nan=cube_min + sphere_radius,
+            posinf=cube_max - sphere_radius,
+            neginf=cube_min + sphere_radius,
+        )
+        return x.clamp(min=cube_min + sphere_radius, max=cube_max - sphere_radius)
 
-    def vf_guided(t, x, x_src, metas):
-        x = x.requires_grad_(True)
-        t_scalar = torch.as_tensor(t, device=device)
+    def _vf_core(t, x, x_src, metas, guided: bool):
+        # Make sure time has same dtype as state
+        t_scalar = torch.as_tensor(t, device=device, dtype=x.dtype)
         B = x.shape[0]
-        t_batch = t_scalar.expand(B)  # shape (B,)
-        v = model(t_batch, x, x_src, metas, context_dropout_p=0.0)
-        if guided_gamma > 0.0:
-            g = grad_collision(x, sphere_radius)
+        t_batch = t_scalar.expand(B)  # (B,)
+
+        # Evaluate model on a clamped (safe) state to avoid exploding cdist etc.
+        x_safe = _sanitize_x(x)
+
+        v = model(t_batch, x_safe, x_src, metas, context_dropout_p=0.0)
+        if guided and guided_gamma > 0.0:
+            g = grad_collision(x_safe, sphere_radius)
             v = v - guided_gamma * g
+
+        # Last-ditch safety: scrub any non-finite velocity
+        v = torch.nan_to_num(v)
         return v
 
     steps = int(math.ceil(num_samples / batch_size))
@@ -584,18 +633,29 @@ def sample_flow_model_optionB(
             kind=lattice_kind if lattice_kind!='mix' else 'fcc',
             jitter=lattice_jitter, rotate=lattice_rotate, mix_kinds=(lattice_kind=='mix')
         )
-        t_span = torch.tensor([1.0, 0.0], device=device)
-        vf = vf_guided if guided_gamma > 0.0 else vf_plain
-        if ode_method.lower() == 'rk4':
-            step_size = 1.0 / float(ode_n_steps)
-            out = odeint(lambda tt, xx: vf(tt, xx, xT, metas), xT, t_span,
-                 method='rk4', options={'step_size': step_size})[-1]
-        else:
-            out = odeint(lambda tt, xx: vf(tt, xx, xT, metas), xT, t_span,
-                 atol=ode_atol, rtol=ode_rtol)[-1]
-        
 
-        proj = out.clamp(min=cube_min + sphere_radius, max=cube_max - sphere_radius)
+        # Start from a sanitized state just in case
+        xT = _sanitize_x(xT)
+
+        t_span = torch.tensor([1.0, 0.0], device=device, dtype=xT.dtype)
+        guided = (guided_gamma > 0.0)
+
+        def vf(tt, xx):  # closure that captures xT/metas
+            return _vf_core(tt, xx, xT, metas, guided)
+
+        if ode_method.lower() == 'rk4':
+            step_size = 1.0 / float(max(1, ode_n_steps))
+            out = odeint(vf, xT, t_span, method='rk4', options={'step_size': step_size})[-1]
+        else:
+            out = odeint(vf, xT, t_span, atol=ode_atol, rtol=ode_rtol)[-1]
+
+        proj = _sanitize_x(out)
+
+        # Keep going even if one batch had issues; log and repair instead of crashing
+        if not torch.isfinite(proj).all():
+            print("[WARN] Non-finite values after integration; sanitizing batch.")
+            proj = _sanitize_x(proj)
+
         samples.append(proj.cpu().numpy())
         meta_log.extend(metas)
 
@@ -663,7 +723,6 @@ if __name__ == '__main__':
     ode_method       = sec.get('ode_method', 'rk45')   # default old behavior
     ode_n_steps      = int(sec.get('ode_n_steps', 64))
 
-
     dev = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     dataset = SpherePackingDataset(path)
@@ -708,17 +767,17 @@ if __name__ == '__main__':
         boundary_warmup=boundary_warmup,
         boundary_schedule_center=boundary_center, boundary_schedule_sharpness=boundary_sharp,
         # collision schedule
-        pen_schedule_center=pen_center, pen_schedule_sharpness=pen_sharp
+        pen_schedule_center=pen_center, pen_schedule_sharpness=pen_sharp,
+        # scheduler
+        scheduler=scheduler
     )
-
-    try: scheduler.step()
-    except Exception: pass
 
     X, metas = sample_flow_model_optionB(
         model, num_new, batch_n, pts, dev,
         radius, cube_min, cube_max, dim=d,
         lattice_kind=lattice_kind, lattice_jitter=lattice_jitter, lattice_rotate=lattice_rotate,
-        guided_gamma=guided_gamma, ode_atol=ode_atol, ode_rtol=ode_rtol, k_local=k_local
+        guided_gamma=guided_gamma, ode_atol=ode_atol, ode_rtol=ode_rtol, k_local=k_local,
+        ode_method=ode_method, ode_n_steps=ode_n_steps
     )
     os.makedirs(save_g, exist_ok=True)
     out_path = os.path.join(save_g, f"flow_gen_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pt")
