@@ -161,10 +161,10 @@ def _box_step_jit(n, d, centers, target_sq, radius, dt,
                 for dim in range(d):
                     if dir_unit[dim] > 1e-9: # Moving towards max boundary
                         t = (box_max[dim] - orig[dim]) / dir_unit[dim]
-                        if t < t_hit: t_hit = t
+                        if t > 0 and t < t_hit: t_hit = t
                     elif dir_unit[dim] < -1e-9: # Moving towards min boundary
                         t = (box_min[dim] - orig[dim]) / dir_unit[dim]
-                        if t < t_hit: t_hit = t
+                        if t > 0 and t < t_hit: t_hit = t
                 
                 final_pos = orig + dir_unit * t_hit
                 # Final clamp to handle any floating point inaccuracies
@@ -275,7 +275,7 @@ def main():
     )
     anim = anim_c
     if anim is not None:
-        anim.save("./output/push_tests/box_clamp_elim2d_51spheres.mp4",
+        anim.save("./diffuse_boost/output/push_tests/box_clamp_elim2d_51spheres.mp4",
                   writer='ffmpeg', fps=30)
     print("Box-clamp final centers (first 5):\n", final_clamp[:5])
 
@@ -287,7 +287,7 @@ def main():
     )
     anim = anim_h
     if anim is not None:
-        anim.save("./output/push_tests/box_stophit_elim2d_51spheres.mp4",
+        anim.save("./diffuse_boost/output/push_tests/box_stophit_elim2d_51spheres.mp4",
                   writer='ffmpeg', fps=30)
     print("Box-stophit final centers (first 5):\n", final_hit[:5])
 
