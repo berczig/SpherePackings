@@ -123,12 +123,12 @@ Pipfile.lock
 #*.pt
 
 # generated datasets
-/output/generated_sets/
-/output/push_simulation_PESC/
-/output/fixed_gen_sets/
+#/diffuse_boost/output/generated_sets/
+#/diffuse_boost/output/push_simulation_PESC/
+#/diffuse_boost/output/fixed_gen_sets/
 
 # saved models
-/output/saved_models/
+/diffuse_boost/output/**
 
 # matplotlib animations
 *.gif
