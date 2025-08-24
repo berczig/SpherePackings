@@ -175,7 +175,7 @@ def _box_step_jit(n, d, centers, target_sq, radius, dt,
 def eliminate_overlaps_box(
     initial_centers, radius, box_size,
     max_iter=100, dt=0.2, tol=1e-5,
-    boundary_mode="clamp", visualize=False
+    boundary_mode="clamp", visualize=False, verbose=True
 ):
     centers = np.array(initial_centers, float)
     n, d = centers.shape
@@ -188,7 +188,7 @@ def eliminate_overlaps_box(
     boundary_flag = 0 if boundary_mode == "clamp" else 1
 
     history = []
-    bar = tqdm(range(max_iter), desc=f"Box({boundary_mode})")
+    bar = tqdm(range(max_iter), desc=f"Box({boundary_mode})", disable=not verbose)
     for it in bar:
         if visualize and d == 2:
             history.append(centers.copy())

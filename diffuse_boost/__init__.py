@@ -4,7 +4,6 @@ import os
 import configparser
 
 # constants
-print("file: ", diffuse_boost.__file__)
 reffolder = Path(diffuse_boost.__file__).parent.parent
 CONFIG_FILE  = os.path.join(reffolder, "config.cfg")
 

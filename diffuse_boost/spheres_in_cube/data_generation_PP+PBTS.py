@@ -198,7 +198,7 @@ def generate_dataset_push_srp():
     maxiter_opt = cfg.getint(sec, "srp_maxiter", fallback=300)
     restarts = cfg.getint(sec, "srp_restarts", fallback=10)
 
-    data = np.zeros((M, D, N), dtype=np.float32)
+    data = np.zeros((M*restarts, D, N), dtype=np.float32)
     min_dists = []
 
     for i in range(M):
@@ -260,7 +260,7 @@ def generate_dataset_push_srp():
                 best_min = post_min
                 best_centers = centers_k.copy()
 
-        data[i] = best_centers.T
+            data[i*restarts+k] = centers_k.copy().T
         min_dists.append(best_min)
         print(f"Finished sample {i+1}/{M}, best_min = {best_min:.6f}\n")
 

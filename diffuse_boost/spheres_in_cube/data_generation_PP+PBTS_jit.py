@@ -10,6 +10,8 @@ import numba as nb
 from numba import njit
 from diffuse_boost import cfg
 from diffuse_boost.spheres_in_cube.physics_push_PESC import eliminate_overlaps_box
+from diffuse_boost.spheres_in_cube.best_results import load_best_results
+from tqdm import tqdm
 
 # -----------------------------------------------------------------------------
 # Utilities: Penalty gradient, energy evaluation, and clearance maximization
@@ -208,7 +210,7 @@ def apply_symmetries_to_data(data, L):
 # -----------------------------------------------------------------------------
 # Main generation: SRP + local_opt + maximin + physics push
 # -----------------------------------------------------------------------------
-def generate_dataset_push_srp():
+def generate_dataset_push_srp(verbose=True):
     sec = "sample_generation_PP+PBTS"
     D = cfg.getint(sec, "dimension")
     L = cfg.getfloat(sec, "bounding_box_width")
@@ -238,16 +240,16 @@ def generate_dataset_push_srp():
     maxiter_opt = cfg.getint(sec, "srp_maxiter", fallback=300)
     restarts = cfg.getint(sec, "srp_restarts", fallback=10)
 
-    data = np.zeros((M, D, N), dtype=np.float32)
+    data = np.zeros((M*restarts, D, N), dtype=np.float32)
     min_dists = []
 
-    for i in range(M):
-        print(f"Generating sample {i+1}/{M}...")
+    for i in tqdm(range(M), desc=f"Generating sample - will be used for {restarts} restarts"):
+        if verbose: print(f"Generating sample {i+1}/{M}...")
         pts = sample_uniform_points(D, L, r, N)
         centers0, _ = eliminate_overlaps_box(
             pts, r, [L] * D,
             max_iter=max_iter, dt=dt, tol=tol,
-            boundary_mode=mode, visualize=False
+            boundary_mode=mode, visualize=False, verbose=verbose
         )
         half = L / 2
         X0 = (centers0 - half).ravel()
@@ -256,16 +258,16 @@ def generate_dataset_push_srp():
         best_centers = centers0.copy()
         best_min = init_min
         excess = best_d - init_min
-        print(f"Sample {i+1}/{M}: initial min distance = {init_min:.6f}, excess = {excess:.6f}")
+        if verbose: print(f"Sample {i+1}/{M}: initial min distance = {init_min:.6f}, excess = {excess:.6f}")
         for k in range(restarts):
-            print(f"  SRP restart {k+1}/{restarts} for sample {i+1}/{M}")
+            if verbose: print(f"  SRP restart {k+1}/{restarts} for sample {i+1}/{M}")
             eps = 1e-6
             X_srp = SRP(X0, L, N, r, Imax, m, sigma, beta)
             X_srp_clip = np.clip(X_srp, -L/2 + eps, L/2 - eps)
             EL_before = compute_EL(X_srp_clip, L, N, r)
-            print(f"    SRP restart {k+1}/{restarts}: EL before local_opt = {EL_before:.6f}")
+            if verbose: print(f"    SRP restart {k+1}/{restarts}: EL before local_opt = {EL_before:.6f}")
             X_lo, EL_after = local_opt(X_srp_clip, L, N, r, tol_opt, maxiter_opt)
-            print(f"    SRP restart {k+1}/{restarts}: EL after local_opt  = {EL_after:.6f}")
+            if verbose: print(f"    SRP restart {k+1}/{restarts}: EL after local_opt  = {EL_after:.6f}")
             # Print min distance and excess after local_opt
             coords = X_lo.reshape((N, 3))
             centers_opt = (coords + half) * ((L - 2 * r) / L) + r
@@ -274,7 +276,7 @@ def generate_dataset_push_srp():
             diffs_pre = centers_opt[:, None, :] - centers_opt[None, :, :]
             pre_min = np.min(np.linalg.norm(diffs_pre, axis=-1)[np.triu_indices(N, k=1)])
             excess = best_d - pre_min
-            print(f"    min distance after local_opt = {pre_min:.6f}, excess = {excess:.6f}")
+            if verbose: print(f"    min distance after local_opt = {pre_min:.6f}, excess = {excess:.6f}")
             #X_max = maximize_clearance(X_lo, N, steps=5, step_size=0.01)
             #coords = X_max.reshape((N, 3))
             #centers_opt = (coords + half) * ((L - 2 * r) / L) + r
@@ -288,28 +290,28 @@ def generate_dataset_push_srp():
             centers_k, _ = eliminate_overlaps_box(
                 centers_opt, r, [L] * D,
                 max_iter=max_iter, dt=dt, tol=tol,
-                boundary_mode=mode, visualize=False
+                boundary_mode=mode, visualize=False, verbose=verbose
             )
             diffs_k = centers_k[:, None, :] - centers_k[None, :, :]
             post_min = np.min(np.linalg.norm(diffs_k, axis=-1)[np.triu_indices(N, k=1)])
             excess = best_d - post_min
-            print(f"    min_after_physics_push = {post_min:.6f}, excess = {excess:.6f}")
+            if verbose: print(f"    min_after_physics_push = {post_min:.6f}, excess = {excess:.6f}")
             with open(metrics_fn, 'a') as mf:
                 mf.write(f"{i},{k+1},{EL_before:.6f},{EL_after:.6f},{pre_min:.6f},{post_min:.6f},{excess:.6f}\n")
             if post_min > best_min:
                 best_min = post_min
                 best_centers = centers_k.copy()
+            data[i*restarts+k] = centers_k.copy().T
 
-        data[i] = best_centers.T
         min_dists.append(best_min)
-        print(f"Finished sample {i+1}/{M}, best_min = {best_min:.6f}\n")
+        if verbose: print(f"Finished sample {i+1}/{M}, best_min = {best_min:.6f}\n")
 
     data_fn = cfg.get(sec, "output_filename").replace("{DATE}", timestamp_str)
     data_dir = os.path.dirname(data_fn)
     if data_dir:
         os.makedirs(data_dir, exist_ok=True)
     torch.save(torch.from_numpy(data), data_fn)
-    print(f"Saved full dataset to {data_fn}")
+    if verbose: print(f"Saved full dataset to {data_fn}")
 
     try:
         sym_data = apply_symmetries_to_data(data, L)
@@ -318,7 +320,7 @@ def generate_dataset_push_srp():
         if sym_dir:
             os.makedirs(sym_dir, exist_ok=True)
         torch.save(torch.from_numpy(sym_data), sym_fn)
-        print(f"Saved symmetrized dataset to {sym_fn}")
+        if verbose: print(f"Saved symmetrized dataset to {sym_fn}")
     except ValueError as e:
         print(f"Skipping symmetry enrichment: {e}")
 
@@ -330,7 +332,7 @@ def generate_dataset_push_srp():
     if top_dir:
         os.makedirs(top_dir, exist_ok=True)
     torch.save(torch.from_numpy(top_data), top_fn)
-    print(f"Saved top {k_top} samples to {top_fn}")
+    if verbose: print(f"Saved top {k_top} samples to {top_fn}")
 
     try:
         sym_top = apply_symmetries_to_data(top_data, L)
@@ -339,9 +341,44 @@ def generate_dataset_push_srp():
         if sym_top_dir:
             os.makedirs(sym_top_dir, exist_ok=True)
         torch.save(torch.from_numpy(sym_top), sym_top_fn)
-        print(f"Saved symmetrized top dataset to {sym_top_fn}")
+        if verbose: print(f"Saved symmetrized top dataset to {sym_top_fn}")
     except ValueError as e:
         print(f"Skipping symmetry enrichment for top samples: {e}")
+
+def generate_dataset_push_srp_different_sphere_count():
+    secmul = "sample_generation_PP+PBTS_multiple_sphere_num"
+    secgen = "sample_generation_PP+PBTS"
+    timestamp_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S") 
+    num_spheres_start       = cfg.getint(secmul, "num_spheres_start")
+    num_spheres_end       = cfg.getint(secmul, "num_spheres_end")
+
+    base_output_filename = cfg.get(secmul, "output_filename").replace("{DATE}", timestamp_str)
+    base_output_filename_top = cfg.get(secmul, "output_filename_top").replace("{DATE}", timestamp_str)
+    base_output_filename_metrics = cfg.get(secmul, "output_filename_metrics").replace("{DATE}", timestamp_str)
+    base_output_filename_metrics_excess = cfg.get(secmul, "output_filename_metrics_excess").replace("{DATE}", timestamp_str)
+
+    print("base_output_filename: ", base_output_filename)
+    print(f"generate multiple packing starting from {num_spheres_start} spheres, up to {num_spheres_end} spheres per packing")
+    box_sizes = load_best_results()
+    bar = tqdm(range(num_spheres_start, num_spheres_end+1))
+    for sphere_num in bar:
+        bar.set_description(f"Generating packings from {num_spheres_start} to {num_spheres_end}, Currently at {sphere_num} spheres", refresh=True)
+        radius = 1/box_sizes[sphere_num]
+
+        # Parameters
+        cfg.set(secgen, "num_spheres", str(sphere_num))
+        cfg.set(secgen, "bounding_box_width", "1.0")
+        cfg.set(secgen, "sphere_radius", str(radius))
+        cfg.set(secgen, "best_known_diameter", str(2*radius))
+        # File paths
+        cfg.set(secgen, "output_filename", base_output_filename.replace("{SPHERE_NUM}", str(sphere_num)))
+        cfg.set(secgen, "output_filename_top", base_output_filename_top.replace("{SPHERE_NUM}", str(sphere_num)))
+        cfg.set(secgen, "output_filename_metrics", base_output_filename_metrics.replace("{SPHERE_NUM}", str(sphere_num)))
+        cfg.set(secgen, "output_filename_metrics_excess", base_output_filename_metrics_excess.replace("{SPHERE_NUM}", str(sphere_num)))
+
+        generate_dataset_push_srp(verbose=False)
+
+
 
 def load_metrics_PP_p_PBTS(filename):
     data_excess = []
@@ -353,4 +390,7 @@ def load_metrics_PP_p_PBTS(filename):
     return data_excess
 
 if __name__ == "__main__":
-    generate_dataset_push_srp()
+    if cfg.getboolean("sample_generation_PP+PBTS_multiple_sphere_num", "active"):
+        generate_dataset_push_srp_different_sphere_count()
+    else:
+        generate_dataset_push_srp()
