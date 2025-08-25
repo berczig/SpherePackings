@@ -4,6 +4,7 @@ import torch
 from diffuse_boost.spheres_in_cube.plot_data_points import compute_metrics
 from diffuse_boost.spheres_in_cube.data_generation_PESC_symmetries import apply_symmetries_to_data
 from diffuse_boost import cfg, reffolder
+from collections import defaultdict
 
 # Concatenate the tensors in the following three symmetrized datasets:
 # output/push_simulation_PESC/2025-06-26/dataset_sym.pt, output/push_simulation_PESC/2025-07-02/dataset_sym.pt and 
@@ -12,6 +13,30 @@ from diffuse_boost import cfg, reffolder
 #sym_data_1 = torch.load("output/push_simulation_PESC/2025-06-26/dataset_sym.pt")
 #sym_data_2 = torch.load("output/push_simulation_PESC/2025-07-02/dataset_sym.pt")
 #sym_data_3 = torch.load("output/push_simulation_PESC/2025-07-03/dataset_sym.pt")
+
+def concatenate_multiple(folder, output_path):
+    sphere_count_files = collect_files(folder, [str(i) for i in range(50, 90)], ["dataset.pt"])
+    total_dataset = []
+    for count in sphere_count_files:
+        datasets = [torch.load(filepath) for filepath in sphere_count_files[count]]
+        dataset = torch.cat(datasets, dim=0)
+        print(f"concatenated {[x.shape for x in datasets]} into {dataset.shape}")
+        total_dataset.append(dataset)
+    print(f"save list with {len(total_dataset)} 3D tensors as {output_path}")
+    torch.save(total_dataset, output_path)
+
+def collect_files(root_folder, target_folders, target_files):
+    result = defaultdict(list)
+    target_folders = set(target_folders)
+    target_files = set(target_files)
+    
+    for dirpath, dirnames, filenames in os.walk(root_folder):
+        folder_name = os.path.basename(dirpath)
+        if folder_name in target_folders:
+            for fname in filenames:
+                if fname in target_files:
+                    result[folder_name].append(os.path.join(dirpath, fname))
+    return dict(result)
 
 def concatenate(files, output_filename):
     datasets = [torch.load(file) for file in files]
@@ -49,18 +74,23 @@ def symmetrize(filename, bounding_box_width, output_filename):
     torch.save(sym_data, output_filename)
 
 if __name__ == "__main__":
-    mode = "symmetrize"
+    mode = "combine_multiple"
     if mode == "pick":
         #pick_best("output/push_simulation_PESC/2025-07-07/dataset_combined_96k.pt", "output/generated_sets/96k_best.pt", 0.2)
         pick_best("diffuse_boost/output/push_simulation_PP+PBTS/combined/dataset_20000.pt", "diffuse_boost/output/push_simulation_PP+PBTS/combined/dataset_20000_best_5000.pt", 5000, False)
     elif mode == "combine":
         concatenate(files = [
-            "diffuse_boost/output/push_simulation_PP+PBTS/2025-08-13_09-15-22/dataset.pt",
-            "diffuse_boost/output/push_simulation_PP+PBTS/2025-08-13_12-51-28/dataset.pt"],
-            output_filename="diffuse_boost/output/push_simulation_PP+PBTS/combined/dataset_20000.pt")
+            "diffuse_boost/output/push_simulation_PP+PBTS/combined/dataset_20000.pt",
+            "diffuse_boost/output/push_simulation_PP+PBTS/2025-08-15_12-18-26/dataset.pt",
+            "diffuse_boost/output/push_simulation_PP+PBTS/2025-08-16_01-07-18/dataset.pt",
+            "diffuse_boost/output/push_simulation_PP+PBTS/2025-08-16_10-43-35/dataset.pt",
+            "diffuse_boost/output/push_simulation_PP+PBTS/2025-08-18_02-06-03/dataset.pt"],
+            output_filename="diffuse_boost/output/push_simulation_PP+PBTS/combined/dataset_92000.pt")
     elif mode == "generate":
         random_dataset(10000, 3, 89, "diffuse_boost/output/generated_sets/random_dataset.pt")
     elif mode == "symmetrize":
-        symmetrize(os.path.join(reffolder, "diffuse_boost/output/push_simulation_PP+PBTS/combined/dataset_5000_from_20000.pt"), 
+        symmetrize(os.path.join(reffolder, "diffuse_boost/output/push_simulation_PP+PBTS/combined/dataset_92000.pt"), 
                    8.78968670811599928, 
-                   os.path.join(reffolder, "diffuse_boost/output/push_simulation_PP+PBTS/combined/dataset_5000_from_20000_sym.pt"))
+                   os.path.join(reffolder, "diffuse_boost/output/push_simulation_PP+PBTS/combined/dataset_92000_sym.pt"))
+    elif mode == "combine_multiple":
+        concatenate_multiple("diffuse_boost/output/push_simulation_PP+PBTS/multiple", "diffuse_boost/output/push_simulation_PP+PBTS/multiple/mixed_sphere_count.pt")
