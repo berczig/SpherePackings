@@ -120,18 +120,19 @@ def run_srp_push_on_loaded_dataset():
                 best_cent = centers_opt.copy()
 
             # Physics push (removes any residual overlaps respecting walls)
-            centers_k, _ = eliminate_overlaps_box(
-                centers_opt, r, [L] * D,
-                max_iter=max_iter, dt=dt, tol=tol,
-                boundary_mode=mode, visualize=False
-            )
+            #centers_k, _ = eliminate_overlaps_box(
+            #    centers_opt, r, [L] * D,
+            #    max_iter=max_iter, dt=dt, tol=tol,
+            #    boundary_mode=mode, visualize=False)
 
             # Post-push stats
-            diffs_post = centers_k[:, None, :] - centers_k[None, :, :]
-            post_min   = np.min(np.linalg.norm(diffs_post, axis=-1)[np.triu_indices(N, 1)])
-            post_excess     = best_d - post_min
+            #diffs_post = centers_k[:, None, :] - centers_k[None, :, :]
+            #post_min   = np.min(np.linalg.norm(diffs_post, axis=-1)[np.triu_indices(N, 1)])
+            #post_excess     = best_d - post_min
 
             # Log metrics
+            post_min = pre_min
+            post_excess = best_d - post_min
             with open(metrics_fn, 'a') as mf:
                 mf.write(f"{i},{k+1},{EL_before:.6f},{EL_after:.6f},{pre_min:.6f},{post_min:.6f},{pre_excess:.6f},{post_excess:.6f}\n")
             
@@ -149,11 +150,11 @@ def run_srp_push_on_loaded_dataset():
 
         # Save to output_save_path after each 10 samples 
         if (i + 1) % 10 == 0:
-            torch.save(torch.from_numpy(out_data), output_save_path)
+            torch.save(torch.from_numpy(out_data[:i+1]), output_save_path)
             print(f"  Saved intermediate dataset to: {output_save_path}")
 
     # Save pushed dataset + metrics
-    torch.save(torch.from_numpy(out_data), output_save_path)
+    torch.save(torch.from_numpy(out_data[:i+1]), output_save_path)
     print(f"\nSaved SRP-pushed dataset to: {output_save_path}")
     print(f"Metrics written to:          {metrics_fn}")
 

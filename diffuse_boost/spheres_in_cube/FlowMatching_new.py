@@ -1,4 +1,4 @@
-%cd /scratch/users/baranh/deep_0/SpherePackings
+#cd /scratch/users/baranh/deep_0/SpherePackings
 import os
 import numpy as np
 import torch

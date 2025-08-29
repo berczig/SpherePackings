@@ -1,15 +1,23 @@
+import os, platform
+# If you need the quick unblock, leave this enabled on macOS.
+# Disable by exporting SPHEREPACK_DISABLE_KMP_HACK=1 in your shell.
+if platform.system() == "Darwin" and os.environ.get("SPHEREPACK_DISABLE_KMP_HACK") != "1":
+    # Intel notes this is an unsafe workaround; prefer the environment fix below.
+    # It must be set BEFORE any library initializes OpenMP.
+    os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+import torch    
 import numpy as np
-import torch
 import matplotlib.pyplot as plt
-import os
 import matplotlib as mpl
 
 def load_dataset(filename):
     print(f"loading {filename}")
     T = torch.load(filename)
+    #Take first 1630 rows of T
+    T = T[:1630]
     print(f"Shape: {T.shape} min:{T.min()}, max:{T.max()}")
 
-    return torch.load(filename)
+    return T
 
 def compute_metrics(tensor_data):
     N = tensor_data.shape[2]
@@ -103,60 +111,19 @@ def plot_3d(dataset, title="plot"):
 
 
 if __name__ == "__main__":
-    # plot_files_combined([
-    #     "output/push_simulation_PESC/2025-07-07/dataset_combined_96k.pt",
-    #     "output/generated_sets/generated_20250709_102713.pt",
-    #     "output/generated_sets/generated_20250706_120635.pt",
-    #     "output/generated_sets/generated_20250707_111228.pt",
-    #     "output/generated_sets/generated_20250708_105703.pt",
-    #     "output/generated_sets/generated_20250708_160214.pt",
-    #     "output/fixed_gen_sets/physics_push_2025-07-06_140100.pt"
-    # ], ["Input data", "fixed penality", "After Diff(Pointnet)", "After Diff 2(Transformer)", "After Diff 3(Transformer)", "After Diff 4(Trans, penalty)", "Pointnet pushed"], n_bins=300, plotmode="overlay") 
-    # plot_3d("output/generated_sets/generated_20250709_102713.pt")
+    training_data = "diffuse_boost/output/push_simulation_PP+PBTS/sample_2500.pt"
+    gen_samples = "diffuse_boost/output/generated_sets/flow_gen_20250822_110043.pt"
+    pushed_samples = "diffuse_boost/output/fixed_gen_sets/srp_pushed_2025-08-22_221053.pt"
 
-    # plot_files_combined([
-    #     "output/push_simulation_PESC/2025-07-07/dataset_combined_96k.pt",
-    #     "output/generated_sets/generated_20250709_102713.pt",
-    #     "output/generated_sets/generated_20250709_164921.pt",
-    #     "output/generated_sets/generated_20250708_105703.pt",
-    # ], ["Input data", "fixed penality", "Fine tune", "After Diff 2(Transformer)", "After Diff 3(Transformer)"], n_bins=300, plotmode="overlay") 
-    #plot_3d("output/generated_sets/flow_gen_20250710_103909.pt")
-
-
-    """data_sets = ["generated_20250710_010405.pt", "generated_20250710_011148.pt",
-                 "generated_20250710_012552.pt", "generated_20250710_085625.pt",
-                 "generated_20250710_094621.pt", "generated_20250710_144901.pt"]
-    data_sets = ["flow_gen_20250710_123547.pt", "flow_gen_20250710_141042.pt", "flow_gen_20250710_141042.pt"]
-
-    data_sets = [f"output/generated_sets/{name}" for name in data_sets]
-
-    for dataname in data_sets:
-        data = load_dataset(dataname)
-        print(f"{dataname} min: {data.min()}, max: {data.max()}")
-
-    plot_files_combined(data_sets, data_sets, "output")"""
-    current = "output/fixed_gen_sets/physics_push_2025-07-10_160016.pt"
-    #plot_3d("output/for_presentation/best_300.pt", title = "Sampled with Flow matching")
-    plot_files_combined(["output/push_simulation_PESC/2025-07-07/dataset_combined_96k.pt", "output/for_presentation/best_300.pt", current], 
-                        ["Training data", "Samples(Flow matching)", "Pushed Samples"], "output")
-
-
-    
-
-    """f1 = "output/push_simulation_PESC/2025-07-03/dataset_combined_sym.pt"
-    d1 = load_dataset(f1)
-    f1_min, f1_avg = compute_metrics(d1)
-
-    f2 = "output/generated_sets/generated_20250704_053415.pt"
-    d2 = load_dataset(f2)
-    f2_min, f2_avg = compute_metrics(d2)
-    print("f2_min: ", min(f2_min))
-
-    f3 = "output/fixed_gen_sets/physics_push_2025-07-06_104040.pt"
-    d3 = load_dataset(f3)
-    f3_min, f3_avg = compute_metrics(d3)
-
-
-    plot(Arrays=[f1_min, f2_min, f3_min], labels=("Input data", "After Diff.", "Final push"))
-    #plot(Arrays=[f1_min], labels=("Input data"))"""
-    
+    plot_files_combined([training_data, gen_samples, pushed_samples], 
+                        ["Test data", "Samples(Flow matching)", "SRP Pushed Samples"], "output")
+    #print the maximum values of the pushed_samples plot
+    pushed_samples_data = load_dataset(pushed_samples)
+    pushed_samples_metrics = compute_metrics(pushed_samples_data)
+    print("Max Avg Dist (SRP Pushed Samples):", np.max(pushed_samples_metrics["avg_dists"]))
+    print("Max Min Dist (SRP Pushed Samples):", np.max(pushed_samples_metrics["min_dists"]))
+    # print same for training_data
+    training_data = load_dataset(training_data)
+    training_metrics = compute_metrics(training_data)
+    print("Max Avg Dist (Training Data):", np.max(training_metrics["avg_dists"]))
+    print("Max Min Dist (Training Data):", np.max(training_metrics["min_dists"]))

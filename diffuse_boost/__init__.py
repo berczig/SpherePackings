@@ -1,10 +1,12 @@
 from pathlib import Path
-import diffuse_boost
+#import diffuse_boost
 import os
 import configparser
 
 # constants
 reffolder = Path(diffuse_boost.__file__).parent.parent
+# print("file: ", diffuse_boost.__file__)
+reffolder = Path(__file__).parent.parent
 CONFIG_FILE  = os.path.join(reffolder, "config.cfg")
 
 def load_config(file_path):
