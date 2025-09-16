@@ -116,7 +116,7 @@ def _box_step_jit(n, d, centers, target_sq, radius, dt,
                   box_min, box_max, boundary_flag):
 
     moves = np.zeros_like(centers)
-    max_ov = 0.0
+    max_ov = -0.1
 
     for i in range(n):
         for j in range(i + 1, n):
@@ -129,7 +129,7 @@ def _box_step_jit(n, d, centers, target_sq, radius, dt,
                 #    max_ov = overlap
                 max_ov = max(max_ov, overlap)
                 direction = vec / dist
-                mag = ((1 + overlap)**2 - 1) / 2.0
+                mag = ((1 + overlap+0.01)**2 - 1) / 2.0
                 moves[i] += direction * mag
                 moves[j] -= direction * mag
 
@@ -183,7 +183,7 @@ def eliminate_overlaps_box(
     full_box = np.array(box_size, float)
     box_min_arr = np.full(d, radius)
     box_max_arr = full_box - radius
-    target_sq = (2*radius)**2
+    target_sq = (2*radius)**2+0.01
 
     boundary_flag = 0 if boundary_mode == "clamp" else 1
 
