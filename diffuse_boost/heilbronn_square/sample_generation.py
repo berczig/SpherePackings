@@ -607,7 +607,173 @@ def generate_heilbronn_dataset():
 
 
 # =============================================================================
+# Final-push mode: apply SRP to an existing [M,2,N] sample tensor
+# =============================================================================
+def final_push_existing_samples():
+    sec = "heilbronn_SRP"
+
+    # Config / defaults
+    N   = _get_cfg(sec, "num_points",   50)
+    M   = _get_cfg(sec, "num_samples",  5000)
+
+    # SRP hyperparams
+    Imax        = _get_cfg(sec, "srp_Imax",        400)
+    m           = _get_cfg(sec, "srp_m",           30)
+    beta_sched  = _get_cfg(sec, "srp_beta",        0.985)
+    backtrack   = _get_cfg(sec, "srp_backtrack",   3)
+    step_center = _get_cfg(sec, "srp_step_center", 0.05)
+
+    # Loss params
+    w_wall      = _get_cfg(sec, "w_wall",          1.0)
+    beta_softmin= _get_cfg(sec, "beta_softmin",    50.0)   # higher β → sharper min
+    eps_abs     = _get_cfg(sec, "area_eps_abs",    1e-12)
+
+    # Local opt
+    gtol        = _get_cfg(sec, "lbfgs_gtol",      1e-8)
+    ftol        = _get_cfg(sec, "lbfgs_ftol",      1e-12)
+    maxiter     = _get_cfg(sec, "lbfgs_maxiter",   1000)
+    maxcor      = _get_cfg(sec, "lbfgs_maxcor",    20)
+
+    # Loss/annealing
+    w_wall           = _get_cfg(sec, "w_wall",             1.0)
+    beta_softmin0    = _get_cfg(sec, "beta_softmin_start", 40.0)
+    beta_softminF    = _get_cfg(sec, "beta_softmin_final", 300.0)
+    eps_abs          = _get_cfg(sec, "area_eps_abs",       1e-12)
+
+    # Top-K
+    topk_K           = _get_cfg(sec, "topk_K",             0)
+    topk_tol         = _get_cfg(sec, "topk_tol",           1e-12)
+
+    # I/O + plotting
+    out_dir     = _get_cfg(sec, "final_push_output",      "./outputs_heilbronn")
+    plot_k      = _get_cfg(sec, "plot_k",          0)
+    plot_dir    = os.path.join(out_dir, "plots")
+
+    # NEW: where to read existing samples (torch .pt tensor, shape (M,2,N) or (M,N,2))
+    input_path  = _get_cfg(sec, "final_push_input", "")
+    assert isinstance(input_path, str) and len(input_path) > 0 and os.path.exists(input_path), \
+        "Set heilbronn_SRP.final_push_input to a valid .pt file"
+
+    os.makedirs(out_dir, exist_ok=True)
+    stamp      = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+    dataset_fn = os.path.join(out_dir, f"heilbronn_srp_pushed_{stamp}.pt")
+    metrics_fn = os.path.join(out_dir, f"heilbronn_metrics_{stamp}.csv")
+
+    # NEW: load the input tensor (Torch), normalize shape to (M,2,N)
+    loaded = torch.load(input_path, map_location="cpu")  # supports tensors saved via torch.save
+    if isinstance(loaded, torch.Tensor):
+        arr = loaded.detach().cpu().numpy()
+    else:
+        # if it was saved as a dict or list, try to extract the tensor-like payload
+        raise ValueError("Expected a tensor at final_push_input")
+
+    if arr.ndim != 3:
+        raise ValueError(f"Expected 3D tensor, got shape {arr.shape}")
+
+    # Accept either (M,2,N) or (M,N,2); enforce (M,2,N)
+    if arr.shape[1] == 2:
+        M_in, d_in, N_in = arr.shape
+    elif arr.shape[-1] == 2:
+        # transpose to (M,2,N)
+        arr = np.transpose(arr, (0, 2, 1))
+        M_in, d_in, N_in = arr.shape
+    else:
+        raise ValueError(f"Second or last dimension must be 2; got shape {arr.shape}")
+    if d_in != 2:
+        raise ValueError("Point dimension must be 2")
+
+    # If config provided M/N, cap/verify against input
+    if M is None or M <= 0 or M > M_in:
+        M = M_in
+    if N is None or N <= 0:
+        N = N_in
+    if N != N_in:
+        raise ValueError(f"Config N={N} but input samples have N={N_in} points")
+
+    print(f"Pushing {M} loaded Heilbronn point sets from file (N={N})")
+    with open(metrics_fn, "w") as mf:
+        mf.write("sample,min_triangle_area,min_wall_clear,min_pair_dist,loss_after\n")
+
+    # allocate output (same shape as input subset)
+    data = np.zeros((M, 2, N), dtype=np.float32)
+
+    bar = tqdm(range(M), desc="Pushing point sets")
+    for s in bar:
+        # NEW: start from loaded sample instead of random
+        # arr[s] is (2,N); convert to (N,2) float64 for optimizer
+        P0 = arr[s].astype(np.float64).T
+        X0 = P0.ravel()
+
+        # SRP exploration (unchanged)
+        X_srp = srp_adaptive_points(
+            X0, N,
+            Imax=Imax, m=m,
+            step_center=step_center,
+            beta_sched_decay=beta_sched, backtrack=backtrack,
+            w_wall=w_wall,
+            beta_softmin_start=beta_softmin0, beta_softmin_final=beta_softminF,
+            eps_abs=eps_abs,
+            topk_K=topk_K, topk_tol=topk_tol
+        )
+
+        # Local refinement (unchanged)
+        X_fin, L_fin = local_optimize_points(
+            X_srp, N,
+            w_wall=w_wall,
+            beta_softmin_final=beta_softminF, eps_abs=eps_abs,
+            topk_K=topk_K, topk_tol=topk_tol,
+            gtol=gtol, ftol=ftol, maxiter=maxiter, maxcor=maxcor
+        )
+
+        pts = X_fin.reshape(N, 2)
+
+        # Metrics (unchanged)
+        A_min = float(min_triangle_area(pts, eps_abs))
+        mwc   = float(min_wall_clearance_points(pts))
+        mpd   = float(min_pair_distance(pts))
+
+        with open(metrics_fn, "a") as mf:
+            mf.write(f"{s},{A_min:.10f},{mwc:.10f},{mpd:.10f},{L_fin:.8e}\n")
+
+        data[s, 0, :] = pts[:, 0].astype(np.float32)
+        data[s, 1, :] = pts[:, 1].astype(np.float32)
+
+        bar.set_postfix(min_area=f"{A_min:.6f}", clr=f"{min(mwc, mpd):.4f}")
+
+    # Sort by min triangle area (descending) — unchanged
+    scores = np.zeros(M, dtype=np.float64)
+    for s in range(M):
+        pts = data[s].T.astype(np.float64)
+        scores[s] = min_triangle_area(pts, 1e-12)
+    sorted_indices = np.argsort(-scores)
+    data = data[sorted_indices]
+
+    # Save dataset
+    torch.save(torch.from_numpy(data), dataset_fn)
+    print(f"\nSaved pushed dataset:  {dataset_fn}")
+    print(f"Saved metrics:         {metrics_fn}")
+
+    # Optional plots (unchanged)
+    if plot_k > 0:
+        plot_top_k_minarea_samples(data, plot_k, plot_dir, filename_prefix="heilbronn_mintriangles")
+        print(f"Saved plots:   {plot_dir}")
+
+# =============================================================================
+# Entrypoint
+# =============================================================================
+
+# =============================================================================
 # Entrypoint
 # =============================================================================
 if __name__ == "__main__":
-    generate_heilbronn_dataset()
+    sec  = "heilbronn_SRP"
+    mode = _get_cfg(sec, "mode", "training_set_gen").strip().lower()
+
+    if mode == "training_set_gen":
+        # Unchanged behavior
+        generate_heilbronn_dataset()
+    elif mode == "final_push":
+        # New behavior: SRP applied to an existing [M,2,N] tensor loaded from disk
+        final_push_existing_samples()
+    else:
+        raise ValueError(f"Unknown mode '{mode}'. Use 'training_set_gen' or 'final_push'.")

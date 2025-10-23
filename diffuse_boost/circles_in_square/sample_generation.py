@@ -509,8 +509,289 @@ def generate_circle_packing_dataset():
     if plot_k > 0:
         plot_first_k_samples(data, plot_k, plot_dir, filename_prefix="circle_packing")
         print(f"Saved plots:   {plot_dir}") 
+
+
 # =============================================================================
-# Entrypoint
+# Final-push pass over an existing dataset tensor (M,3,N)
+# =============================================================================
+def main_final_push(input_path=None):
+    """
+    Read an existing tensor of shape (M, 3, N) with rows [x, y, r],
+    run SRP + local L-BFGS-B from those initial conditions per sample,
+    hard-project radii to a max-sum feasible solution, and save the
+    pushed tensor + metrics into <output_dir>/final_push/.
+    """
+    sec = "circle_packing_SRP"
+
+    # Core config (re-use the same knobs as generator)
+    Imax       = _get_cfg(sec, "srp_Imax",        400)
+    m          = _get_cfg(sec, "srp_m",           30)
+    beta       = _get_cfg(sec, "srp_beta",        0.985)
+    backtrack  = _get_cfg(sec, "srp_backtrack",   3)
+    step_center= _get_cfg(sec, "srp_step_center", 0.05)
+    step_radius= _get_cfg(sec, "srp_step_radius", 0.01)
+
+    w_overlap  = _get_cfg(sec, "w_overlap",       1.0)
+    w_wall     = _get_cfg(sec, "w_wall",          1.0)
+    alpha      = _get_cfg(sec, "alpha_sum_r",     1.0)
+
+    gtol       = _get_cfg(sec, "lbfgs_gtol",      1e-8)
+    ftol       = _get_cfg(sec, "lbfgs_ftol",      1e-12)
+    maxiter    = _get_cfg(sec, "lbfgs_maxiter",   1000)
+    maxcor     = _get_cfg(sec, "lbfgs_maxcor",    20)
+
+    out_dir    = _get_cfg(sec, "output_dir",      "./outputs_circle_packing")
+    plot_k     = _get_cfg(sec, "plot_k",          0)  # optional quick look
+
+    # Input path (can come from cfg or argument)
+    if input_path is None:
+        input_path = _get_cfg(sec, "final_push_input", None)
+        if input_path is None:
+            raise ValueError(
+                "main_final_push: No input_path provided and "
+                "circle_packing_SRP.final_push_input not set."
+            )
+
+    # Load input tensor
+    tin = torch.load(input_path)
+    if isinstance(tin, np.ndarray):
+        data_in = tin
+    else:
+        data_in = tin.detach().cpu().numpy()
+    if data_in.ndim != 3 or data_in.shape[1] != 3:
+        raise ValueError(f"Expected tensor of shape (M, 3, N); got {data_in.shape}.")
+
+    M, _, N = data_in.shape
+    print(f"Final-push on {M} samples, N={N} each, from: {input_path}")
+
+    # I/O setup
+    final_dir  = os.path.join(out_dir, "final_push")
+    plot_dir   = os.path.join(final_dir, "plots")
+    os.makedirs(final_dir, exist_ok=True)
+
+    stamp         = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+    pushed_fn     = os.path.join(final_dir, f"circle_final_push_{M}x{N}_{stamp}.pt")
+    metrics_fn    = os.path.join(final_dir, f"circle_final_push_metrics_{M}x{N}_{stamp}.csv")
+
+    with open(metrics_fn, "w") as mf:
+        mf.write("sample,sum_r,min_wall_clear,min_pair_clear,loss_after\n")
+
+    data_out = np.zeros((M, 3, N), dtype=np.float32)
+
+    bar = tqdm(range(M), desc="Final-push SRP")
+    for s in bar:
+        # Use provided centers/radii as the starting point
+        centers0 = data_in[s, :2, :].T.astype(np.float64)  # (N,2)
+        radii0   = data_in[s, 2, :].astype(np.float64)     # (N,)
+
+        X0 = np.concatenate([centers0.ravel(), radii0], axis=0)
+
+        # SRP exploration from provided init
+        X_srp = srp_adaptive(
+            X0, N,
+            Imax=Imax, m=m,
+            step_center=step_center,
+            step_radius=step_radius,
+            beta=beta, backtrack=backtrack,
+            w_overlap=w_overlap, w_wall=w_wall, alpha=alpha
+        )
+
+        # Local refinement
+        X_fin, L_fin = local_optimize(
+            X_srp, N,
+            w_overlap=w_overlap, w_wall=w_wall, alpha=alpha,
+            gtol=gtol, ftol=ftol, maxiter=maxiter, maxcor=maxcor
+        )
+
+        centers = X_fin[:2*N].reshape(N, 2)
+        radii   = X_fin[2*N:2*N+N]
+
+        # Hard projection to feasible radii with max sum
+        r_proj, info = hard_project_max_sum_radii(centers, radii, safety=1e-9)
+
+        # Replace radii for saving / plotting
+        radii = r_proj
+
+        # Diagnostics (same metrics as generator)
+        sum_r   = float(np.sum(radii))
+        mwc     = float(min_wall_clearance(centers, radii))
+        mpc     = float(min_pair_clearance(centers, radii))
+
+        with open(metrics_fn, "a") as mf:
+            mf.write(f"{s},{sum_r:.8f},{mwc:.8f},{mpc:.8f},{L_fin:.8e}\n")
+
+        data_out[s, 0, :] = centers[:, 0].astype(np.float32)
+        data_out[s, 1, :] = centers[:, 1].astype(np.float32)
+        data_out[s, 2, :] = radii.astype(np.float32)
+
+        bar.set_postfix(sum_r=f"{sum_r:.3f}", clr=f"{min(mwc, mpc):.4f}")
+
+    # Sort by sum of radii (descending), mirroring training set convention
+    sum_radii = data_out[:, 2, :].sum(axis=1)
+    sorted_idx = np.argsort(-sum_radii)
+    data_out = data_out[sorted_idx]
+
+    # Save pushed tensor and optional plots
+    torch.save(torch.from_numpy(data_out), pushed_fn)
+    print(f"\nSaved pushed tensor: {pushed_fn}")
+    print(f"Saved metrics:       {metrics_fn}")
+
+    if plot_k > 0:
+        plot_first_k_samples(data_out, plot_k, plot_dir, filename_prefix="final_push")
+        print(f"Saved plots:         {plot_dir}")
+
+
+# =============================================================================
+# Final-push pass over an existing dataset tensor (M,3,N)
+# =============================================================================
+def main_final_push(input_path=None, output_path=None):
+    """
+    Read an existing tensor of shape (M, 3, N) with rows [x, y, r],
+    run SRP + local L-BFGS-B from those initial conditions per sample,
+    hard-project radii to a max-sum feasible solution, and save the
+    pushed tensor + metrics into <output_dir>/final_push/.
+    """
+    sec = "circle_packing_SRP"
+
+    # Core config (re-use the same knobs as generator)
+    Imax       = _get_cfg(sec, "srp_Imax",        400)
+    m          = _get_cfg(sec, "srp_m",           30)
+    beta       = _get_cfg(sec, "srp_beta",        0.985)
+    backtrack  = _get_cfg(sec, "srp_backtrack",   3)
+    step_center= _get_cfg(sec, "srp_step_center", 0.05)
+    step_radius= _get_cfg(sec, "srp_step_radius", 0.01)
+
+    w_overlap  = _get_cfg(sec, "w_overlap",       1.0)
+    w_wall     = _get_cfg(sec, "w_wall",          1.0)
+    alpha      = _get_cfg(sec, "alpha_sum_r",     1.0)
+
+    gtol       = _get_cfg(sec, "lbfgs_gtol",      1e-8)
+    ftol       = _get_cfg(sec, "lbfgs_ftol",      1e-12)
+    maxiter    = _get_cfg(sec, "lbfgs_maxiter",   1000)
+    maxcor     = _get_cfg(sec, "lbfgs_maxcor",    20)
+
+    out_dir    = _get_cfg(sec, "output_dir",      "./outputs_circle_packing")
+    plot_k     = _get_cfg(sec, "plot_k",          0)  # optional quick look
+
+    # Input path (can come from cfg or argument)
+    if input_path is None:
+        input_path = _get_cfg(sec, "final_push_input", None)
+        if input_path is None:
+            raise ValueError(
+                "main_final_push: No input_path provided and "
+                "circle_packing_SRP.final_push_input not set."
+            )
+
+    # Load input tensor
+    tin = torch.load(input_path)
+    if isinstance(tin, np.ndarray):
+        data_in = tin
+    else:
+        data_in = tin.detach().cpu().numpy()
+    if data_in.ndim != 3 or data_in.shape[1] != 3:
+        raise ValueError(f"Expected tensor of shape (M, 3, N); got {data_in.shape}.")
+
+    M, _, N = data_in.shape
+    print(f"Final-push on {M} samples, N={N} each, from: {input_path}")
+
+    # I/O setup
+    final_dir  = os.path.join(out_dir, "final_push")
+    plot_dir   = os.path.join(final_dir, "plots")
+    os.makedirs(final_dir, exist_ok=True)
+
+    stamp         = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+    pushed_fn     = os.path.join(final_dir, f"circle_final_push_{M}x{N}_{stamp}.pt")
+    metrics_fn    = os.path.join(final_dir, f"circle_final_push_metrics_{M}x{N}_{stamp}.csv")
+
+    with open(metrics_fn, "w") as mf:
+        mf.write("sample,sum_r,min_wall_clear,min_pair_clear,loss_after\n")
+
+    data_out = np.zeros((M, 3, N), dtype=np.float32)
+
+    bar = tqdm(range(M), desc="Final-push SRP")
+    for s in bar:
+        # Use provided centers/radii as the starting point
+        centers0 = data_in[s, :2, :].T.astype(np.float64)  # (N,2)
+        radii0   = data_in[s, 2, :].astype(np.float64)     # (N,)
+
+        X0 = np.concatenate([centers0.ravel(), radii0], axis=0)
+
+        # SRP exploration from provided init
+        X_srp = srp_adaptive(
+            X0, N,
+            Imax=Imax, m=m,
+            step_center=step_center,
+            step_radius=step_radius,
+            beta=beta, backtrack=backtrack,
+            w_overlap=w_overlap, w_wall=w_wall, alpha=alpha
+        )
+
+        # Local refinement
+        X_fin, L_fin = local_optimize(
+            X_srp, N,
+            w_overlap=w_overlap, w_wall=w_wall, alpha=alpha,
+            gtol=gtol, ftol=ftol, maxiter=maxiter, maxcor=maxcor
+        )
+
+        centers = X_fin[:2*N].reshape(N, 2)
+        radii   = X_fin[2*N:2*N+N]
+
+        # Hard projection to feasible radii with max sum
+        r_proj, info = hard_project_max_sum_radii(centers, radii, safety=1e-9)
+
+        # Replace radii for saving / plotting
+        radii = r_proj
+
+        # Diagnostics (same metrics as generator)
+        sum_r   = float(np.sum(radii))
+        mwc     = float(min_wall_clearance(centers, radii))
+        mpc     = float(min_pair_clearance(centers, radii))
+
+        with open(metrics_fn, "a") as mf:
+            mf.write(f"{s},{sum_r:.8f},{mwc:.8f},{mpc:.8f},{L_fin:.8e}\n")
+
+        data_out[s, 0, :] = centers[:, 0].astype(np.float32)
+        data_out[s, 1, :] = centers[:, 1].astype(np.float32)
+        data_out[s, 2, :] = radii.astype(np.float32)
+
+        bar.set_postfix(sum_r=f"{sum_r:.3f}", clr=f"{min(mwc, mpc):.4f}")
+
+    # Sort by sum of radii (descending), mirroring training set convention
+    sum_radii = data_out[:, 2, :].sum(axis=1)
+    sorted_idx = np.argsort(-sum_radii)
+    data_out = data_out[sorted_idx]
+
+    # Save pushed tensor and optional plots
+    torch.save(torch.from_numpy(data_out), pushed_fn)
+    print(f"\nSaved pushed tensor: {pushed_fn}")
+    print(f"Saved metrics:       {metrics_fn}")
+
+    if plot_k > 0:
+        plot_first_k_samples(data_out, plot_k, plot_dir, filename_prefix="final_push")
+        print(f"Saved plots:         {plot_dir}")
+
+
+# =============================================================================
+# Entrypoint (config-driven)
 # =============================================================================
 if __name__ == "__main__":
-    generate_circle_packing_dataset()
+    sec = "circle_packing_SRP"
+    # default to 'generate' if not provided
+    mode = str(_get_cfg(sec, "mode", "generate")).strip().lower()
+
+    if mode in ("generate", "gen"):
+        generate_circle_packing_dataset()
+
+    elif mode in ("final_push", "final-push", "push"):
+        # Will read the path from config: circle_packing_SRP.final_push_input
+        # if not supplied explicitly to main_final_push(...)
+        input_path = _get_cfg(sec, "final_push_input", None)
+        output_path = _get_cfg(sec, "final_push_output", None)
+
+        main_final_push(input_path=input_path, output_path=output_path)
+
+    else:
+        raise ValueError(
+            f"Unknown mode '{mode}'. Expected one of: "
+            "'generate', 'gen', 'final_push', 'final-push', 'push'."
+        )
