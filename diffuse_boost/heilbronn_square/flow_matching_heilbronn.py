@@ -46,14 +46,12 @@ def sample_uniform_x1_like(x0):
 def all_triangle_areas(points):
     """
     points: (B,2,N) in [0,1]
-    returns: list of tensors [B, K] of areas per batch (K = C(N,3))
-    Memory-safe version using blocks.
+    returns: tensor (B, K) of areas per batch (K = C(N,3))
     """
     B, _, N = points.shape
     device = points.device
     dtype = points.dtype
     idx = []
-    # generate combinations (i<j<k)
     for i in range(N - 2):
         for j in range(i + 1, N - 1):
             for k in range(j + 1, N):
@@ -66,7 +64,6 @@ def all_triangle_areas(points):
         A = P[:, i, :]  # (B,2)
         Bp = P[:, j, :]
         C = P[:, k, :]
-        # 2*area = |(B-A) x (C-A)|
         BA = Bp - A
         CA = C - A
         cross = BA[:, 0] * CA[:, 1] - BA[:, 1] * CA[:, 0]
@@ -75,14 +72,14 @@ def all_triangle_areas(points):
 
 def softmin_triangle_area(points, tau=1e-3, sample_K=None, rng=None):
     """
-    Smooth approximation to min area via soft-min:  a_soft = -tau * logsumexp(-A/tau)
+    Smooth approximation to min area via soft-min: a_soft = -tau * logsumexp(-A/tau)
     Optionally subsample K triangles for efficiency.
+    Returns: (B,)
     """
     B, _, N = points.shape
     if sample_K is None:
         A = all_triangle_areas(points)  # (B, K)
     else:
-        # random K triplets per batch
         if rng is None: rng = np.random
         idx = []
         for _ in range(sample_K):
@@ -100,8 +97,6 @@ def softmin_triangle_area(points, tau=1e-3, sample_K=None, rng=None):
             A_list.append(0.5 * cross.abs())
         A = torch.stack(A_list, dim=1)  # (B,sample_K)
 
-    # soft-min
-    # Avoid INF: normalize by max
     m = torch.amax(-A, dim=1, keepdim=True)
     a_soft = -tau * (m + torch.log(torch.clamp(torch.sum(torch.exp(-A / tau - m), dim=1, keepdim=True), min=1e-20)))
     return a_soft.squeeze(1)  # (B,)
@@ -148,7 +143,7 @@ class FlowSetTransformer(nn.Module):
         time_F  = int(st_kwargs.get("time_fourier_dim", max(16, dim_time // 2)))
         time_h  = int(st_kwargs.get("time_hidden", 2 * dim_time))
         sigma   = float(st_kwargs.get("time_fourier_sigma", 1.0))
-        cond_in = int(st_kwargs.get("cond_dim_in", 2))  # here: [N/scale_N, target_min_area] by default
+        cond_in = int(st_kwargs.get("cond_dim_in", 2))  # [N/scale_N, target_min_area]
         self.uses_cond = cond_in > 0
 
         self.time_emb = self.TimeEmbedFourier(dim_time, time_F, time_h, sigma)
@@ -255,7 +250,6 @@ def train_flow_model(
 
     for epoch in range(num_epochs):
         ep_losses = []
-        # cosine ramp for auxiliary penalty
         ratio = 0.5 * (1 - math.cos(math.pi * min(1.0, epoch / max(1, int(0.5 * num_epochs)))))
 
         for x_0, cond in loader:
@@ -275,7 +269,6 @@ def train_flow_model(
             loss_fm = mse(u_pred, dx_t)
 
             # Auxiliary: encourage high min-triangle area near projected x0
-            # Derive x0_pred via local linearization as in spheres code
             eps_t = 1e-3
             with torch.no_grad():
                 sch0 = FM_PATH.scheduler(t_in)
@@ -286,13 +279,9 @@ def train_flow_model(
             x0_proj = (u_pred - sigma_dot * x_1) / alpha_dot_safe
             x0_proj = clamp_unit_square(x0_proj)
 
-            # target is the sample's own min_area (second cond component)
             target = cond[:, 1]  # (B,)
-            # soft hinge on (target - softmin_area(x0_proj)), minimized
             a_soft = softmin_triangle_area(x0_proj, tau=1e-3, sample_K=None)
-            # we want a_soft >= target  => penalty on deficit
             deficit = (target - a_soft).clamp_min(0.0)
-            # smooth with softplus
             loss_heil = F.softplus(80.0 * deficit).mean() / 80.0
 
             loss = mse_strength * loss_fm + heil_penalty_strength * ratio * loss_heil
@@ -307,7 +296,6 @@ def train_flow_model(
         history.append(avg)
         print(f"Epoch {epoch+1}/{num_epochs} | FM={avg[0]:.5f} HeilPen={avg[1]:.5f} Tot={avg[2]:.5f}")
 
-    # Save model + simple loss plot data
     hist = np.array(history, dtype=np.float32)
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     name = f"heilbronn_fm_loss={hist[-1,2]:.6f}_{ts}.pth"
@@ -326,10 +314,27 @@ def train_flow_model(
     return model, hist, path
 
 # ================================
-# Sampler (+ optional polishing)
+# PCFM-style sampler (+ polishing)
 # ================================
 def sample_flow_model(model, optimizer, num_samples, batch_size, num_points, device,
-                      cond_loader=None, polish_steps=20, polish_lr=0.02, tau=1e-3):
+                      cond_loader=None, polish_steps=20, polish_lr=0.02, tau=1e-3,
+                      # PCFM knobs
+                      n_steps=40,
+                      ode_method="midpoint",
+                      ode_step_cap=0.05,
+                      proj_steps=6,
+                      proj_lr=0.05,
+                      prox_steps=6,
+                      prox_lr=0.1,
+                      prox_lambda=1.0,
+                      de_novo_minarea_bump=0.0,
+                      # soft-min annealing
+                      tau_start=None,
+                      tau_end=None,
+                      # optional hard-min refinement
+                      hardmin_topk=0,
+                      hardmin_steps=0,
+                      hardmin_lr_frac=0.5):
     model.eval().to(device)
     if optimizer is not None:
         try:
@@ -337,13 +342,46 @@ def sample_flow_model(model, optimizer, num_samples, batch_size, num_points, dev
         except Exception:
             pass
 
+    # Terminal projection: increase soft-min area via gradient ascent
+    def _terminal_projection_softmin(u, steps=6, lr=0.05, tau_soft=1e-3):
+        x = u.clone()
+        for _ in range(max(1, steps)):
+            x.requires_grad_(True)
+            a_soft = softmin_triangle_area(x, tau=tau_soft, sample_K=None).mean()
+            loss = -a_soft
+            (grad,) = torch.autograd.grad(loss, x, retain_graph=False, create_graph=False)
+            with torch.no_grad():
+                x = x - lr * grad
+                x = clamp_unit_square(x)
+        return x.detach()
+
+    # Proximal relaxation: min 0.5||x - x_hat||^2 - lam * a_soft(x)
+    def _prox_relaxed_softmin(u, u0, u_proj, tau_prime, steps=6, lr=0.1, lam=1.0, tau_soft=1e-3):
+        u_hat = (1.0 - tau_prime) * u0 + tau_prime * u_proj
+        x = u.clone()
+        for _ in range(max(1, steps)):
+            x.requires_grad_(True)
+            a_soft = softmin_triangle_area(x, tau=tau_soft, sample_K=None).mean()
+            quad = 0.5 * (x - u_hat).pow(2).mean()
+            loss = quad - lam * a_soft
+            (grad,) = torch.autograd.grad(loss, x, retain_graph=False, create_graph=False)
+            with torch.no_grad():
+                x = x - lr * grad
+                x = clamp_unit_square(x)
+        return x.detach()
+
     samples = []
     remaining = int(num_samples)
-
     cond_iter = iter(cond_loader) if cond_loader is not None else None
 
+    class _FMVF:
+        def __init__(self, mdl, c): self.mdl, self.c = mdl, c
+        def __call__(self, x, t, **_):
+            tb = torch.full((x.size(0),), float(t), device=x.device, dtype=x.dtype)
+            return self.mdl(tb, x, cond=self.c) if self.c is not None else self.mdl(tb, x)
+
     while remaining > 0:
-        # cond batch
+        # Conditioning batch (+ optional de-novo bump on min-area target)
         if cond_iter is not None:
             try:
                 _, cond = next(cond_iter)
@@ -351,53 +389,78 @@ def sample_flow_model(model, optimizer, num_samples, batch_size, num_points, dev
                 cond_iter = iter(cond_loader)
                 _, cond = next(cond_iter)
             cond = cond.to(device)
-            # ensure model batch matches cond batch
             bs = min(batch_size, remaining, cond.size(0))
             cond = cond[:bs]
+            if de_novo_minarea_bump > 0.0:
+                cond = cond.clone()
+                cond[:, 1] = (cond[:, 1] + float(de_novo_minarea_bump)).clamp(max=1.0)
         else:
             bs = min(batch_size, remaining)
             cond = None
 
-
-        # initialize from x1 ~ U([0,1]^2)
+        # Initialize from x1 ~ U([0,1]^2)
         u0 = torch.rand(bs, 2, num_points, device=device)
         u = u0.clone()
 
-        # simple uniform tau grid with ODE integration of learned field
-        N_steps = 40
-        ode_method = "midpoint"
-        ode_step_cap = 0.05
-
-        class _FMVF:
-            def __init__(self, mdl, c): self.mdl, self.c = mdl, c
-            def __call__(self, x, t, **_):
-                tb = torch.full((x.size(0),), float(t), device=x.device, dtype=x.dtype)
-                return self.mdl(tb, x, cond=self.c) if self.c is not None else self.mdl(tb, x)
-
         solver = ODESolver(velocity_model=_FMVF(model, cond))
 
-        for k in range(N_steps):
-            tau = k / N_steps
-            tau_n = (k + 1) / N_steps
-            t0, t1 = 1.0 - tau, 1.0 - tau_n
+        # PCFM loop over tau in [0,1]
+        for k in range(max(1, n_steps)):
+            tau_k = k / max(1, n_steps)
+            tau_n = (k + 1) / max(1, n_steps)
+
+            # Soft-min temperature (anneal if provided)
+            if (tau_start is not None) and (tau_end is not None):
+                # geometric schedule
+                tau_k_use = float(tau_start) * ((float(tau_end) / float(tau_start)) ** (k / max(1, n_steps - 1)))
+            else:
+                tau_k_use = tau
+
+            # 1) ODE integrate a small step (t = 1 - tau)
+            t0, t1 = 1.0 - tau_k, 1.0 - tau_n
             T = torch.tensor([t0, t1], device=u.device, dtype=u.dtype)
             step_size = min(ode_step_cap, max(1e-3, abs(t1 - t0)))
             u = solver.sample(time_grid=T, x_init=u, method=ode_method,
                               step_size=step_size, return_intermediates=False, enable_grad=False)
             u = clamp_unit_square(u)
 
-        # light polishing: maximize soft-min area by few projected ascent steps
+            # 2) Terminal projection: increase soft-min area
+            u_proj = _terminal_projection_softmin(u, steps=proj_steps, lr=proj_lr, tau_soft=tau_k_use)
+
+            # 3) Proximal relaxation: balance projection with source-target blend
+            u = _prox_relaxed_softmin(u, u0, u_proj, tau_prime=tau_n,
+                                      steps=prox_steps, lr=prox_lr, lam=prox_lambda, tau_soft=tau_k_use)
+
+        # Optional light polishing (soft-min)
+        tau_polish = tau_end if (tau_start is not None and tau_end is not None) else tau
         if polish_steps > 0:
             u = u.clone().detach().requires_grad_(True)
             opt = torch.optim.SGD([u], lr=polish_lr)
             for _ in range(polish_steps):
                 opt.zero_grad()
-                a_soft = softmin_triangle_area(u, tau=tau, sample_K=None)
+                a_soft = softmin_triangle_area(u, tau=tau_polish, sample_K=None)
                 loss = -a_soft.mean()
                 loss.backward()
                 with torch.no_grad():
                     u[:] = clamp_unit_square(u)
                 opt.step()
+            u = u.detach()
+
+        # Optional hard-min top-k refinement (targets true min more directly)
+        if hardmin_topk > 0 and hardmin_steps > 0:
+            u = u.clone().detach().requires_grad_(True)
+            hm_lr = max(1e-5, float(polish_lr) * float(hardmin_lr_frac))
+            opt_hm = torch.optim.SGD([u], lr=hm_lr)
+            for _ in range(hardmin_steps):
+                opt_hm.zero_grad()
+                A = all_triangle_areas(u)  # (B, K)
+                k = min(int(hardmin_topk), A.size(1))
+                vals, _ = torch.topk(A, k, dim=1, largest=False)  # k smallest per batch
+                loss_hard = -vals.mean()  # maximize worst areas
+                loss_hard.backward()
+                with torch.no_grad():
+                    u[:] = clamp_unit_square(u)
+                opt_hm.step()
             u = u.detach()
 
         samples.append(u.cpu().numpy())
@@ -423,7 +486,6 @@ def load_model_if_exists(model, opt, path, device):
 # Main controlled by INI
 # ======================
 def main():
-    
     sec = "heilbronn_flow"
     mode = cfg.get(sec, "mode", fallback="training_and_sampling").strip()
 
@@ -458,6 +520,24 @@ def main():
     plot_k = cfg.getint(sec, "plot_top_k_samples", fallback=5)
     plot_dir = cfg.get(sec, "plot_save_dir", fallback="./outputs_heilbronn_plots")
     os.makedirs(plot_dir, exist_ok=True)
+
+    # NEW: PCFM sampling knobs
+    pcfm_steps = cfg.getint(sec, "pcfm_steps", fallback=40)
+    ode_method = cfg.get(sec, "ode_method", fallback="midpoint")
+    ode_step_cap = cfg.getfloat(sec, "ode_step_cap", fallback=0.05)
+    proj_steps = cfg.getint(sec, "proj_steps", fallback=6)
+    proj_lr = cfg.getfloat(sec, "proj_lr", fallback=0.05)
+    prox_steps = cfg.getint(sec, "prox_steps", fallback=6)
+    prox_lr = cfg.getfloat(sec, "prox_lr", fallback=0.1)
+    prox_lambda = cfg.getfloat(sec, "prox_lambda", fallback=1.0)
+    de_novo_minarea_bump = cfg.getfloat(sec, "de_novo_minarea_bump", fallback=0.0)
+    # soft-min annealing
+    tau_softmin_start = cfg.getfloat(sec, "tau_softmin_start", fallback=tau_softmin)
+    tau_softmin_end   = cfg.getfloat(sec, "tau_softmin_end",   fallback=tau_softmin)
+    # hard-min top-k refinement
+    hardmin_topk    = cfg.getint(sec, "hardmin_topk",    fallback=0)
+    hardmin_steps   = cfg.getint(sec, "hardmin_steps",   fallback=0)
+    hardmin_lr_frac = cfg.getfloat(sec, "hardmin_lr_frac", fallback=0.5)
 
     # Architecture
     st_kwargs = {
@@ -496,7 +576,6 @@ def main():
     model = FlowSetTransformer(d, **st_kwargs).to(device)
     opt = schedulefree.RAdamScheduleFree(model.parameters(), lr=lr)
 
-    # Optional: a previously saved model
     resume_path = cfg.get(sec, "resume_model_path", fallback="").strip()
 
     if mode == "training_and_sampling":
@@ -506,14 +585,26 @@ def main():
         )
         samples = sample_flow_model(
             model, opt, num_new, batch_n, points_N, device,
-            cond_loader=test_loader, polish_steps=polish_steps, polish_lr=polish_lr, tau=tau_softmin
+            cond_loader=test_loader, polish_steps=polish_steps, polish_lr=polish_lr, tau=tau_softmin,
+            n_steps=pcfm_steps, ode_method=ode_method, ode_step_cap=ode_step_cap,
+            proj_steps=proj_steps, proj_lr=proj_lr,
+            prox_steps=prox_steps, prox_lr=prox_lr, prox_lambda=prox_lambda,
+            de_novo_minarea_bump=de_novo_minarea_bump,
+            tau_start=tau_softmin_start, tau_end=tau_softmin_end,
+            hardmin_topk=hardmin_topk, hardmin_steps=hardmin_steps, hardmin_lr_frac=hardmin_lr_frac
         )
     elif mode == "sampling_only":
         assert resume_path and os.path.isfile(resume_path), "resume_model_path must point to a saved model"
         model, opt = load_model_if_exists(model, opt, resume_path, device)
         samples = sample_flow_model(
             model, opt, num_new, batch_n, points_N, device,
-            cond_loader=test_loader, polish_steps=polish_steps, polish_lr=polish_lr, tau=tau_softmin
+            cond_loader=test_loader, polish_steps=polish_steps, polish_lr=polish_lr, tau=tau_softmin,
+            n_steps=pcfm_steps, ode_method=ode_method, ode_step_cap=ode_step_cap,
+            proj_steps=proj_steps, proj_lr=proj_lr,
+            prox_steps=prox_steps, prox_lr=prox_lr, prox_lambda=prox_lambda,
+            de_novo_minarea_bump=de_novo_minarea_bump,
+            tau_start=tau_softmin_start, tau_end=tau_softmin_end,
+            hardmin_topk=hardmin_topk, hardmin_steps=hardmin_steps, hardmin_lr_frac=hardmin_lr_frac
         )
         model_path = resume_path
     elif mode == "retrain_and_sampling":
@@ -525,7 +616,13 @@ def main():
         )
         samples = sample_flow_model(
             model, opt, num_new, batch_n, points_N, device,
-            cond_loader=test_loader, polish_steps=polish_steps, polish_lr=polish_lr, tau=tau_softmin
+            cond_loader=test_loader, polish_steps=polish_steps, polish_lr=polish_lr, tau=tau_softmin,
+            n_steps=pcfm_steps, ode_method=ode_method, ode_step_cap=ode_step_cap,
+            proj_steps=proj_steps, proj_lr=proj_lr,
+            prox_steps=prox_steps, prox_lr=prox_lr, prox_lambda=prox_lambda,
+            de_novo_minarea_bump=de_novo_minarea_bump,
+            tau_start=tau_softmin_start, tau_end=tau_softmin_end,
+            hardmin_topk=hardmin_topk, hardmin_steps=hardmin_steps, hardmin_lr_frac=hardmin_lr_frac
         )
     else:
         raise ValueError(f"Unknown mode: {mode}")

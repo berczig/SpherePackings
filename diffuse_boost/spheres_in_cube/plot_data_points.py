@@ -10,14 +10,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 
-def load_dataset(filename):
-    print(f"loading {filename}")
-    T = torch.load(filename)
-    #Take first 1630 rows of T
-    T = T[:1630]
-    print(f"Shape: {T.shape} min:{T.min()}, max:{T.max()}")
+def load_dataset(file):
+    if isinstance(file, torch.Tensor):
+        return file
+    return torch.load(file)
 
-    return T
 
 def compute_metrics(tensor_data):
     N = tensor_data.shape[2]
@@ -111,10 +108,14 @@ def plot_3d(dataset, title="plot"):
 
 
 if __name__ == "__main__":
-    training_data = "diffuse_boost/output/push_simulation_PP+PBTS/sample_2500.pt"
-    gen_samples = "diffuse_boost/output/generated_sets/flow_gen_20250822_110043.pt"
-    pushed_samples = "diffuse_boost/output/fixed_gen_sets/srp_pushed_2025-08-22_221053.pt"
-
+    training_data = "diffuse_boost/output/heilbronn_square/training_sets/heilbronn_srp_generated_2000x10_2025-10-22_120000.pt"
+    gen_samples = "diffuse_boost/output/heilbronn_square/generated_sets/heilbronn_gen_500x10_20251102_112819.pt"
+    pushed_samples = "diffuse_boost/output/heilbronn_square/fixed_gen_sets/heilbronn_srp_pushed_2025-11-02_113304.pt"
+    if isinstance(torch.load(training_data), dict):
+        training_data = torch.load(training_data)["pushed"]
+    #pushed_samplesb = "diffuse_boost/output/fixed_gen_sets/srp_pushed_2025-08-29_183046.pt"
+    # merge the two pushed samples
+    #pushed_samples = torch.cat((torch.load(pushed_samplesa), torch.load(pushed_samplesb)), dim=0)
     plot_files_combined([training_data, gen_samples, pushed_samples], 
                         ["Test data", "Samples(Flow matching)", "SRP Pushed Samples"], "output")
     #print the maximum values of the pushed_samples plot

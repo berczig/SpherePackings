@@ -1,30 +1,26 @@
 # -*- coding: utf-8 -*-
 """
-Flow-Matching model for packing circles in the unit square, maximizing sum of radii.
+Flow-Matching model for packing circles in a square, maximizing sum of radii.
 
 Includes:
   - Model (FlowSetTransformer) + FM training loop with circle-aware penalties
-  - Physics-Constrained sampling:
-        ODE step -> center projection -> LP projection of radii (max sum r) -> relaxed reverse step
+  - Physics-Constrained sampling (PCFM):
+        ODE step -> center projection -> LP projection of radii (max sum r) -> proximal relaxation -> final polish
   - Dataset wrapper for tensors of shape (M, 3, N) with rows [x, y, r]
   - Validator (batch metrics + CSV)
   - Plotters (single + batch)
 
 Notes:
-  * scipy.optimize.linprog (HiGHS) is used for the LP projection. See SciPy docs. [1]
-  * Circles plotted via matplotlib.patches.Circle. [2]
-  * Pairwise distances via torch.cdist. [3]
-  * Flow Matching background: Lipman et al., "Flow Matching for Generative Modeling" (2022). [4]
-
-[1] SciPy linprog(… method='highs') — docs.scipy.org  (HiGHS, highs-ipm, highs-ds)
-[2] matplotlib.patches.Circle — Matplotlib docs
-[3] torch.cdist — PyTorch docs
-[4] arXiv:2210.02747 — Flow Matching paper
+  * scipy.optimize.linprog (HiGHS) is used for the LP projection. See SciPy docs.
+  * Circles plotted via matplotlib.patches.Circle.
+  * Pairwise distances via torch.cdist.
+  * Flow Matching background: Lipman et al., "Flow Matching for Generative Modeling" (2022).
 """
 import os
 import math
 import time
 import numpy as np
+import re
 from datetime import datetime
 from typing import Dict, Any
 
@@ -38,18 +34,15 @@ from matplotlib.patches import Circle
 
 from tqdm import tqdm
 
-# --- Optional config (kept to mirror your environment) ---
+# --- Optional config (reads from [flow_matching_sumradii]) ---
 try:
     from diffuse_boost import cfg
     HAS_CFG = True
 except Exception:
     HAS_CFG = False
 
-
 import schedulefree
-from x_transformers import ContinuousTransformerWrapper, Encoder
-from torchdiffeq import odeint
-
+from x_transformers import Encoder
 from flow_matching.path.scheduler import CondOTScheduler
 from flow_matching.path import AffineProbPath
 from flow_matching.utils import ModelWrapper
@@ -58,7 +51,7 @@ from flow_matching.solver import ODESolver
 # =============================
 # Flow-Matching path (CondOT)
 # =============================
-FM_PATH = AffineProbPath(scheduler=CondOTScheduler())   # CondOT/Gaussian path [4]
+FM_PATH = AffineProbPath(scheduler=CondOTScheduler())
 
 # =============================
 # Transformer Model
@@ -103,7 +96,6 @@ class FlowSetTransformer(nn.Module):
         model_dim = int(st_kwargs.get("dim_hidden", 512))
         heads = int(st_kwargs.get("num_heads", 8))
         depth = int(st_kwargs.get("num_isab", st_kwargs.get("depth", 6)))
-        ff_mult = float(st_kwargs.get("ff_mult", 4.0))
         attn_do = float(st_kwargs.get("attn_dropout", 0.1))
         ff_do = float(st_kwargs.get("ff_dropout", 0.1))
         dim_time = int(st_kwargs.get("dim_time", max(64, 4 * d)))
@@ -197,7 +189,7 @@ class FlowSetTransformer(nn.Module):
         return out
 
 # =============================
-# Helpers for circles
+# Helpers for circles (unit square)
 # =============================
 _TRI_CACHE: Dict[Any, Any] = {}
 
@@ -207,29 +199,29 @@ def sample_t(B, device, small_t_weight=0.5, gamma=2.0):
     use_small = (torch.rand(B, device=device) < small_t_weight).float()
     return use_small * t_small + (1 - use_small) * s
 
-def _wall_upper_bounds_xy(xy: torch.Tensor) -> torch.Tensor:
+def _wall_upper_bounds_xy(xy: torch.Tensor, L: float = 1.0) -> torch.Tensor:
     x = xy[:, 0, :]
     y = xy[:, 1, :]
-    wall_ub = torch.minimum(torch.minimum(x, 1.0 - x), torch.minimum(y, 1.0 - y))
+    wall_ub = torch.minimum(torch.minimum(x, L - x), torch.minimum(y, L - y))
     return wall_ub.clamp_min(0.0)
 
-def _clamp_box_circles(xyr: torch.Tensor) -> torch.Tensor:
+def _clamp_box_circles(xyr: torch.Tensor, L: float = 1.0) -> torch.Tensor:
     B, d, N = xyr.shape
     assert d == 3
     xy = xyr[:, :2, :]
     r  = xyr[:, 2, :].clamp_min(0.0)
-    wall_ub = _wall_upper_bounds_xy(xy)
+    wall_ub = _wall_upper_bounds_xy(xy, L=L)
     r = torch.minimum(r, wall_ub)
-    x = xy[:, 0, :].clamp(r, 1.0 - r)
-    y = xy[:, 1, :].clamp(r, 1.0 - r)
+    x = xy[:, 0, :].clamp(r, L - r)
+    y = xy[:, 1, :].clamp(r, L - r)
     out = torch.stack([x, y, r], dim=1)
     return out
 
-def circle_wall_penalty(xyr, beta=80.0, p=2, margin=0.0, q=0.1):
+def circle_wall_penalty(xyr, beta=80.0, p=2, margin=0.0, q=0.1, L: float = 1.0):
     B, _, N = xyr.shape
     xy = xyr[:, :2, :]
     r  = xyr[:, 2, :].clamp_min(0.0)
-    wall_ub = _wall_upper_bounds_xy(xy) - margin
+    wall_ub = _wall_upper_bounds_xy(xy, L=L) - margin
     gap = r - wall_ub
     v = F.softplus(beta * gap) / beta
     if p != 1:
@@ -241,7 +233,7 @@ def circle_wall_penalty(xyr, beta=80.0, p=2, margin=0.0, q=0.1):
 def circle_pair_penalty(xyr, beta=80.0, p=2, margin=0.0, q=0.2, eps=1e-12):
     B, _, N = xyr.shape
     P = xyr[:, :2, :].permute(0, 2, 1).contiguous()
-    D = torch.cdist(P, P).clamp_min(eps)  # [3]
+    D = torch.cdist(P, P).clamp_min(eps)
     r = xyr[:, 2, :]
     S = r[:, :, None] + r[:, None, :]
     tri = _TRI_CACHE.get((xyr.device, N))
@@ -286,7 +278,7 @@ class CirclePackingDataset(Dataset):
         min_wall = (wall_ub - r).amin(dim=1)
 
         P = xy.permute(0,2,1).contiguous()
-        D = torch.cdist(P, P)  # [3]
+        D = torch.cdist(P, P)
         S = r[:, :, None] + r[:, None, :]
         eye = torch.eye(self.N, device=D.device, dtype=torch.bool)[None]
         D = D.masked_fill(eye, float('inf'))
@@ -311,10 +303,11 @@ def train_flow_model(
     optimizer.train()
     mse = nn.MSELoss()
     history = []
+    # Supervised anchor for sum of radii (from config)
+    sumr_strength = _get_cfg("flow_matching_sumradii", "sumr_strength", 0.2)
 
     for epoch in tqdm(range(num_epochs), desc="Training"):
         ep_losses = []
-        # cosine ramp for penalties (first half warmup)
         ratio = 0.5 * (1 - np.cos(np.pi * min(1.0, epoch / (0.5 * num_epochs))))
         for x_0, cond in loader:
             x_0 = x_0.to(device)      # (B,3,N) [x,y,r]
@@ -344,27 +337,44 @@ def train_flow_model(
             pen_pairs = circle_pair_penalty(x0_like, beta=160.0, p=2, margin=0.0, q=0.30)
             pen_walls = circle_wall_penalty(x0_like, beta=160.0, p=2, margin=0.0, q=0.15)
 
-            loss = mse_strength * loss_fm + dist_strength * ratio * (pen_pairs + pen_walls)
+            # Sum-of-radii regression anchor (target from cond[:,1])
+            target_sumr = cond[:, 1]                  # (B,)
+            pred_sumr   = x0_like[:, 2, :].sum(dim=1) # (B,)
+            loss_sumr   = F.mse_loss(pred_sumr, target_sumr)
+
+            loss = (
+                mse_strength * loss_fm
+                + dist_strength * ratio * (pen_pairs + pen_walls)
+                + float(sumr_strength) * loss_sumr
+            )
             optimizer.zero_grad(); loss.backward(); optimizer.step()
 
-            ep_losses.append([loss_fm.item(), (pen_pairs+pen_walls).item(), loss.item()])
+            ep_losses.append([loss_fm.item(), (pen_pairs+pen_walls).item(), loss_sumr.item(), loss.item()])
 
         avg = np.mean(ep_losses, axis=0)
         history.append(avg)
-        print(f"Epoch {epoch+1}/{num_epochs} | FM={avg[0]:.4e} Pen={avg[1]:.4e} Tot={avg[2]:.4e}")
+        print(f"Epoch {epoch+1}/{num_epochs} | FM={avg[0]:.4e} Pen={avg[1]:.4e} SumR={avg[2]:.4e} Tot={avg[3]:.4e}")
 
     history = np.array(history)
 
-    # save
+    # save (store st_kwargs and dim for reliable reloads)
     os.makedirs(save_path, exist_ok=True)
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     model_path = os.path.join(save_path, f"flow_circles_{ts}.pth")
-    torch.save({"model": model.state_dict(), "params": params, "history": history}, model_path)
+    torch.save({
+        "model": model.state_dict(),
+        "params": {
+            "st_kwargs": params,
+            "dim": int(getattr(model, "d", 3))
+        },
+        "history": history
+    }, model_path)
 
     plt.figure(figsize=(12,6))
     plt.plot(history[:,0], label="FM MSE")
     plt.plot(history[:,1], label="Geom Penalty")
-    plt.plot(history[:,2], label="Total")
+    plt.plot(history[:,2], label="SumR Anchor")
+    plt.plot(history[:,3], label="Total")
     plt.yscale('log'); plt.xlabel('Epoch'); plt.ylabel('Loss'); plt.legend(); plt.grid()
     plt.savefig(os.path.join(save_path, f"train_losses_{ts}.png"), dpi=150, bbox_inches="tight")
     plt.close()
@@ -372,75 +382,215 @@ def train_flow_model(
     return model, history
 
 # =============================
-# LP radii projection (maximize sum r)
+# LP radii projection (maximize sum r) with robust fallback
 # =============================
-def _lp_project_radii_max_sum(xyr: torch.Tensor, safety: float = 1e-9, pair_safety_mul: float = 1.0) -> torch.Tensor:
+def _lp_project_radii_max_sum(xyr: torch.Tensor, L: float = 1.0, safety: float = 1e-9, pair_safety_mul: float = 0.995) -> torch.Tensor:
     """
-    xyr: (B,3,N) -> radii' (B,N) maximizing sum r for current centers.
-    Uses SciPy HiGHS LP solver. [1]
+    Maximize sum r subject to:
+      0 <= r_i <= wall_ub_i
+      r_i + r_j <= pair_safety_mul * dist(i,j)
+    Returns radii (B,N). Uses SciPy HiGHS when available; otherwise a fast vectorized fallback.
     """
-    import numpy as np
-    from scipy.optimize import linprog
+    # Try SciPy first
+    try:
+        import numpy as _np
+        from scipy.optimize import linprog as _linprog
 
-    xyr_np = xyr.detach().cpu().numpy()
-    B, _, N = xyr_np.shape
-    out_r = np.empty((B, N), dtype=np.float64)
+        xyr_np = xyr.detach().cpu().numpy()
+        B, _, N = xyr_np.shape
+        out_r = _np.empty((B, N), dtype=_np.float64)
 
-    for b in range(B):
-        C = xyr_np[b, :2, :].T  # (N,2)
-        x = C[:,0]; y = C[:,1]
-        wall_ub = np.minimum.reduce([x, 1.0-x, y, 1.0-y])
-        wall_ub = np.clip(wall_ub - safety, 0.0, None)
+        for b in range(B):
+            C = xyr_np[b, :2, :].T  # (N,2)
+            x = C[:,0]; y = C[:,1]
+            wall_ub = _np.minimum.reduce([x, L - x, y, L - y])
+            wall_ub = _np.clip(wall_ub - safety, 0.0, None)
 
-        dx = x[:,None] - x[None,:]
-        dy = y[:,None] - y[None,:]
-        D  = np.sqrt(dx*dx + dy*dy)
+            dx = x[:,None] - x[None,:]
+            dy = y[:,None] - y[None,:]
+            D  = _np.sqrt(dx*dx + dy*dy) * float(pair_safety_mul)
 
-        c = -np.ones(N, dtype=float)                       # maximize sum r
-        bounds = [(0.0, float(wall_ub[i])) for i in range(N)]
+            c = -_np.ones(N, dtype=float)
+            bounds = [(0.0, float(wall_ub[i])) for i in range(N)]
 
-        rows, rhs = [], []
-        for i in range(N):
-            for j in range(i+1, N):
-                row = np.zeros(N, dtype=float); row[i]=1.0; row[j]=1.0
-                rows.append(row)
-                rhs.append(max(D[i,j] * pair_safety_mul - safety, 0.0))
+            rows, rhs = [], []
+            for i in range(N):
+                for j in range(i+1, N):
+                    row = _np.zeros(N, dtype=float); row[i]=1.0; row[j]=1.0
+                    rows.append(row)
+                    rhs.append(max(D[i,j] - safety, 0.0))
 
-        A_ub = np.vstack(rows) if rows else None
-        b_ub = np.asarray(rhs, dtype=float) if rows else None
+            A_ub = _np.vstack(rows) if rows else None
+            b_ub = _np.asarray(rhs, dtype=float) if rows else None
 
-        res = linprog(c, A_ub=A_ub, b_ub=b_ub, bounds=bounds, method="highs")  # [1]
-        if res.success:
-            out_r[b] = np.maximum(0.0, res.x - safety)
-        else:
-            out_r[b] = np.minimum(xyr_np[b,2,:], wall_ub)  # fallback: clamp to walls
-    return torch.from_numpy(out_r).to(xyr.device, dtype=xyr.dtype)
+            res = _linprog(c, A_ub=A_ub, b_ub=b_ub, bounds=bounds, method="highs")
+            if res.success:
+                out_r[b] = _np.maximum(0.0, res.x - safety)
+            else:
+                raise RuntimeError("HiGHS failed")
+        return torch.from_numpy(out_r).to(xyr.device, dtype=xyr.dtype)
+    except Exception:
+        pass
+
+    # Fallback: vectorized equal-split projection (fast, near-optimal)
+    with torch.no_grad():
+        B, _, N = xyr.shape
+        xy = xyr[:, :2, :]
+        x, y = xy[:, 0, :], xy[:, 1, :]
+        wall_ub = torch.minimum(torch.minimum(x, L - x), torch.minimum(y, L - y)).clamp_min(0.0)
+        r = wall_ub.clone()
+
+        P = xy.permute(0, 2, 1).contiguous()  # (B,N,2)
+        for _ in range(80):
+            D = torch.cdist(P, P).clamp_min(1e-12) * float(pair_safety_mul)
+            S = r[:, :, None] + r[:, None, :]
+            O = (S - D).clamp_min(0.0)  # overlap matrix (B,N,N)
+            eye = torch.eye(N, device=xyr.device, dtype=torch.bool)[None]
+            O = O.masked_fill(eye, 0.0)
+            if float(O.max().item()) <= 1e-10:
+                break
+            # Equal split: each circle reduces half of its total overlaps
+            reduce_i = 0.5 * O.sum(dim=2)  # (B,N)
+            r = (r - reduce_i).clamp_min(0.0)
+            r = torch.minimum(r, wall_ub)
+        return r
 
 # =============================
-# Sampling (PCFM for circles)
+# PCFM Sampling for circles
 # =============================
+
+def _sanitize_ode_method(val: str, default="midpoint") -> str:
+    if not isinstance(val, str):
+        return default
+    # strip inline ; or # comments and extra spaces
+    s = re.split(r'[;#]', val, maxsplit=1)[0].strip().lower()
+    valid = {"dopri8","dopri5","bosh3","fehlberg2","adaptive_heun","euler","midpoint","heun2","heun3","rk4","explicit_adams","implicit_adams","fixed_adams","scipy_solver"}
+    return s if s in valid else default
+
+def _infer_st_kwargs_from_state_dict(sd: dict):
+    """
+    Infer FlowSetTransformer kwargs and input dim from a checkpoint state_dict.
+    Returns (st_kwargs: dict, d_inferred: int)
+    """
+    # model_dim and d (output channels of token_out)
+    if "token_out.weight" in sd:
+        d_out, model_dim = sd["token_out.weight"].shape
+        d_inferred = int(d_out)
+    else:
+        model_dim, _ = sd["token_in.weight"].shape
+        d_inferred = 3
+
+    # depth from max layer index
+    layer_ids = []
+    pat = re.compile(r"^encoder\.layers\.(\d+)\.")
+    for k in sd.keys():
+        m = pat.match(k)
+        if m:
+            layer_ids.append(int(m.group(1)))
+    depth = (max(layer_ids) + 1) if layer_ids else 6
+
+    # time dims
+    if "time_emb.net.2.weight" in sd:
+        dim_time, time_hidden = sd["time_emb.net.2.weight"].shape
+    else:
+        dim_time, time_hidden = 64, 128
+
+    if "time_emb.net.0.weight" in sd:
+        _, in_dim0 = sd["time_emb.net.0.weight"].shape
+        time_fourier_dim = max((in_dim0 - 4) // 2, 16)
+    else:
+        time_fourier_dim = max(dim_time // 2, 16)
+
+    # cond mlp dims
+    if "cond_mlp.0.weight" in sd:
+        cond_hidden, cond_dim_in = sd["cond_mlp.0.weight"].shape
+    else:
+        cond_dim_in = 4
+        cond_hidden = max(64, dim_time)
+
+    # pick heads dividing model_dim
+    for h in (16, 12, 8, 6, 4, 2, 1):
+        if model_dim % h == 0:
+            num_heads = h
+            break
+
+    st_kw = {
+        "dim_hidden": int(model_dim),
+        "num_heads": int(num_heads),
+        "depth": int(depth),
+        "attn_dropout": 0.1,
+        "ff_dropout": 0.1,
+        "dim_time": int(dim_time),
+        "time_fourier_dim": int(time_fourier_dim),
+        "time_hidden": int(time_hidden),
+        "time_fourier_sigma": 1.0,
+        "cond_dim_in": int(cond_dim_in),
+        "cond_hidden": int(cond_hidden),
+    }
+    return st_kw, int(d_inferred)
+
+def _build_model_from_ckpt(checkpoint, device, fallback_kwargs):
+    # Prefer saved st_kwargs (new checkpoints saved by this script)
+    if isinstance(checkpoint, dict) and "params" in checkpoint and isinstance(checkpoint["params"], dict):
+        params = checkpoint["params"]
+        if "st_kwargs" in params:
+            st_kw = params["st_kwargs"]
+            dim = int(params.get("dim", 3))
+            print("[FM] Rebuilding model from checkpoint params.")
+            return FlowSetTransformer(dim, **st_kw).to(device)
+        # Backward-compat: params may be st_kwargs directly
+        if any(k in params for k in ("dim_hidden","num_heads","depth","dim_time","time_hidden","cond_hidden")):
+            print("[FM] Rebuilding model from flat params (st_kwargs).")
+            return FlowSetTransformer(int(params.get("dim", 3) or 3), **params).to(device)
+
+    # Try inferring from state_dict
+    if isinstance(checkpoint, dict) and "model" in checkpoint and isinstance(checkpoint["model"], dict):
+        try:
+            st_kw_inf, dim_inf = _infer_st_kwargs_from_state_dict(checkpoint["model"])
+            print("[FM] Rebuilding model from inferred state_dict shapes:")
+            print(f"     dim={dim_inf} | dim_hidden={st_kw_inf['dim_hidden']} | depth={st_kw_inf['depth']} | "
+                  f"heads={st_kw_inf['num_heads']} | dim_time={st_kw_inf['dim_time']} | "
+                  f"time_fourier_dim={st_kw_inf['time_fourier_dim']} | time_hidden={st_kw_inf['time_hidden']} | "
+                  f"cond_dim_in={st_kw_inf['cond_dim_in']} | cond_hidden={st_kw_inf['cond_hidden']}")
+            return FlowSetTransformer(dim_inf, **st_kw_inf).to(device)
+        except Exception as e:
+            print(f"[FM] Inference from state_dict failed ({e}); falling back to current config.")
+
+    # Fallback: use current config kwargs
+    print("[FM] Checkpoint did not include st_kwargs; using current config widths.")
+    return FlowSetTransformer(3, **fallback_kwargs).to(device)
+
 @torch.no_grad()
-def sample_flow_model(model, optimizer, num_samples, batch_size, num_points,
-                      device, clip_min, clip_max, dim, cond_loader=None):
+def sample_flow_model(
+    model, optimizer, num_samples, batch_size, num_points,
+    device, clip_min, clip_max, dim, cond_loader=None,
+    # Read from [flow_matching_sumradii]
+    L=1.0,                         # box_len
+    pcfm_steps=40,
+    ode_method='midpoint',
+    ode_step_cap=0.05,
+    proj_iters=6,
+    alpha_proj=0.25,
+    contact_q=1.0,
+    wall_weight=1.0,
+    wall_margin=0.05,
+    prox_iters=8,
+    prox_step=0.1,
+    prox_lambda=1.5,
+    final_passes=4,
+    tol_finish=1e-8,
+    # radii limits
+    r_min_init=1e-4,
+    r_max_init_frac=0.25,
+    # de-novo conditioning bump
+    de_novo_minsep_bump=0.0,
+    cond_minsep_index=3
+):
     """
-    Physics-Constrained FM for circles in [0,1]^2 with variable radii.
+    Physics-Constrained FM for circles in [0,L]^2 with variable radii.
     Returns: np.ndarray (num_samples, 3, N) rows [x,y,r]
     """
-    # hyperparams
-    N_steps = 40
-    ode_method = 'midpoint'
-    ode_step_cap = 0.05
     eps_nrm = 1e-6
-    proj_outer_iters = 6
-    alpha_proj = 0.25
-    contact_q = 1.0
-    wall_weight = 1.0
-    wall_margin = 0.05
-    prox_iters = 8
-    prox_step = 0.1
-    prox_lambda = 1.5
-    final_passes = 4
-    tol_finish = 1e-8
 
     def _FMVF(mdl, cond):
         class VF:
@@ -457,13 +607,13 @@ def sample_flow_model(model, optimizer, num_samples, batch_size, num_points,
         step_size = min(ode_step_cap, max(1e-3, dt))
         x_end = solver.sample(time_grid=T, x_init=x_init, method=ode_method,
                               step_size=step_size, return_intermediates=False, enable_grad=False)
-        return _clamp_box_circles(x_end)
+        return _clamp_box_circles(x_end, L=L)
 
     def _active_overlap_centers(xyr, for_stop=False):
         P = xyr[:, :2, :].permute(0,2,1).contiguous()  # (B,N,2)
         if not for_stop and eps_nrm > 0.0:
             P = P + (eps_nrm) * torch.randn_like(P)
-        D = torch.cdist(P, P).clamp_min(1e-12)         # [3]
+        D = torch.cdist(P, P).clamp_min(1e-12)
         r = xyr[:, 2, :]
         S = r[:, :, None] + r[:, None, :]
         overlap = (S - D)
@@ -483,6 +633,9 @@ def sample_flow_model(model, optimizer, num_samples, batch_size, num_points,
 
     def _JJt_inv_h_times_Jt(overlap, n, eye, q):
         active = _select_active(overlap, eye, q)
+        if not bool(active.any()):
+            B, N, _ = overlap.shape
+            return torch.zeros((B, 3, N), device=overlap.device, dtype=overlap.dtype)
         w = (0.5 * overlap * active.float())
         term_i = (w.unsqueeze(-1) * n).sum(dim=2)              # (B,N,2)
         term_j = (w.transpose(1,2).unsqueeze(-1) * n.transpose(1,2)).sum(dim=2)
@@ -498,27 +651,27 @@ def sample_flow_model(model, optimizer, num_samples, batch_size, num_points,
     def _wall_push(xyr, margin_frac=0.05, scale=1.0):
         xy = xyr[:, :2, :]
         r  = xyr[:, 2, :]
-        thr = margin_frac * 2.0 * r.mean(dim=1, keepdim=True)
+        thr = margin_frac * 2.0 * r  # per-circle margin
         delta = torch.zeros_like(xyr)
         x = xy[:, 0, :]; y = xy[:, 1, :]
-        dl = x - r; dh = (1.0 - r) - x
-        db = y - r; dt = (1.0 - r) - y
-        delta[:, 0, :] += torch.where(dl < thr, (thr - dl), 0.0)
-        delta[:, 0, :] -= torch.where(dh < thr, (thr - dh), 0.0)
-        delta[:, 1, :] += torch.where(db < thr, (thr - db), 0.0)
-        delta[:, 1, :] -= torch.where(dt < thr, (thr - dt), 0.0)
+        dl = x - r; dh = (L - r) - x
+        db = y - r; dt = (L - r) - y
+        delta[:, 0, :] += torch.where(dl < thr, (thr - dl), torch.zeros_like(dl))
+        delta[:, 0, :] -= torch.where(dh < thr, (thr - dh), torch.zeros_like(dh))
+        delta[:, 1, :] += torch.where(db < thr, (thr - db), torch.zeros_like(db))
+        delta[:, 1, :] -= torch.where(dt < thr, (thr - dt), torch.zeros_like(dt))
         return scale * delta
 
     def _project_centers(xyr):
         u = xyr
-        for _ in range(proj_outer_iters):
+        for _ in range(proj_iters):
             overlap, n, eye = _active_overlap_centers(u, for_stop=False)
             has_pairs = bool((overlap > 0).any())
             if not has_pairs and wall_weight <= 0.0:
                 break
             delta_pairs = _JJt_inv_h_times_Jt(overlap, n, eye, contact_q) if has_pairs else 0.0
             delta_walls = _wall_push(u, margin_frac=wall_margin, scale=wall_weight) if wall_weight > 0.0 else 0.0
-            u = _clamp_box_circles(u + alpha_proj * (delta_pairs + delta_walls))
+            u = _clamp_box_circles(u + alpha_proj * (delta_pairs + delta_walls), L=L)
         return u
 
     def _prox_relaxed(u, u0, u_proj, tau_prime, cond):
@@ -527,7 +680,7 @@ def sample_flow_model(model, optimizer, num_samples, batch_size, num_points,
         for _ in range(max(1, prox_iters)):
             tb = torch.full((u.size(0),), t_prime, device=u.device, dtype=u.dtype)
             v = model(tb, u, cond=cond) if cond is not None else model(tb, u)
-            u_next = _clamp_box_circles(u + (1.0 - tau_prime) * v)
+            u_next = _clamp_box_circles(u + (1.0 - tau_prime) * v, L=L)
 
             overlap, n, eye = _active_overlap_centers(u_next, for_stop=False)
             active = (overlap > 0) & (~eye)
@@ -541,7 +694,7 @@ def sample_flow_model(model, optimizer, num_samples, batch_size, num_points,
             jt[:, :2, :] = jt_pairs_xy + jt_walls
 
             grad = (u - u_hat) + prox_lambda * jt
-            u = _clamp_box_circles(u - prox_step * grad)
+            u = _clamp_box_circles(u - prox_step * grad, L=L)
         return u
 
     def _final_polish(u):
@@ -552,7 +705,12 @@ def sample_flow_model(model, optimizer, num_samples, batch_size, num_points,
             u = _project_centers(u)
         return u
 
-    model.eval(); optimizer.eval()
+    model.eval()
+    try:
+        optimizer.eval()
+    except Exception:
+        pass
+
     samples, remaining = [], int(num_samples)
     cond_iter = iter(cond_loader) if cond_loader is not None else None
 
@@ -567,29 +725,36 @@ def sample_flow_model(model, optimizer, num_samples, batch_size, num_points,
                 x_dummy, cond = next(cond_iter)
             cond = cond.to(device)
             if cond.size(0) > bs: cond = cond[:bs]
+            if de_novo_minsep_bump > 0.0 and cond.size(1) > cond_minsep_index:
+                cond = cond.clone()
+                cond[:, cond_minsep_index] = (cond[:, cond_minsep_index] + float(de_novo_minsep_bump)).clamp(max=1.0)
         else:
             cond = None
 
-        # init: random centers, tiny radii
+        # init: random centers in [0,L], tiny radii
         u0 = torch.empty(bs, 3, num_points, device=device)
-        u0[:, :2, :] = torch.rand(bs, 2, num_points, device=device)
-        u0[:, 2, :]  = (0.01 + 0.005 * torch.randn(bs, num_points, device=device)).clamp_min(1e-4)
-        u0 = _clamp_box_circles(u0)
+        u0[:, :2, :] = torch.rand(bs, 2, num_points, device=device) * L
+        r0 = (max(1e-6, float(r_min_init)) + float(r_max_init_frac) * 0.5 * torch.rand(bs, num_points, device=device))
+        u0[:, 2, :]  = r0
+        u0 = _clamp_box_circles(u0, L=L)
         u = u0.clone()
 
-        for k in range(N_steps):
-            tau, tau_next = k / N_steps, (k+1) / N_steps
-            u1 = _ode_solve_with_model(u, tau, 1.0, cond)
+        for k in range(max(1, pcfm_steps)):
+            tau, tau_next = k / max(1, pcfm_steps), (k+1) / max(1, pcfm_steps)
+            u1 = _ode_solve_with_model(u, tau, tau_next, cond)
             u_proj = _project_centers(u1)
-            # LP: maximize sum radii given current centers
-            new_r = _lp_project_radii_max_sum(u_proj)
+            # LP: maximize sum radii given current centers (respect walls)
+            new_r = _lp_project_radii_max_sum(u_proj, L=L)
             u_proj = u_proj.clone()
-            u_proj[:, 2, :] = torch.minimum(new_r, _wall_upper_bounds_xy(u_proj[:, :2, :]))
+            u_proj[:, 2, :] = torch.minimum(new_r, _wall_upper_bounds_xy(u_proj[:, :2, :], L=L))
             u = _prox_relaxed(u, u0, u_proj, tau_next, cond)
 
         u = _final_polish(u)
-        r_final = _lp_project_radii_max_sum(u)
-        u[:, 2, :] = torch.minimum(r_final, _wall_upper_bounds_xy(u[:, :2, :]))
+        r_final = _lp_project_radii_max_sum(u, L=L)
+        u[:, 2, :] = torch.minimum(r_final, _wall_upper_bounds_xy(u[:, :2, :], L=L))
+        # Diagnostics: show sum of radii for this batch
+        batch_sumr = u[:, 2, :].sum(dim=1)
+        print(f"[PCFM] batch sum_r: mean={batch_sumr.mean().item():.6f} max={batch_sumr.max().item():.6f}")
         samples.append(u.cpu().numpy())
         remaining -= bs
 
@@ -598,9 +763,9 @@ def sample_flow_model(model, optimizer, num_samples, batch_size, num_points,
 # =============================
 # Validation utilities + CSV
 # =============================
-def _min_wall_clearance_batch(xy: np.ndarray, r: np.ndarray) -> np.ndarray:
+def _min_wall_clearance_batch(xy: np.ndarray, r: np.ndarray, L: float = 1.0) -> np.ndarray:
     x, y = xy[:, 0, :], xy[:, 1, :]
-    w = np.minimum.reduce([x - r, 1.0 - x - r, y - r, 1.0 - y - r])
+    w = np.minimum.reduce([x - r, L - x - r, y - r, L - y - r])
     return w.min(axis=1)
 
 def _min_pair_clearance_batch(xy: np.ndarray, r: np.ndarray) -> np.ndarray:
@@ -616,14 +781,14 @@ def _min_pair_clearance_batch(xy: np.ndarray, r: np.ndarray) -> np.ndarray:
         out[b] = np.min(D - S)
     return out
 
-def validate_circle_samples(samples: np.ndarray, tol: float = 1e-9, return_details: bool = True):
+def validate_circle_samples(samples: np.ndarray, tol: float = 1e-9, return_details: bool = True, L: float = 1.0):
     assert samples.ndim == 3 and samples.shape[1] == 3, "Expected (M,3,N)"
     M, _, N = samples.shape
     xy = samples[:, :2, :]
     r  = samples[:, 2, :]
 
     sum_r = r.sum(axis=1)
-    min_wall = _min_wall_clearance_batch(xy, r)
+    min_wall = _min_wall_clearance_batch(xy, r, L=L)
     min_pair = _min_pair_clearance_batch(xy, r)
     min_clear = np.minimum(min_wall, min_pair)
     feasible = (min_clear >= -tol)
@@ -641,27 +806,18 @@ def validate_circle_samples(samples: np.ndarray, tol: float = 1e-9, return_detai
         out["violations_any"] = (~feasible)
     return out
 
-import os
 import csv
-from datetime import datetime
-import numpy as np
 
 def save_validation_csv(metrics, csv_out_path, prefix="fm_circle_generated"):
     """
     Save validation metrics to a stamped CSV file inside the directory
     indicated by `csv_out_path` (if it's a directory) or the directory
-    part of `csv_out_path` (if it's a file path). The filename is:
-        {prefix}_{num_samples}_{YYYY-mm-dd_HHMMSS}.csv
-
-    The function auto-detects per-sample fields (1-D arrays of length M)
-    and writes one row per sample. Scalar fields are written as commented
-    header lines.
+    part of `csv_out_path` (if it's a file path).
     """
     # Determine sample count (required)
     if "num_samples" in metrics and isinstance(metrics["num_samples"], (int, np.integer)):
         M = int(metrics["num_samples"])
     else:
-        # Fallback: infer from first vector-like entry
         M = None
         for v in metrics.values():
             try:
@@ -677,7 +833,7 @@ def save_validation_csv(metrics, csv_out_path, prefix="fm_circle_generated"):
     # Decide output directory
     is_csv_path = str(csv_out_path).lower().endswith(".csv")
     out_dir = os.path.dirname(csv_out_path) if is_csv_path else csv_out_path
-    os.makedirs(out_dir, exist_ok=True)  # idempotent recursive creation
+    os.makedirs(out_dir, exist_ok=True)
 
     # Build stamped filename
     stamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
@@ -694,21 +850,16 @@ def save_validation_csv(metrics, csv_out_path, prefix="fm_circle_generated"):
         except Exception:
             continue
 
-    # Stable order: common useful columns first if present
-    preferred = ["index", "feasible", "sum_r", "min_wall_clear", "min_pair_clear", "loss_after"]
+    preferred = ["index", "feasible", "sum_r", "min_wall_clear", "min_pair_clear", "min_clear"]
     ordered_cols = [c for c in preferred if c in per_sample_cols]
     ordered_cols += [c for c in per_sample_cols if c not in ordered_cols]
 
-    # Ensure an index column (0..M-1)
-    # We'll synthesize it if not present in metrics
     synth_index = None
     if "index" not in ordered_cols:
         synth_index = np.arange(M, dtype=int)
         ordered_cols.insert(0, "index")
 
-    # Prepare writers
     with open(out_path, "w", newline="") as f:
-        # Commented scalar/meta lines at top
         scalars = {k: v for k, v in metrics.items()
                    if not (hasattr(v, "__len__") and np.asarray(v).ndim == 1 and np.asarray(v).shape[0] == M)}
         for k, v in sorted(scalars.items()):
@@ -717,35 +868,27 @@ def save_validation_csv(metrics, csv_out_path, prefix="fm_circle_generated"):
         writer = csv.DictWriter(f, fieldnames=ordered_cols)
         writer.writeheader()
 
-        # Emit per-sample rows
-        # Helper to cast numpy scalars to plain Python
-        def _py(x):
-            if isinstance(x, (np.generic,)):
-                return x.item()
-            return x
-
-        # Fetch arrays only once
         arrays = {k: np.asarray(metrics[k]) for k in per_sample_cols}
         if synth_index is not None:
             arrays["index"] = synth_index
 
         for i in range(M):
-            row = {col: _py(arrays[col][i]) for col in ordered_cols}
+            row = {col: arrays[col][i].item() if isinstance(arrays[col][i], np.generic) else arrays[col][i]
+                   for col in ordered_cols}
             writer.writerow(row)
 
     return out_path
 
-
 # =============================
 # Plotters
 # =============================
-def _detect_infeasible_indices(xy: np.ndarray, r: np.ndarray, tol: float = 1e-9):
+def _detect_infeasible_indices(xy: np.ndarray, r: np.ndarray, tol: float = 1e-9, L: float = 1.0):
     N = r.size
     bad = set()
     w1 = xy[0, :] - r < -tol
-    w2 = 1.0 - xy[0, :] - r < -tol
+    w2 = L - xy[0, :] - r < -tol
     w3 = xy[1, :] - r < -tol
-    w4 = 1.0 - xy[1, :] - r < -tol
+    w4 = L - xy[1, :] - r < -tol
     for i in np.where(w1 | w2 | w3 | w4)[0]:
         bad.add(int(i))
     dx = xy[0, :][:, None] - xy[0, :][None, :]
@@ -760,29 +903,29 @@ def _detect_infeasible_indices(xy: np.ndarray, r: np.ndarray, tol: float = 1e-9)
     return bad
 
 def plot_circle_sample(sample_3xN: np.ndarray, ax: plt.Axes = None,
-                       title: str = None, mark_infeasible: bool = True, tol: float = 1e-9, lw: float = 1.5):
+                       title: str = None, mark_infeasible: bool = True, tol: float = 1e-9, lw: float = 1.5, L: float = 1.0):
     assert sample_3xN.shape[0] == 3
     xy = sample_3xN[:2, :]
     r  = sample_3xN[2, :]
     if ax is None:
         fig, ax = plt.subplots(figsize=(5,5))
-    ax.plot([0,1,1,0,0], [0,0,1,1,0], linewidth=1.5)
-    bad = _detect_infeasible_indices(xy, r, tol) if mark_infeasible else set()
+    ax.plot([0,L,L,0,0], [0,0,L,L,0], linewidth=1.5)
+    bad = _detect_infeasible_indices(xy, r, tol, L=L) if mark_infeasible else set()
     for i in range(xy.shape[1]):
         c = Circle((xy[0, i], xy[1, i]), r[i],
                    fill=False,
                    linewidth=lw,
                    edgecolor=("red" if i in bad else "black"))
-        ax.add_patch(c)  # [2]
+        ax.add_patch(c)
     ax.set_aspect('equal', adjustable='box')
-    ax.set_xlim(0, 1); ax.set_ylim(0, 1)
+    ax.set_xlim(0, L); ax.set_ylim(0, L)
     if title is None:
         title = f"N={xy.shape[1]}, sum_r={np.sum(r):.4f}, feas={len(bad)==0}"
     ax.set_title(title)
     return ax
 
 def plot_first_k_samples(samples: np.ndarray, k: int, out_dir: str,
-                         filename_prefix: str = "gen_circle", mark_infeasible: bool = True, tol: float = 1e-9):
+                         filename_prefix: str = "gen_circle", mark_infeasible: bool = True, tol: float = 1e-9, L: float = 1.0):
     os.makedirs(out_dir, exist_ok=True)
     M = samples.shape[0]
     k = min(k, M)
@@ -790,16 +933,16 @@ def plot_first_k_samples(samples: np.ndarray, k: int, out_dir: str,
         xy = samples[s, :2, :]
         r  = samples[s, 2, :]
         sum_r = float(np.sum(r))
-        feas = len(_detect_infeasible_indices(xy, r, tol)) == 0
+        feas = len(_detect_infeasible_indices(xy, r, tol, L=L)) == 0
         title = f"Sample {s} | N={xy.shape[1]} | sum_r={sum_r:.4f} | feas={feas}"
         fig, ax = plt.subplots(figsize=(5,5))
-        plot_circle_sample(samples[s], ax=ax, title=title, mark_infeasible=mark_infeasible, tol=tol)
+        plot_circle_sample(samples[s], ax=ax, title=title, mark_infeasible=mark_infeasible, tol=tol, L=L)
         fn = f"{filename_prefix}_N{xy.shape[1]}_sumr{sum_r:.4f}_idx{s}.png"
         fig.savefig(os.path.join(out_dir, fn), dpi=150, bbox_inches="tight")
         plt.close(fig)
 
 # =============================
-# Main
+# Config helper
 # =============================
 def _get_cfg(sec, key, fallback):
     if HAS_CFG:
@@ -807,11 +950,15 @@ def _get_cfg(sec, key, fallback):
             if isinstance(fallback, int):    return cfg.getint(sec, key, fallback=fallback)
             if isinstance(fallback, float):  return cfg.getfloat(sec, key, fallback=fallback)
             if isinstance(fallback, bool):   return cfg.getboolean(sec, key, fallback=fallback)
-            return cfg.get(sec, key, fallback=fallback)
+            val = cfg.get(sec, key, fallback=fallback)
+            return val
         except Exception:
             return fallback
     return fallback
 
+# =============================
+# Main
+# =============================
 if __name__ == "__main__":
     # Section name in your INI (feel free to rename)
     SEC = "flow_matching_sumradii"
@@ -821,12 +968,12 @@ if __name__ == "__main__":
     save_model_dir = _get_cfg(SEC, "save_model_path", "./fm_circle_models")
     save_gen_dir   = _get_cfg(SEC, "save_generated_path", "./fm_circle_generated")
     plot_out_dir   = _get_cfg(SEC, "plot_out_dir", "./fm_circle_plots")
-    csv_out_path   = _get_cfg(SEC, "csv_out_path", "./fm_circle_metrics/generated_metrics.csv")
+    csv_out_path   = _get_cfg(SEC, "csv_out_path", "./fm_circle_metrics")
 
     dim            = 3
     batch_size     = _get_cfg(SEC, "batch_size", 64)
     learning_rate  = _get_cfg(SEC, "learning_rate", 2e-4)
-    eta_min        = _get_cfg(SEC, "eta_min", 2e-5)  # if you choose cosine schedule, not used here
+    eta_min        = _get_cfg(SEC, "eta_min", 2e-5)  # not used by schedulefree, kept for completeness
     num_epochs     = _get_cfg(SEC, "num_epochs", 200)
 
     mse_strength   = _get_cfg(SEC, "mse_strength", 1.0)
@@ -835,7 +982,10 @@ if __name__ == "__main__":
     num_new        = _get_cfg(SEC, "sample_new_points", 1000)
     batch_new      = _get_cfg(SEC, "sample_new_points_batch_size", 50)
     N_points       = _get_cfg(SEC, "num_circles", 50)
-    mode = _get_cfg(SEC, "mode", "train_and_sample")  # options: train_and_sample, sample_only, train_only
+    mode           = _get_cfg(SEC, "mode", "train_and_sample")  # train_and_sample | sampling_only | train_only
+
+    # Box
+    box_len        = _get_cfg(SEC, "box_len", 1.0)
 
     # ---------------- Data ----------------
     full_ds = CirclePackingDataset(dataset_path)
@@ -858,44 +1008,32 @@ if __name__ == "__main__":
     st_kwargs = {
         'dim_hidden': _get_cfg(SEC, 'st_dim_hidden', 512),
         'num_heads':  _get_cfg(SEC, 'st_num_heads', 8),
+        'depth':      _get_cfg(SEC, 'st_depth', 6),
+        'attn_dropout': _get_cfg(SEC, 'st_attn_dropout', 0.1),
+        'ff_dropout':   _get_cfg(SEC, 'st_ff_dropout', 0.1),
+        'dim_time':     _get_cfg(SEC, 'st_dim_time', 128),
+        'time_fourier_dim': _get_cfg(SEC, 'time_fourier_dim', 64),
+        'time_hidden':      _get_cfg(SEC, 'st_time_hidden', _get_cfg(SEC, 'time_hidden', 256)),
+        'time_fourier_sigma': _get_cfg(SEC, 'time_fourier_sigma', 1.0),
         'cond_dim_in': 4,
-        'dim_out': dim
+        'cond_hidden': _get_cfg(SEC, 'cond_hidden', 128),
     }
-    print(mode)
-    if mode in ["sample_only"]:
-        # load model
+
+    if mode in ["sample_only", "sampling_only"]:
         ckpt_path = _get_cfg(SEC, "load_model_path", None)
-        assert ckpt_path is not None, "In sample_only mode, you must provide load_model_path in the config."
+        assert ckpt_path and os.path.isfile(ckpt_path), "Provide a valid load_model_path for sampling_only mode."
         checkpoint = torch.load(ckpt_path, map_location=dev)
-        # Handle different checkpoint formats
-        if "params" in checkpoint and "st_kwargs" in checkpoint["params"]:
-            # New format
-            st_kwargs = checkpoint["params"]["st_kwargs"]
-            dim = checkpoint["params"]["dim"]
-        elif "params" in checkpoint:
-            # Params exists but no st_kwargs - use defaults
-            st_kwargs = {
-                'dim_hidden': _get_cfg(SEC, 'st_dim_hidden', 512),
-                'num_heads':  _get_cfg(SEC, 'st_num_heads', 8),
-                'cond_dim_in': 4,
-                'dim_out': dim
-            }
-            print("Warning: Using default st_kwargs - checkpoint doesn't contain model architecture params")
-        else:
-            # Old format - use defaults
-            st_kwargs = {
-                'dim_hidden': _get_cfg(SEC, 'st_dim_hidden', 512),
-                'num_heads':  _get_cfg(SEC, 'st_num_heads', 8),
-                'cond_dim_in': 4,
-                'dim_out': dim
-            }
-            print("Warning: Using default st_kwargs - old checkpoint format")
-    
-        model = FlowSetTransformer(dim, **st_kwargs).to(dev)
-        model.load_state_dict(checkpoint["model"])
-        print(f"Loaded model from {ckpt_path}")
+        model = _build_model_from_ckpt(checkpoint, dev, st_kwargs)
+        try:
+            model.load_state_dict(checkpoint["model"], strict=True)
+            print(f"[FM] Loaded model (strict=True) from {ckpt_path}")
+        except Exception as e:
+            print(f"[FM] Strict load failed ({e}); trying strict=False (only safe if shapes match).")
+            model.load_state_dict(checkpoint["model"], strict=False)
+            print(f"[FM] Loaded model (strict=False) from {ckpt_path}")
     else:
-        model = FlowSetTransformer(dim, **st_kwargs).to(dev)
+        model = FlowSetTransformer(3, **st_kwargs).to(dev)
+
     opt = schedulefree.RAdamScheduleFree(model.parameters(), lr=learning_rate)
 
     # ---------------- Train ----------------
@@ -909,11 +1047,56 @@ if __name__ == "__main__":
     # ---------------- Sample ----------------
     if mode in ["train_only"]:
         print("Training only mode selected; skipping sampling.")
-        exit(0)
+        raise SystemExit(0)
+
+    # PCFM knobs from config
+    pcfm_steps   = _get_cfg(SEC, "pcfm_steps", 40)
+    ode_method_raw = _get_cfg(SEC, "ode_method", "midpoint")
+    ode_method   = _sanitize_ode_method(ode_method_raw)
+    ode_step_cap = _get_cfg(SEC, "ode_step_cap", 0.05)
+
+    proj_iters   = _get_cfg(SEC, "proj_iters", 6)
+    alpha_proj   = _get_cfg(SEC, "alpha_proj", 0.25)
+    contact_q    = _get_cfg(SEC, "contact_q", 1.0)
+
+    wall_weight  = _get_cfg(SEC, "wall_weight", 1.0)
+    wall_margin  = _get_cfg(SEC, "wall_margin", 0.05)
+
+    prox_iters   = _get_cfg(SEC, "prox_iters", 8)
+    prox_step    = _get_cfg(SEC, "prox_step", 0.1)
+    prox_lambda  = _get_cfg(SEC, "prox_lambda", 1.5)
+
+    final_passes = _get_cfg(SEC, "final_passes", 4)
+    tol_finish   = _get_cfg(SEC, "tol_finish", 1e-8)
+
+    r_min_init   = _get_cfg(SEC, "r_min_init", 1e-4)
+    r_max_init_frac = _get_cfg(SEC, "r_max_init_frac", 0.25)
+
+    de_novo_minsep_bump = _get_cfg(SEC, "de_novo_minsep_bump", 0.0)
+    cond_minsep_index   = _get_cfg(SEC, "cond_minsep_index", 3)
+
     samples = sample_flow_model(
-        model, opt, num_new, batch_new, N_points,
-        dev, clip_min=0.0, clip_max=1.0, dim=dim,
-        cond_loader=test_loader
+        model, opt, num_new, batch_new, N_points, dev,
+        clip_min=0.0, clip_max=float(box_len), dim=dim,
+        cond_loader=test_loader,
+        L=float(box_len),
+        pcfm_steps=int(pcfm_steps),
+        ode_method=str(ode_method),
+        ode_step_cap=float(ode_step_cap),
+        proj_iters=int(proj_iters),
+        alpha_proj=float(alpha_proj),
+        contact_q=float(contact_q),
+        wall_weight=float(wall_weight),
+        wall_margin=float(wall_margin),
+        prox_iters=int(prox_iters),
+        prox_step=float(prox_step),
+        prox_lambda=float(prox_lambda),
+        final_passes=int(final_passes),
+        tol_finish=float(tol_finish),
+        r_min_init=float(r_min_init),
+        r_max_init_frac=float(r_max_init_frac),
+        de_novo_minsep_bump=float(de_novo_minsep_bump),
+        cond_minsep_index=int(cond_minsep_index)
     )
 
     os.makedirs(save_gen_dir, exist_ok=True)
@@ -922,14 +1105,14 @@ if __name__ == "__main__":
     print(f"Saved {samples.shape[0]} samples to {out_path}")
 
     # ---------------- Validate + CSV ----------------
-    metrics = validate_circle_samples(samples, tol=1e-9)
-    os.makedirs(os.path.dirname(csv_out_path), exist_ok=True)
+    os.makedirs(csv_out_path if not csv_out_path.lower().endswith(".csv") else os.path.dirname(csv_out_path), exist_ok=True)
+    metrics = validate_circle_samples(samples, tol=1e-9, L=float(box_len))
     save_validation_csv(metrics, csv_out_path, prefix="fm_circle_generated")
-    print(f"Validation CSV: {csv_out_path}")
+    print(f"Validation CSV written under: {csv_out_path}")
     print(f"Feasible: {metrics['feasible'].sum()}/{metrics['num_samples']} | "
           f"best sum_r={metrics['sum_r'].max():.6f}")
 
     # ---------------- Plots ----------------
     plot_first_k_samples(samples, k=min(20, samples.shape[0]), out_dir=plot_out_dir,
-                         filename_prefix="circle_packing_gen", mark_infeasible=True, tol=1e-9)
+                         filename_prefix="circle_packing_gen", mark_infeasible=True, tol=1e-9, L=float(box_len))
     print(f"Saved plots to {plot_out_dir}")
