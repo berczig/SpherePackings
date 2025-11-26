@@ -293,6 +293,8 @@ class SpherePackingDataset(Dataset):
             D  = D.masked_fill(eye, float('inf'))
             # per-sample min pair distance = min over all pairs
             minsep[s:e] = D.amin(dim=-1).amin(dim=-1).cpu()
+        
+        self.minsep = minsep.clone()   # shape (M,)
 
         # cond vector: [r/L, N/scale_N, p_face, minsep/L]
         r_over_L = torch.full((self.M,), self.r / self.L, dtype=self.data.dtype)
@@ -691,6 +693,8 @@ def main():
     split_seed = cfg.getint(sec, "split_seed", fallback=1234)
     max_samples = cfg.getint(sec, "max_samples", fallback=25000)
 
+    train_top_fraction = cfg.getfloat(sec, "train_top_fraction", fallback=1.0)
+
     # Training penalty knobs
     aux_margin_factor = cfg.getfloat(sec, "aux_margin_factor", fallback=0.02)
     aux_beta          = cfg.getfloat(sec, "aux_beta", fallback=80.0)
@@ -764,6 +768,28 @@ def main():
     test_size = max(1, int(round(max_samples * test_fraction)))
     test_idx = perm[:test_size].tolist()
     train_idx = perm[test_size:].tolist()
+
+    try:
+        frac = float(train_top_fraction)
+    except Exception:
+        frac = 1.0
+
+    if frac < 1.0 and len(train_idx) > 0:
+        k = max(1, int(math.ceil(len(train_idx) * frac)))
+        if k < len(train_idx):
+            # minsep is precomputed and stored in full_ds.minsep
+            minsep_all = full_ds.minsep  # (M,)
+            idx_tensor = torch.tensor(train_idx, dtype=torch.long)
+            minsep_train = minsep_all[idx_tensor]
+            _, top_pos = torch.topk(minsep_train, k=k, largest=True)
+            filtered_train_idx = idx_tensor[top_pos].tolist()
+            print(f"[Spheres] Filtering training to top {100.0*frac:.1f}% by minsep: {len(filtered_train_idx)} of {len(train_idx)}")
+            train_idx = filtered_train_idx
+        else:
+            print(f"[Spheres] train_top_fraction keeps all {len(train_idx)} training samples.")
+    else:
+        print(f"[Spheres] train_top_fraction={frac} -> using all {len(train_idx)} training samples.")
+
 
     train_ds = Subset(full_ds, train_idx)
     test_ds  = Subset(full_ds,  test_idx)
