@@ -5,6 +5,7 @@ import numpy as np
 from datetime import datetime
 
 import torch
+from tqdm import tqdm
 from torch import nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset, Subset
@@ -381,6 +382,10 @@ def sample_flow_model(model, optimizer, num_samples, batch_size, num_points, dev
             return self.mdl(tb, x, cond=self.c) if self.c is not None else self.mdl(tb, x)
 
     while remaining > 0:
+        # Print progress using tqdm bar
+        with tqdm(total=remaining, desc="[Sampling]", unit="sample") as pbar:
+            pbar.update(0)
+
         # Conditioning batch (+ optional de-novo bump on min-area target)
         if cond_iter is not None:
             try:
@@ -508,8 +513,7 @@ def main():
     heil_s= cfg.getfloat(sec, "heilbronn_penalty_strength", fallback=0.2)
     test_fraction = cfg.getfloat(sec, "test_fraction", fallback=0.1)
     split_seed = cfg.getint(sec, "split_seed", fallback=1234)
-    perc = cfg.getfloat(sec, "data_percentage", fallback=1.0)
-
+    
     # Sampling params
     num_new = cfg.getint(sec, "num_generated_samples", fallback=1000)
     batch_n = cfg.getint(sec, "generation_batch_size", fallback=50)
@@ -560,12 +564,32 @@ def main():
         points_N = full_ds.N
     assert points_N == full_ds.N, f"Config num_points={points_N} but dataset N={full_ds.N}"
 
-    max_samples = max(1, int(perc * len(full_ds)))
     gen = torch.Generator().manual_seed(split_seed)
-    perm = torch.randperm(max_samples, generator=gen)
-    test_size = max(1, int(round(max_samples * test_fraction)))
+    perm = torch.randperm(len(full_ds), generator=gen)
+    test_size = max(1, int(round(len(full_ds) * test_fraction)))
     test_idx = perm[:test_size].tolist()
     train_idx = perm[test_size:].tolist()
+
+    # Keep only the top-X% (by min triangle area) within the training split
+    train_top_fraction = cfg.getfloat(sec, "train_top_fraction", fallback=0.5)
+    try:
+        frac = float(train_top_fraction)
+    except Exception:
+        frac = 0.5
+    if frac < 1.0 and len(train_idx) > 0:
+        k = max(1, int(math.ceil(len(train_idx) * frac)))
+        if k < len(train_idx):
+            # min_area is precomputed in the dataset
+            min_area_all = full_ds.min_area  # tensor shape (M,)
+            idx_tensor = torch.tensor(train_idx, dtype=torch.long)
+            min_area_train = min_area_all[idx_tensor]
+            _, top_pos = torch.topk(min_area_train, k=k, largest=True)
+            filtered_train_idx = idx_tensor[top_pos].tolist()
+            print(f"[Heilbronn] Filtering training to top {100.0*frac:.1f}% by min-area: {len(filtered_train_idx)} of {len(train_idx)}")
+            train_idx = filtered_train_idx
+        else:
+            print(f"[Heilbronn] train_top_fraction keeps all {len(train_idx)} training samples.")
+
     train_ds = Subset(full_ds, train_idx)
     test_ds  = Subset(full_ds,  test_idx)
     train_loader = DataLoader(train_ds, batch_size=bs, shuffle=True)

@@ -161,9 +161,9 @@ def plot_3d(dataset, title="plot"):
 
 
 if __name__ == "__main__":
-    training_data = "diffuse_boost/output/heilbronn_square/training_sets/heilbronn_srp_generated_2000x10_2025-10-22_120000.pt"
-    gen_samples = "diffuse_boost/output/heilbronn_square/generated_sets/heilbronn_gen_500x10_20251102_112819.pt"
-    pushed_samples = "diffuse_boost/output/heilbronn_square/fixed_gen_sets/heilbronn_srp_pushed_2025-11-02_113304.pt"
+    training_data = "diffuse_boost/output/heilbronn_square/training_sets/heilbronn_srp_600x13_2025-11-05_120626.pt"
+    gen_samples = "diffuse_boost/output/heilbronn_square/fixed_gen_sets/heilbronn_srp_pushed_2025-11-07_110336.pt"
+    pushed_samples = "diffuse_boost/output/heilbronn_square/fixed_gen_sets/heilbronn_srp_pushed_2025-11-06_092110.pt"
 
     # if training data is a dict, let training_data be the tensor corresponding to key "pushed"
     td_loaded = torch.load(training_data)
@@ -172,15 +172,41 @@ if __name__ == "__main__":
 
     plot_files_combined(
         [training_data, gen_samples, pushed_samples],
-        ["Training data", "Samples (Flow matching)", "SRP Pushed Samples"],
+        ["Training data", "2nd iteration", "4th iteration"],
         "output"
     )
 
     # Optional: print best min triangle area per set
-    pushed_samples_data = load_dataset(pushed_samples)
-    pushed_samples_metrics = compute_metrics(pushed_samples_data)
-    print("Max Min Triangle Area (SRP Pushed Samples):", np.max(pushed_samples_metrics["min_triangle_areas"]))
 
     training_data_tensor = load_dataset(training_data)
     training_metrics = compute_metrics(training_data_tensor)
     print("Max Min Triangle Area (Training Data):", np.max(training_metrics["min_triangle_areas"]))
+
+    sample_data_tensor = load_dataset(gen_samples)
+    sample_metrics = compute_metrics(sample_data_tensor)
+    print("Max Min Triangle Area (Generated Samples):", np.max(sample_metrics["min_triangle_areas"]))
+
+    pushed_samples_data = load_dataset(pushed_samples)
+    pushed_samples_metrics = compute_metrics(pushed_samples_data)
+    print("Max Min Triangle Area (SRP Pushed Samples):", np.max(pushed_samples_metrics["min_triangle_areas"]))
+
+    # Merge the top 50% of training, generated, and pushed samples into one tensor and save it for future plotting
+    def top_k_fraction(tensor_data, fraction):
+        metrics = compute_metrics(tensor_data)
+        min_areas = metrics["min_triangle_areas"]
+        k = max(1, int(len(min_areas) * fraction))
+        top_indices = np.argsort(min_areas)[-k:]
+        if isinstance(tensor_data, torch.Tensor):
+            return tensor_data[top_indices]
+        else:
+            return torch.tensor(tensor_data)[top_indices]
+    fraction = 0.5
+    top_training = top_k_fraction(training_data_tensor, fraction)
+    top_generated = top_k_fraction(sample_data_tensor, fraction)
+    top_pushed = top_k_fraction(pushed_samples_data, fraction)
+
+    merged_top = torch.cat([top_training, top_generated, top_pushed], dim=0)
+    #Create output directory if it doesn't exist
+    os.makedirs("diffuse_boost/output/heilbronn_square/fixed_gen_sets/merged_sets/", exist_ok=True)
+    merged_fn = f"diffuse_boost/output/heilbronn_square/fixed_gen_sets/merged_sets/heilbronn_srp_top{int(fraction*100)}pct_merged_{len(merged_top)}x{merged_top.shape[2]}_{np.datetime64('now').astype(str).replace(':','').replace(' ','_')}.pt"
+    torch.save(merged_top, merged_fn)

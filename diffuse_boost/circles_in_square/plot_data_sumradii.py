@@ -14,9 +14,9 @@ import matplotlib as mpl
 # -----------------------------------------------------------------------------
 # Edit these paths
 # -----------------------------------------------------------------------------
-training_data = "diffuse_boost/output/circles_in_square/training_sets/circle_srp_generated_10000x32_2025-10-23_161628.pt"  # e.g. "diffuse_boost/output/circles_in_square/training_sets/circle_srp_generated_2000x32_2025-10-22_120000.pt"
-gen_samples    = "diffuse_boost/output/circles_in_square/generated_sets/flow_circles_gen_20251103_120323.pt"  # e.g. "diffuse_boost/output/circles_in_square/generated_sets/flow_circles_gen_20251102_143210.pt"
-pushed_samples = "diffuse_boost/output/circles_in_square/fixed_gen_sets/circle_final_push_mod_100x32_2025-11-04_120536.pt"  
+training_data = "diffuse_boost/output/circles_in_square/training_sets/circle_srp_generated_300x28_2025-11-04_150356.pt"  # e.g. "diffuse_boost/output/circles_in_square/training_sets/circle_srp_generated_2000x32_2025-10-22_120000.pt"
+gen_samples    = "diffuse_boost/output/circles_in_square/fixed_gen_sets/circle_final_push_mod_300x28_2025-11-04_152618.pt"
+pushed_samples = "diffuse_boost/output/circles_in_square/fixed_gen_sets/circle_final_push_mod_1000x28_2025-11-04_165649.pt"  
 save_dir      = "diffuse_boost/output/circles_in_square/fixed_gen_sets/distribution_plots"  # where to save the plot PNG
 
 # -----------------------------------------------------------------------------

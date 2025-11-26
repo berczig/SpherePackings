@@ -17,6 +17,7 @@ from torch.utils.data import DataLoader, Dataset, Subset
 
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
+import tqdm 
 
 # optional config library
 try:
@@ -369,8 +370,10 @@ def sample_flow_model_centers_only(
     model.eval()
     samples = []
     remaining = num_samples
-
+       
     while remaining > 0:
+        # Print progress using a bar
+        pbar = tqdm.tqdm(total=remaining, desc="Generating samples", unit="sample")
         bs = min(batch_size, remaining)
         xy0 = torch.rand(bs, 2, num_points, device=device) * L
         r0  = torch.zeros(bs, num_points, device=device)
@@ -647,19 +650,45 @@ def _infer_st_kwargs_from_state_dict(sd: dict):
 def _build_model_from_ckpt_sumradii_compat(FlowSetTransformerCls, checkpoint, device, fallback_kwargs, target_d=2):
     """
     Prefer loading the exact sumradii class if the checkpoint has d_out=3.
-    Otherwise, try to reconstruct with inferred shapes (legacy centers-only ckpts).
+    For 2‑channel (centers‑only) checkpoints, first use saved params (st_kwargs, dim)
+    if present; otherwise infer from the state_dict.
     """
     sd = checkpoint["model"] if isinstance(checkpoint, dict) and "model" in checkpoint else checkpoint
-    if "token_out.weight" in sd and int(sd["token_out.weight"].shape[0]) == 3:
-        # Load the original sumradii model and adapt to centers-only
+    # figure output dim
+    if "token_out.weight" not in sd:
+        raise RuntimeError("Checkpoint missing token_out.weight")
+    d_out = int(sd["token_out.weight"].shape[0])
+
+    # 3‑channel -> load original sumradii model and wrap
+    if d_out == 3:
         return _load_sumradii_model_exact(checkpoint, device)
 
-    # Legacy: true centers-only checkpoint (d_out=2). Reconstruct and load strictly.
-    st_kw, d_ckpt = _infer_st_kwargs_from_state_dict(sd)
-    base = FlowSetTransformerCls(int(d_ckpt), **st_kw).to(device)
-    base.load_state_dict(sd, strict=True)
-    print(f"[CKPT] Loaded centers-only checkpoint (d={getattr(base,'d',2)}, depth={st_kw['depth']}, heads={st_kw['num_heads']}, dim={st_kw['dim_hidden']}).")
-    return base
+    # 2‑channel -> build FlowSetTransformerCenters
+    # try saved params first
+    if isinstance(checkpoint, dict) and "params" in checkpoint and isinstance(checkpoint["params"], dict):
+        params = checkpoint["params"]
+        d_ckpt = int(params.get("dim", 2))
+        st_kw  = dict(params.get("st_kwargs", fallback_kwargs or {}))
+        base = FlowSetTransformerCls(d_ckpt, **st_kw).to(device)
+        try:
+            base.load_state_dict(sd, strict=True)
+            print(f"[CKPT] Loaded centers‑only checkpoint via saved params (depth={st_kw.get('depth','?')}, heads={st_kw.get('num_heads','?')}, dim={st_kw.get('dim_hidden','?')}).")
+            return base
+        except Exception as e:
+            print(f"[CKPT] Strict load with saved params failed: {e}. Falling back to inference...")
+
+    # fallback: infer from state_dict
+    st_kw_inf, d_ckpt_inf = _infer_st_kwargs_from_state_dict(sd)
+    base = FlowSetTransformerCls(int(d_ckpt_inf), **st_kw_inf).to(device)
+    try:
+        base.load_state_dict(sd, strict=True)
+        print(f"[CKPT] Loaded centers‑only checkpoint (inferred) depth={st_kw_inf['depth']} heads={st_kw_inf['num_heads']} dim={st_kw_inf['dim_hidden']}.")
+        return base
+    except Exception as e:
+        print(f"[CKPT] Strict load (inferred) failed: {e}. Using strict=False as last resort.")
+        missing = base.load_state_dict(sd, strict=False)
+        print(f"[CKPT] Loaded with strict=False. Missing: {len(missing.missing_keys)} keys, unexpected: {len(missing.unexpected_keys)} keys.")
+        return base
 
 # ---------------- Main entrypoint ----------------
 if __name__ == "__main__":
@@ -684,6 +713,7 @@ if __name__ == "__main__":
     N_points         = _get_cfg(SEC, "num_circles",         50)
     box_len          = _get_cfg(SEC, "box_len",            1.0)
     mode             = _get_cfg(SEC, "mode",               "train_and_sample")
+    train_top_fraction = _get_cfg(SEC, "train_top_fraction", 0.5)
 
     # Data loader
     full_ds = CircleCentersDataset(dataset_path)
@@ -695,6 +725,24 @@ if __name__ == "__main__":
     test_size     = max(1, int(round(max_samples * test_fraction)))
     test_idx      = perm[:test_size].tolist()
     train_idx     = perm[test_size:].tolist()
+
+    # Filter training indices to top-X% by sum of radii (computed from the file)
+    # sum_r is stored in cond[:, 1] by CircleCentersDataset
+    if train_top_fraction is not None and train_top_fraction > 0.0:
+        K = max(1, int(round(max_samples * min(1.0, train_top_fraction))))
+        sum_r_all = full_ds.cond[:, 1]  # tensor of shape (M,)
+        top_idx_overall = torch.topk(sum_r_all, k=K, largest=True).indices.tolist()
+        top_set = set(top_idx_overall)
+        # keep only training samples that are in the global top-K
+        filtered_train_idx = [i for i in train_idx if i in top_set]
+        if len(filtered_train_idx) == 0:
+            # fallback: use the global top-K but avoid test indices if possible
+            filtered_train_idx = [i for i in top_idx_overall if i not in set(test_idx)]
+            if len(filtered_train_idx) == 0:
+                filtered_train_idx = top_idx_overall
+        print(f"[Filter] Training restricted to top {K}/{max_samples} ({100.0*min(1.0, train_top_fraction):.1f}%) by sum(r). "
+              f"Train size: {len(filtered_train_idx)} (was {len(train_idx)}).")
+        train_idx = filtered_train_idx
     train_ds      = Subset(full_ds, train_idx)
     test_ds       = Subset(full_ds, test_idx)
     train_loader  = DataLoader(train_ds, batch_size=batch_size, shuffle=True)
@@ -730,7 +778,7 @@ if __name__ == "__main__":
 
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
-    if mode in ["train_and_sample", "train_only"]:
+    if mode in ["train_and_sample", "retrain_and_sampling","train_only"]:
         model, _ = train_flow_model_centers(model=model,
                                             optimizer=optimizer,
                                             loader=train_loader,
