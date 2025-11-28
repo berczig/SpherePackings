@@ -561,9 +561,11 @@ def final_push_existing_samples():
     with open(metrics_fn, "w") as mf:
         mf.write("sample,srp_restart,EL_before,EL_after,pre_push_min,post_push_min,excess\n")
 
-    data_out = np.zeros((K, D, N), dtype=np.float32)
+    data_out = np.zeros((K * num_srp_restarts, D, N), dtype=np.float32)
     half = L / 2.0
     scale = (L - 2.0 * r) / L
+
+    min_dists = []
 
     # Arrays for top-10 stats
     best_EL_before_list = [0.0] * K
@@ -637,7 +639,10 @@ def final_push_existing_samples():
                 best_pre_min   = pre_min
                 best_restart   = k + 1
 
-        data_out[s] = best_centers.T.astype(np.float32)
+            data_out[s * num_srp_restarts + k] = centers_k.copy().T.astype(np.float32)
+
+        #data_out[s] = best_centers.T.astype(np.float32)
+        min_dists.append(best_post_min_sample)
         best_EL_before_list[s] = best_EL_before
         best_EL_after_list[s]  = best_EL_after
         best_pre_min_list[s]   = best_pre_min
