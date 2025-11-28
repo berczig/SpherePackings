@@ -16,6 +16,7 @@ from numba import njit
 from diffuse_boost import cfg
 from diffuse_boost.spheres_in_cube.physics_push_PESC import eliminate_overlaps_box
 from diffuse_boost.spheres_in_cube.best_results import load_best_results
+from diffuse_boost.spheres_in_cube_new.pipeline import PipelineState
 from tqdm import tqdm
 
 # -----------------------------------------------------------------------------
@@ -258,21 +259,22 @@ def generate_dataset_push_srp(verbose=True):
     # Output filenames (include N in the timestamp token)
     timestamp_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     stamp_with_N = f"N{N}_{timestamp_str}"
+    day_stamp = datetime.now().strftime("%Y-%m-%d")
 
     base_metrics = _get_cfg(sec, "output_filename_metrics", "srp_metrics_{DATE}.csv")
-    metrics_fn = base_metrics.replace("{DATE}", stamp_with_N)
+    metrics_fn = base_metrics.replace("{DATE}", stamp_with_N).replace("{DAY_DATE}", day_stamp) 
 
     base_data = _get_cfg(sec, "output_filename", "srp_data_{DATE}.pt")
-    data_fn = base_data.replace("{DATE}", stamp_with_N)
+    data_fn = base_data.replace("{DATE}", stamp_with_N).replace("{DAY_DATE}", day_stamp) 
 
     base_sym = _get_cfg(sec, "output_filename_sym", data_fn.replace('.pt', '_sym.pt'))
-    sym_fn = base_sym.replace("{DATE}", stamp_with_N)
+    sym_fn = base_sym.replace("{DATE}", stamp_with_N).replace("{DAY_DATE}", day_stamp) 
 
     base_top = _get_cfg(sec, "output_filename_top", "srp_top_{DATE}.pt")
-    top_fn = base_top.replace("{DATE}", stamp_with_N)
+    top_fn = base_top.replace("{DATE}", stamp_with_N).replace("{DAY_DATE}", day_stamp) 
 
     base_sym_top = _get_cfg(sec, "output_filename_sym_top", top_fn.replace('.pt', '_sym.pt'))
-    sym_top_fn = base_sym_top.replace("{DATE}", stamp_with_N)
+    sym_top_fn = base_sym_top.replace("{DATE}", stamp_with_N).replace("{DAY_DATE}", day_stamp) 
 
     metrics_dir = os.path.dirname(metrics_fn)
     if metrics_dir:
@@ -527,7 +529,9 @@ def final_push_existing_samples():
     physics_push_mode = _get_cfg(sec, "physics_push_mode", True)
 
     # IO paths for final push
+    stamp      = datetime.now().strftime("%Y-%m-%d")
     out_dir    = _get_cfg(sec, "final_push_output", "./outputs_spheres_push")
+    out_dir = os.path.join(out_dir, stamp)
     input_path = _get_cfg(sec, "final_push_input",  "")
 
     assert isinstance(input_path, str) and len(input_path) > 0 and os.path.exists(input_path), \
@@ -675,7 +679,7 @@ def final_push_existing_samples():
 # -----------------------------------------------------------------------------
 # Main mode switch
 # -----------------------------------------------------------------------------
-if __name__ == "__main__":
+def main(state:PipelineState=None):
     main_sec = "sample_generation_PP+PBTS"
     mode = _get_cfg(main_sec, "mode", "training_set_gen").strip().lower()
 
@@ -694,3 +698,6 @@ if __name__ == "__main__":
 
     else:
         raise ValueError(f"Unknown mode '{mode}'. Use 'training_set_gen' or 'final_push'.")
+
+if __name__ == "__main__":
+    main()
