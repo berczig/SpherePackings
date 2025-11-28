@@ -196,7 +196,6 @@ def plot(Arrays, labels, savepath,
     plt.xlim(min_val, max_val)
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
-
     # optional: nicer x-ticks
     try:
         xticks = np.linspace(min_val, max_val, n_xticks)
@@ -228,6 +227,7 @@ def plot_files_combined(files, labels, savepath, **kwargs):
         dataset = load_dataset(file)
         metr = compute_radii(dataset)
         arrays_radii.append(metr["radii"])
+
     plot(Arrays=arrays_radii,
          labels=labels,
          savepath=savepath,
@@ -282,7 +282,7 @@ def plot_3d(dataset, title="plot"):
 # Main: interactive multi-file radius plots
 # ============================================================
 
-if __name__ == "__main__":
+def main():
     # Usage 1: pass files as command-line arguments
     #   python plot_radii.py file1.pt file2.pt ...
     # Usage 2: run with no args, enter paths interactively
@@ -290,9 +290,9 @@ if __name__ == "__main__":
     if len(sys.argv) > 1:
         files = sys.argv[1:]
     else:
-        files = ["diffuse_boost/output/spheres_in_cube_new/training_sets/srp_data_N83_2025-11-26_10-24-40.pt",
-                 "diffuse_boost/output/spheres_in_cube_new/generated_sets/spheres_gen_10x83_20251126_104033.pt",
-                 "diffuse_boost/output/spheres_in_cube_new/final_pushed/spheres_srp_pushed_N83_2025-11-26_104632.pt"]
+        files = ["diffuse_boost/output/spheres_in_cube_new/training_sets/srp_data_N191_2025-11-27_00-00-19.pt",
+                 "diffuse_boost/output/spheres_in_cube_new/generated_sets/spheres_gen_500x191_20251128_000000.pt",
+                 "diffuse_boost/output/spheres_in_cube_new/final_pushed/spheres_srp_pushed_N191_2025-11-28_002657.pt"]
 
     if not files:
         print("No files provided. Exiting.")
@@ -310,6 +310,8 @@ if __name__ == "__main__":
     out_dir = input(f"Output directory for plots (default: {out_dir_default}): ").strip()
     if not out_dir:
         out_dir = out_dir_default
+    else:
+        out_dir = os.path.join(out_dir_default, out_dir)
 
     plot_files_combined(
         files,
@@ -327,3 +329,8 @@ if __name__ == "__main__":
         td = load_dataset(f)
         metr = compute_radii(td)
         print(f"{lab}: max radius = {np.max(metr['radii']):.6f} (over {len(metr['radii'])} samples)")
+
+
+if __name__ == "__main__":
+    main()
+    
