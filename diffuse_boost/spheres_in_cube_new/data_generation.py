@@ -451,6 +451,7 @@ def generate_dataset_push_srp(verbose=True):
             )
     if verbose:
         print(f"Saved top-10 metrics to {metrics_top10_fn}")
+    return data_fn
 
 # -----------------------------------------------------------------------------
 # Multi-sphere-count training generation
@@ -675,6 +676,7 @@ def final_push_existing_samples():
                 f"{best_restart_idx_list[idx]}\n"
             )
     print(f"Saved top-10 pushed metrics: {metrics_top10_fn}")
+    return dataset_fn
 
 # -----------------------------------------------------------------------------
 # Main mode switch
@@ -691,13 +693,17 @@ def main(state:PipelineState=None):
         if multi_active:
             generate_dataset_push_srp_different_sphere_count()
         else:
-            generate_dataset_push_srp(verbose=False)
+            data_save_path = generate_dataset_push_srp(verbose=False)
+            if state: state.samples_path = data_save_path
 
     elif mode == "final_push":
-        final_push_existing_samples()
+        data_save_path = final_push_existing_samples()
+        if state: state.pushed_samples_path = data_save_path
 
     else:
         raise ValueError(f"Unknown mode '{mode}'. Use 'training_set_gen' or 'final_push'.")
+    
+    
 
 if __name__ == "__main__":
     main()

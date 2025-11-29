@@ -905,10 +905,12 @@ def main(state:PipelineState=None):
 
     else:
         raise ValueError(f"Unknown mode: {mode}")
+    if state: state.model_path = model_path
 
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     out_path = os.path.join(save_generated_dir, f"spheres_gen_{num_new}x{points_N}_{ts}.pt")
     torch.save(torch.from_numpy(samples), out_path)
+    if state: state.samples_path = out_path
     print(f"Saved {num_new} generated sphere packings to {out_path}")
     print(f"(Model path: {model_path})")
 
