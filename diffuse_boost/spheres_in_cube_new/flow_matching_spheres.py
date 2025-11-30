@@ -19,6 +19,8 @@ from flow_matching.path.scheduler import CondOTScheduler
 from flow_matching.path import AffineProbPath
 from flow_matching.solver import ODESolver
 
+from diffuse_boost.spheres_in_cube_new.pipeline import PipelineState
+
 from diffuse_boost.spheres_in_cube import data_load_save
 from diffuse_boost import cfg  # assumes diffuse_boost.cfg is a ConfigParser
 
@@ -601,6 +603,7 @@ def sample_flow_model(
     samples, remaining = [], int(num_samples)
     cond_iter = iter(cond_loader) if cond_loader is not None else None
     while remaining > 0:
+        print(f"> {remaining} samples still need to be sampled")
         if cond_iter is not None:
             try:
                 x_dummy, cond = next(cond_iter)
@@ -648,7 +651,7 @@ def sample_flow_model(
 # ============================================================================
 def load_model_if_exists(model, opt, path, device):
     if path and os.path.isfile(path):
-        ckpt = torch.load(path, map_location=device)
+        ckpt = torch.load(path, map_location=device, weights_only=False)
         sd = ckpt.get("model_state_dict", ckpt.get("state_dict", ckpt))
         if isinstance(sd, dict) and len(sd) and next(iter(sd)).startswith("module."):
             sd = {k[7:]: v for k, v in sd.items()}
@@ -666,7 +669,7 @@ def load_model_if_exists(model, opt, path, device):
 # ============================================================================
 # Main controlled by INI (flow_matching section)
 # ============================================================================
-def main():
+def main(state:PipelineState=None):
     sec = "flow_matching"
     mode = cfg.get(sec, "mode", fallback="training_and_sampling").strip()
 
@@ -674,10 +677,14 @@ def main():
     dataset_path = cfg.get(sec, "dataset_path")
     assert dataset_path, "dataset_path required (torch tensor file of shape (M,d,N))"
 
+    stamp      = datetime.now().strftime("%Y-%m-%d")
+
     save_model_dir = cfg.get(sec, "save_model_dir", fallback="./outputs_spheres_models")
+    save_model_dir = os.path.join(save_model_dir, stamp)
     os.makedirs(save_model_dir, exist_ok=True)
 
     save_generated_dir = cfg.get(sec, "save_generated_dir", fallback="./outputs_spheres_samples")
+    save_generated_dir = os.path.join(save_generated_dir, stamp)
     os.makedirs(save_generated_dir, exist_ok=True)
 
     # Model + train params
@@ -898,10 +905,12 @@ def main():
 
     else:
         raise ValueError(f"Unknown mode: {mode}")
+    if state: state.model_path = model_path
 
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     out_path = os.path.join(save_generated_dir, f"spheres_gen_{num_new}x{points_N}_{ts}.pt")
     torch.save(torch.from_numpy(samples), out_path)
+    if state: state.samples_path = out_path
     print(f"Saved {num_new} generated sphere packings to {out_path}")
     print(f"(Model path: {model_path})")
 
