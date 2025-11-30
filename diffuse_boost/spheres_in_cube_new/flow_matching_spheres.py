@@ -305,7 +305,7 @@ class SpherePackingDataset(Dataset):
 
         self.cond = torch.stack([r_over_L, N_scaled, p_face.to(self.data.dtype), minsep_L], dim=1)  # (M, 4)
 
-        print(f"Loaded {path}, shape {self.data.shape} | precomputed conds: {tuple(self.cond.shape)}")
+        print(f"[Load] Loaded tensors from '{path}', shape {self.data.shape} | precomputed conds: {tuple(self.cond.shape)}")
 
     def __len__(self):
         return self.M
@@ -342,7 +342,8 @@ def train_flow_model(
 
     os.makedirs(save_model_dir, exist_ok=True)
 
-    for epoch in tqdm(range(num_epochs), desc="Training"):
+    pbar = tqdm(range(num_epochs), desc="Training")
+    for epoch in pbar:
         ep_losses=[]
         # cosine warmup of penalty
         ratio = 0.5 * (1 - math.cos(math.pi * min(1.0, epoch / max(1, int(0.5 * num_epochs)))))
@@ -397,7 +398,8 @@ def train_flow_model(
 
         avg = np.mean(ep_losses, axis=0)
         history.append(avg)
-        print(f"Epoch {epoch+1}/{num_epochs} | FM={avg[0]:.4f} Pen={avg[1]:.4f} Tot={avg[2]:.4f}")
+        pbar.set_postfix({"FM":f"{avg[0]:.4f}", "Pen":f"{avg[1]:.4f}", "Tot":f"{avg[2]:.4f}"})
+        #print(f"Epoch {epoch+1}/{num_epochs} | FM={avg[0]:.4f} Pen={avg[1]:.4f} Tot={avg[2]:.4f}")
 
     hist = np.array(history, dtype=np.float32)
     ts   = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -415,7 +417,7 @@ def train_flow_model(
         },
         path
     )
-    print(f"[train] Saved model to: {path}")
+    print(f"[Train] Saved model to: '{path}'")
 
     # also save a loss plot
     plt.figure(figsize=(12,6))
@@ -602,8 +604,9 @@ def sample_flow_model(
 
     samples, remaining = [], int(num_samples)
     cond_iter = iter(cond_loader) if cond_loader is not None else None
+
+    pbar = tqdm(total=remaining, desc="Sampling")
     while remaining > 0:
-        print(f"> {remaining} samples still need to be sampled")
         if cond_iter is not None:
             try:
                 x_dummy, cond = next(cond_iter)
@@ -643,6 +646,9 @@ def sample_flow_model(
         samples.append(u.cpu().numpy())
         remaining -= bs
 
+        # Update Progess bar
+        pbar.update(bs)
+
 
     return np.concatenate(samples, axis=0)
 
@@ -661,9 +667,9 @@ def load_model_if_exists(model, opt, path, device):
                 opt.load_state_dict(ckpt["opt"])
         except Exception:
             pass
-        print(f"[load] Loaded model from {path}")
+        print(f"[Load] Loaded model from '{path}'")
     else:
-        print(f"[load] No model found at {path}")
+        print(f"[Load] No model found at '{path}'")
     return model, opt
 
 # ============================================================================
@@ -905,14 +911,13 @@ def main(state:PipelineState=None):
 
     else:
         raise ValueError(f"Unknown mode: {mode}")
-    if state: state.model_path = model_path
+    if state: state.set_model_path(model_path)
 
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     out_path = os.path.join(save_generated_dir, f"spheres_gen_{num_new}x{points_N}_{ts}.pt")
     torch.save(torch.from_numpy(samples), out_path)
-    if state: state.samples_path = out_path
-    print(f"Saved {num_new} generated sphere packings to {out_path}")
-    print(f"(Model path: {model_path})")
+    if state: state.set_samples_path(out_path)
+    print(f"[Save] Saved {num_new} generated sphere packings to '{out_path}', shape {samples.data.shape}")
 
 
 if __name__ == "__main__":

@@ -37,6 +37,10 @@ def _get_cfg(section, key, fallback):
     except Exception:
         return fallback
     
+def _set_cfg(section, key, value):
+    cfg.set(section, key, value)
+    print(f"[CFG] Overwriting '{section}.{key}' to {value}")
+    
 # -----------------------------------------------------------------------------
 # Utilities: Penalty gradient, energy evaluation, and clearance maximization
 # -----------------------------------------------------------------------------
@@ -254,7 +258,7 @@ def generate_dataset_push_srp(verbose=True):
 
     physics_push_mode = _get_cfg(sec, "physics_push_mode", True)
 
-    print(f"Generating dataset with N={N}, M={M}, SRP restarts={num_srp_restarts}, physics_push_mode={physics_push_mode}")
+    print(f"[Data Generation] Generating dataset with N={N}, M={M}, SRP restarts={num_srp_restarts}, physics_push_mode={physics_push_mode}")
 
     # Output filenames (include N in the timestamp token)
     timestamp_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -393,8 +397,7 @@ def generate_dataset_push_srp(verbose=True):
     if data_dir:
         os.makedirs(data_dir, exist_ok=True)
     torch.save(torch.from_numpy(data), data_fn)
-    if verbose:
-        print(f"Saved full dataset to {data_fn}")
+    print(f"[Save] Saved full dataset to {data_fn}")
 
     # Symmetrized full dataset
     try:
@@ -544,6 +547,7 @@ def final_push_existing_samples():
     metrics_fn = os.path.join(out_dir, f"spheres_metrics_pushed_N{N}_{stamp}.csv")
 
     loaded = torch.load(input_path, map_location="cpu")
+    print(f"[Load] Loaded tensors from '{input_path}', shape {loaded.data.shape}")
     arr = loaded.detach().cpu().numpy() if isinstance(loaded, torch.Tensor) else None
     if arr is None or arr.ndim != 3:
         raise ValueError(f"Expected a tensor at final_push_input, got shape {getattr(loaded, 'shape', None)}")
@@ -561,7 +565,7 @@ def final_push_existing_samples():
         raise ValueError(f"Config num_spheres={N} but input samples have N={N_in}")
 
     K = M_in
-    print(f"Pushing {K} loaded samples (N={N}, D={D})")
+    print(f"[Push] Pushing {K} loaded samples (N={N}, D={D})")
 
     with open(metrics_fn, "w") as mf:
         mf.write("sample,srp_restart,EL_before,EL_after,pre_push_min,post_push_min,excess\n")
@@ -580,7 +584,7 @@ def final_push_existing_samples():
     best_excess_list    = [float('inf')] * K
     best_restart_idx_list = [-1] * K
 
-    for s in tqdm(range(K), desc="[Pushing Samples]", unit="sample"):
+    for s in tqdm(range(K), desc="Pushing Samples", unit="sample"):
         centers_in = arr[s].T.astype(np.float64)  # (N, D)
 
         if physics_push_mode:
@@ -656,7 +660,7 @@ def final_push_existing_samples():
         best_restart_idx_list[s] = best_restart
 
     torch.save(torch.from_numpy(data_out), dataset_fn)
-    print(f"\nSaved pushed dataset:  {dataset_fn}")
+    print(f"\nSaved pushed dataset:  {dataset_fn}, shape {data_out.data.shape}")
     print(f"Saved pushed metrics:  {metrics_fn}")
 
     # Top-10 metrics (minimal excess)
@@ -694,11 +698,11 @@ def main(state:PipelineState=None):
             generate_dataset_push_srp_different_sphere_count()
         else:
             data_save_path = generate_dataset_push_srp(verbose=False)
-            if state: state.samples_path = data_save_path
+            if state: state.set_samples_path(data_save_path)
 
     elif mode == "final_push":
         data_save_path = final_push_existing_samples()
-        if state: state.pushed_samples_path = data_save_path
+        if state: state.set_pushed_samples_path(data_save_path)
 
     else:
         raise ValueError(f"Unknown mode '{mode}'. Use 'training_set_gen' or 'final_push'.")
