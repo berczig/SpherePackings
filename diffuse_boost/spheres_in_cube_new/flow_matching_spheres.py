@@ -623,6 +623,7 @@ def sample_flow_model(
 
         # Initialize u0 at tau=0 (x1 in standard FM), then clamp inside box.
         p_face_batch = cond[:, 2].clamp(0, 1) if cond is not None else None
+        #COMMENT: We can improve the prior by more parametric u0 proposal to improve diversity
         u0 = _sample_x1_box_faces_per_batch(
             torch.empty(bs, dim, num_points, device=device),
             r, L=L, p_face_batch=p_face_batch, jitter=jitter
