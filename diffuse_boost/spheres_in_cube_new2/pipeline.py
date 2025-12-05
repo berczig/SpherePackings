@@ -73,18 +73,19 @@ class PipelineState:
 
 if __name__ == "__main__":
     # Avoid Circular imports
-    from diffuse_boost.spheres_in_cube_new.data_generation import _get_cfg, _set_cfg
-    from diffuse_boost.spheres_in_cube_new import data_generation
-    from diffuse_boost.spheres_in_cube_new import flow_matching_spheres
-    from diffuse_boost.spheres_in_cube_new import plot_data_spheres
+    from diffuse_boost.spheres_in_cube_new2.data_generation import _get_cfg, _set_cfg
+    from diffuse_boost.spheres_in_cube_new2 import data_generation
+    from diffuse_boost.spheres_in_cube_new2 import flow_matching_spheres
+    from diffuse_boost.spheres_in_cube_new2 import plot_data_spheres
 
     # Color 
     console = Console()
 
     iterations = _get_cfg("spheres_in_cube_new_pipeline", "iterations", 1)
     start_at_step = _get_cfg("spheres_in_cube_new_pipeline", "start_at_step", "push")
+    use_rg_cfm = _get_cfg("spheres_in_cube_new_pipeline", "use_rg_cfm", False)
 
-    #"start", "train_and_sample", "push", "retrain_and_sample"
+    #"start", "training_and_sampling", "push", "retrain_and_sampling"
     state = PipelineState()
     console.print(f"[Pipeline] Start step: {start_at_step}", style="blue")
     
@@ -92,6 +93,8 @@ if __name__ == "__main__":
     if start_at_step == "start":
         _set_cfg("sample_generation_PP+PBTS", "mode", "training_set_gen")
         data_generation.main(state=state)
+        if state.samples_path:
+            _set_cfg("flow_matching", "dataset_path", state.samples_path)
     elif start_at_step == "push":
         console.print(f"[Pipeline] [Start Push]", style="blue")
         _set_cfg("sample_generation_PP+PBTS", "mode", "final_push")
@@ -101,14 +104,25 @@ if __name__ == "__main__":
     for i in range(iterations):
         console.print(f"[Pipeline] Iteration ({i+1}/{iterations})", style="blue")
 
-        # (Re)train Model
-        if i == 0 and start_at_step == "train_and_sampling":
-            _set_cfg("flow_matching", "mode", "train_and_sampling")
+        if use_rg_cfm:
+            console.print(f"[Pipeline] [Start RG-CFM] - Iteration ({i+1}/{iterations})", style="blue")
+            _set_cfg("flow_matching", "mode", "rg_cfm")
+            flow_matching_spheres.main(state=state)
+            # sample using the RG-CFM fine-tuned model
+            console.print(f"[Pipeline] [Start sampling_only after RG-CFM] - Iteration ({i+1}/{iterations})", style="blue")
+            _set_cfg("flow_matching", "mode", "sampling_only")
+            _set_cfg("flow_matching", "resume_model_path", state.model_path)
+            flow_matching_spheres.main(state=state)
         else:
-            _set_cfg("flow_matching", "mode", "retrain_and_sampling")
+            # (Re)train Model
+            if i == 0 and start_at_step in ["train_and_sampling", "training_and_sampling", "start"]:
+                _set_cfg("flow_matching", "mode", "training_and_sampling")
+            else:
+                _set_cfg("flow_matching", "mode", "retrain_and_sampling")
 
-        console.print(f"[Pipeline] [Start retraining and sampling] - Iteration ({i+1}/{iterations})", style="blue")
-        flow_matching_spheres.main(state=state)
+            console.print(f"[Pipeline] [Start retraining and sampling] - Iteration ({i+1}/{iterations})", style="blue")
+            flow_matching_spheres.main(state=state)
+
         _set_cfg("sample_generation_PP+PBTS", "final_push_input", state.samples_path)
         _set_cfg("flow_matching", "resume_model_path", state.model_path)
 
