@@ -8,6 +8,7 @@ if platform.system() == "Darwin" and os.environ.get("SPHEREPACK_DISABLE_KMP_HACK
 
 import torch
 import numpy as np
+import math
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 
@@ -100,7 +101,26 @@ def _min_pairwise_distance_sample(points_nd: np.ndarray) -> float:
     return float(best if np.isfinite(best) else 0.0)
 
 
-def compute_radii(tensor_data):
+def _min_pairwise_distance_sample_periodic(points_nd: np.ndarray, L: float) -> float:
+    """
+    Minimum-image distance for periodic box of side L.
+    """
+    N, d = points_nd.shape
+    if N < 2:
+        return 0.0
+    best = np.inf
+    for i in range(N):
+        xi = points_nd[i]
+        for j in range(i + 1, N):
+            delta = xi - points_nd[j]
+            delta = (delta + 0.5 * L) % L - 0.5 * L
+            d2 = float(np.dot(delta, delta))
+            if d2 < best * best:
+                best = math.sqrt(d2)
+    return float(best if np.isfinite(best) else 0.0)
+
+
+def compute_radii(tensor_data, L: float = 1.0, boundary_mode: str = "reflect"):
     """
     tensor_data: expected shapes (M,d,N) or (M,N,d) or torch.Tensor.
     Returns dict with per-sample:
@@ -111,11 +131,15 @@ def compute_radii(tensor_data):
     M = data_d_n.shape[0]
     min_dists = np.empty(M, dtype=np.float64)
     radii = np.empty(M, dtype=np.float64)
+    periodic = str(boundary_mode).lower() == "periodic"
 
     for idx in range(M):
         # data_d_n[idx]: (d, N) -> (N, d)
         pts = data_d_n[idx].T.astype(np.float64, copy=False)
-        md = _min_pairwise_distance_sample(pts)
+        if periodic:
+            md = _min_pairwise_distance_sample_periodic(pts, L)
+        else:
+            md = _min_pairwise_distance_sample(pts)
         min_dists[idx] = md
         radii[idx] = 0.5 * md
 
@@ -229,7 +253,7 @@ def plot(Arrays, labels, savepath,
         plt.close()
 
 
-def plot_files_combined(files, labels, savepath, **kwargs):
+def plot_files_combined(files, labels, savepath, boundary_mode="reflect", box_len=1.0, **kwargs):
     """
     files: list of .pt paths (or tensors)
     labels: list of labels (same length)
@@ -239,7 +263,7 @@ def plot_files_combined(files, labels, savepath, **kwargs):
     arrays_radii = []
     for file in files:
         dataset = load_dataset(file)
-        metr = compute_radii(dataset)
+        metr = compute_radii(dataset, L=box_len, boundary_mode=boundary_mode)
         arrays_radii.append(metr["radii"])
 
     plot(Arrays=arrays_radii,

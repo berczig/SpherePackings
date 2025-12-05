@@ -205,7 +205,30 @@ class FlowSetTransformer(nn.Module):
 # ============================================================================
 _TRI_CACHE = {}
 
-def distance_penalty(output, radius, margin=0.0, beta=10.0, p=2, q=0.05, eps=1e-12):
+BOUNDARY_PERIODIC = "periodic"
+BOUNDARY_REFLECT = "reflect"
+
+def _wrap_periodic(x, L):
+    return torch.remainder(x, L)
+
+def _min_image(delta, L):
+    return torch.remainder(delta + 0.5 * L, L) - 0.5 * L
+
+def _cdist_periodic(coords, L, eps=0.0):
+    """
+    coords: (B,N,d)
+    returns pairwise distances with minimum-image convention
+    """
+    diff = coords[:, :, None, :] - coords[:, None, :, :]
+    diff = _min_image(diff, L)
+    return diff.norm(dim=-1) + eps
+
+def _apply_boundary(x, r, L, mode):
+    if mode == BOUNDARY_PERIODIC:
+        return _wrap_periodic(x, L)
+    return x.clamp(r, L - r)
+
+def distance_penalty(output, radius, margin=0.0, beta=10.0, p=2, q=0.05, eps=1e-12, L=1.0, boundary_mode=BOUNDARY_REFLECT):
     """
     Penalty on near / actual overlaps.
     output: (B,d,N) predicted *centers*
@@ -215,7 +238,10 @@ def distance_penalty(output, radius, margin=0.0, beta=10.0, p=2, q=0.05, eps=1e-
     """
     B, d, N = output.shape
     coords = output.permute(0, 2, 1)                  # (B, N, d)
-    dmat = torch.cdist(coords, coords) + eps
+    if boundary_mode == BOUNDARY_PERIODIC:
+        dmat = _cdist_periodic(coords, L, eps=eps)
+    else:
+        dmat = torch.cdist(coords, coords) + eps
     r = torch.as_tensor(radius, device=output.device, dtype=output.dtype)
     m = torch.as_tensor(margin, device=output.device, dtype=output.dtype)
     gap = (2 * r + m) - dmat                          # >0 means violation / near-violation
@@ -237,9 +263,9 @@ def distance_penalty(output, radius, margin=0.0, beta=10.0, p=2, q=0.05, eps=1e-
     return topk.mean()
 
 
-def _box_clamp(x, r, L):
-    # Snap to [r, L-r] per coordinate
-    return x.clamp(r, L - r)
+def _apply_boundary_batch(x, r, L, mode):
+    # x: (B,d,N)
+    return _apply_boundary(x, r, L, mode)
 
 
 def sample_t(B, device, small_t_weight=0.5, gamma=2.0):
@@ -249,12 +275,16 @@ def sample_t(B, device, small_t_weight=0.5, gamma=2.0):
     return use_small * t_small + (1 - use_small) * s
 
 
-def _sample_x1_box_faces_per_batch(x0, r, L=1.0, p_face_batch=None, jitter=5e-3):
+def _sample_x1_box_faces_per_batch(x0, r, L=1.0, p_face_batch=None, jitter=5e-3, boundary_mode=BOUNDARY_REFLECT):
     """
     x0: (B,d,N) (only for shape/device)
     p_face_batch: (B,) per-sample prob a token sits on a face
     """
     B, d, N = x0.shape
+    if boundary_mode == BOUNDARY_PERIODIC:
+        u = torch.rand_like(x0) * L
+        u = _wrap_periodic(u + jitter * torch.randn_like(u), L)
+        return u
     u = torch.rand_like(x0) * (L - 2*r) + r
     if p_face_batch is not None:
         mask = (torch.rand(B, N, device=x0.device) < p_face_batch[:, None])
@@ -272,7 +302,7 @@ def _sample_x1_box_faces_per_batch(x0, r, L=1.0, p_face_batch=None, jitter=5e-3)
 # Dataset
 # ============================================================================
 class SpherePackingDataset(Dataset):
-    def __init__(self, path, radius, box_len, tol=1e-4, chunk=256, scale_N=128):
+    def __init__(self, path, radius, box_len, tol=1e-4, chunk=256, scale_N=128, boundary_mode=BOUNDARY_REFLECT):
         """
         path: torch file with tensor of shape (M, d, N)
         radius: sphere radius r
@@ -286,12 +316,16 @@ class SpherePackingDataset(Dataset):
         self.M, self.d, self.N = self.data.shape
         self.r = float(radius)
         self.L = float(box_len)
+        self.boundary_mode = boundary_mode
 
         # p_face per sample
-        near_r  = (self.data - self.r).abs() <= tol
-        near_lr = (self.data - (self.L - self.r)).abs() <= tol
-        on_face_any = (near_r | near_lr).any(dim=1)        # (M, N)
-        p_face = on_face_any.float().mean(dim=1)           # (M,)
+        if boundary_mode == BOUNDARY_PERIODIC:
+            p_face = torch.zeros(self.M, dtype=self.data.dtype)
+        else:
+            near_r  = (self.data - self.r).abs() <= tol
+            near_lr = (self.data - (self.L - self.r)).abs() <= tol
+            on_face_any = (near_r | near_lr).any(dim=1)        # (M, N)
+            p_face = on_face_any.float().mean(dim=1)           # (M,)
 
         # minsep per sample
         minsep = torch.empty(self.M, dtype=self.data.dtype)
@@ -299,7 +333,10 @@ class SpherePackingDataset(Dataset):
             e = min(self.M, s + chunk)
             xb = self.data[s:e]                            # (B, d, N)
             P  = xb.permute(0, 2, 1).contiguous()          # (B, N, d)
-            D  = torch.cdist(P, P)                         # (B, N, N)
+            if boundary_mode == BOUNDARY_PERIODIC:
+                D = _cdist_periodic(P, self.L)
+            else:
+                D  = torch.cdist(P, P)                      # (B, N, N)
             Bn, Nn, _ = D.shape
             eye = torch.eye(Nn, dtype=torch.bool)[None].expand(Bn, -1, -1)
             D  = D.masked_fill(eye, float('inf'))
@@ -344,6 +381,7 @@ def train_flow_model(
     aux_q=0.20,
     small_t_weight=0.5,
     small_t_gamma=2.0,
+    boundary_mode=BOUNDARY_REFLECT,
 ):
     model.train().to(device)
     optimizer.train()
@@ -367,7 +405,9 @@ def train_flow_model(
             p_face_batch = cond[:, 2].clamp(0, 1)     # (B,)
             x_1 = _sample_x1_box_faces_per_batch(
                 x_0, sphere_radius, L=clip_max,
-                p_face_batch=p_face_batch, jitter=5e-3
+                p_face_batch=p_face_batch if boundary_mode != BOUNDARY_PERIODIC else None,
+                jitter=5e-3,
+                boundary_mode=boundary_mode
             )
 
             t_in = sample_t(B, device=device, small_t_weight=small_t_weight, gamma=small_t_gamma)  # (B,)
@@ -375,7 +415,7 @@ def train_flow_model(
             x_t  = path_sample.x_t
             dx_t = path_sample.dx_t         # target velocity along the path
 
-            u_pred = model(t_in, _box_clamp(x_t, sphere_radius, clip_max), cond=cond_in)
+            u_pred = model(t_in, _apply_boundary_batch(x_t, sphere_radius, clip_max, boundary_mode), cond=cond_in)
 
             # Flow-matching loss
             loss_fm = mse(u_pred, dx_t)
@@ -389,13 +429,16 @@ def train_flow_model(
             sigma_dot = ((sch1.sigma_t - sch0.sigma_t) / eps_t).view(-1, 1, 1).to(x_t.dtype)
             alpha_dot_safe = alpha_dot.sign() * alpha_dot.abs().clamp_min(1e-6)
             x0_proj = (u_pred - sigma_dot * x_1) / alpha_dot_safe
+            x0_proj = _apply_boundary_batch(x0_proj, sphere_radius, clip_max, boundary_mode)
 
             pen = distance_penalty(
                 x0_proj, sphere_radius,
                 margin=aux_margin_factor * sphere_radius,
                 beta=aux_beta,
                 p=2,
-                q=aux_q
+                q=aux_q,
+                L=clip_max,
+                boundary_mode=boundary_mode
             )
 
             loss = mse_strength * loss_fm + dist_strength * ratio * pen
@@ -458,6 +501,7 @@ def sample_flow_model(
     clip_max,
     dim,
     cond_loader=None,
+    boundary_mode=BOUNDARY_REFLECT,
     # PCFM hyperparameters
     n_steps=40,
     ode_method='midpoint',
@@ -483,28 +527,40 @@ def sample_flow_model(
 
     L = float(clip_max)
     r = float(sphere_radius)
+    if boundary_mode == BOUNDARY_PERIODIC:
+        wall_weight = 0.0
 
-    def _clamp_box(x):
-        return x.clamp(r, L - r)
+    def _apply_box(x):
+        return _apply_boundary(x, r, L, boundary_mode)
 
     # model expects t \in [1->0]
     class _FMVF:
-        def __init__(self, mdl, cond):
-            self.mdl, self.cond = mdl, cond
-        def __call__(self, x, t, **_):
-            tb = torch.full((x.size(0),), float(t), device=x.device, dtype=x.dtype)
-            return self.mdl(tb, x, cond=self.cond) if self.cond is not None else self.mdl(tb, x)
+    def __init__(self, mdl, cond, r, L, boundary_mode):
+        self.mdl = mdl
+        self.cond = cond
+        self.r = r
+        self.L = L
+        self.boundary_mode = boundary_mode
+
+    def __call__(self, x, t, **_):
+        # project to fundamental domain before querying model
+        x_in = _apply_boundary(x, self.r, self.L, self.boundary_mode)
+        tb = torch.full((x_in.size(0),), float(t), device=x_in.device, dtype=x_in.dtype)
+        if self.cond is not None:
+            return self.mdl(tb, x_in, cond=self.cond)
+        else:
+            return self.mdl(tb, x_in)
 
     def _ode_solve_with_model(x_init, tau_start, tau_end, cond):
         """ODESolve with learned field from tau_start to tau_end, mapped to model time t=1-tau."""
         t0, t1 = 1.0 - float(tau_start), 1.0 - float(tau_end)   # decreasing t as tau increases
-        solver = ODESolver(velocity_model=_FMVF(model, cond))
+        solver = ODESolver(velocity_model=_FMVF(model, cond, r, L, boundary_mode))
         T = torch.tensor([t0, t1], device=x_init.device, dtype=x_init.dtype)
         dt = abs(t1 - t0)
         step_size = min(ode_step_cap, max(1e-3, dt))
         x_end = solver.sample(time_grid=T, x_init=x_init, method=ode_method,
                               step_size=step_size, return_intermediates=False, enable_grad=False)
-        return _clamp_box(x_end)
+        return _apply_box(x_end)
 
     def _active_overlap(x, for_stop=False):
         P = x.permute(0, 2, 1).contiguous()         # (B,N,d)
@@ -512,6 +568,8 @@ def sample_flow_model(
             P = P + (eps_nrm * r) * torch.randn_like(P)
 
         diff = P[:, :, None, :] - P[:, None, :, :]  # (B,N,N,d)
+        if boundary_mode == BOUNDARY_PERIODIC:
+            diff = _min_image(diff, L)
         dist = diff.norm(dim=-1).clamp_min(1e-12)   # (B,N,N)
         n    = diff / dist.unsqueeze(-1)            # (B,N,N,d)
 
@@ -544,6 +602,8 @@ def sample_flow_model(
     def _wall_push(u, margin_frac=0.05, scale=1.0):
         """Soft wall ghost constraints"""
         B, d_, N = u.shape
+        if boundary_mode == BOUNDARY_PERIODIC or wall_weight <= 0.0:
+            return torch.zeros_like(u)
         delta = torch.zeros_like(u)
         thr = margin_frac * (2.0 * r)
         for ax in range(d_):
@@ -563,7 +623,7 @@ def sample_flow_model(
                 break
             delta_pairs = _JJt_inv_h_times_Jt(overlap, n, eye, contact_q) if has_pairs else 0.0
             delta_walls = _wall_push(u, margin_frac=wall_margin, scale=wall_weight) if wall_weight > 0.0 else 0.0
-            u = _clamp_box(u + alpha_proj * (delta_pairs + delta_walls))
+            u = _apply_box(u + alpha_proj * (delta_pairs + delta_walls))
         return u
 
     def _Jt_h_at_state(u_next):
@@ -589,11 +649,11 @@ def sample_flow_model(
             # evaluate v_theta at tau'
             tb = torch.full((u.size(0),), t_prime, device=u.device, dtype=u.dtype)
             v = model(tb, u, cond=cond) if cond is not None else model(tb, u)
-            u_next = _clamp_box(u + (1.0 - tau_prime) * v)
+            u_next = _apply_box(u + (1.0 - tau_prime) * v)
 
             jt_h = _Jt_h_at_state(u_next)
             grad = (u - u_hat) + prox_lambda * jt_h
-            u = _clamp_box(u - prox_step * grad)
+            u = _apply_box(u - prox_step * grad)
         return u
 
     def _final_polish(u):
@@ -631,9 +691,9 @@ def sample_flow_model(
         p_face_batch = cond[:, 2].clamp(0, 1) if cond is not None else None
         u0 = _sample_x1_box_faces_per_batch(
             torch.empty(bs, dim, num_points, device=device),
-            r, L=L, p_face_batch=p_face_batch, jitter=jitter
+            r, L=L, p_face_batch=p_face_batch, jitter=jitter, boundary_mode=boundary_mode
         )
-        u0 = _clamp_box(u0)
+        u0 = _apply_box(u0)
         u = u0.clone()
 
         # tau grid
@@ -701,6 +761,7 @@ def main():
     pen_s  = cfg.getfloat(sec, "distance_penalty_strength", fallback=0.2)
     sphere_radius = cfg.getfloat(sec, "sphere_radius", fallback=0.05)
     clip_range = cfg.getfloat(sec, "clip_sample_range", fallback=1.0)
+    boundary_mode = cfg.get(sec, "boundary_mode", fallback=BOUNDARY_REFLECT).strip().lower()
     test_fraction = cfg.getfloat(sec, "test_fraction", fallback=0.1)
     split_seed = cfg.getint(sec, "split_seed", fallback=1234)
     max_samples = cfg.getint(sec, "max_samples", fallback=25000)
@@ -766,7 +827,8 @@ def main():
         box_len=clip_range,
         tol=face_tol,
         chunk=minsep_chunk,
-        scale_N=scale_N
+        scale_N=scale_N,
+        boundary_mode=boundary_mode
     )
     if full_ds.d != d:
         raise ValueError(f"Config dimension={d} but dataset dimension={full_ds.d} (from {dataset_path})")
@@ -829,11 +891,13 @@ def main():
             aux_q=aux_q,
             small_t_weight=small_t_weight,
             small_t_gamma=small_t_gamma,
+            boundary_mode=boundary_mode,
         )
         samples = sample_flow_model(
             model, opt, num_new, batch_n, points_N,
             device, sphere_radius, 0.0, clip_range, d,
             cond_loader=test_loader,
+            boundary_mode=boundary_mode,
             n_steps=pcfm_steps,
             ode_method=ode_method,
             ode_step_cap=ode_step_cap,
@@ -858,6 +922,7 @@ def main():
             model, opt, num_new, batch_n, points_N,
             device, sphere_radius, 0.0, clip_range, d,
             cond_loader=test_loader,
+            boundary_mode=boundary_mode,
             n_steps=pcfm_steps,
             ode_method=ode_method,
             ode_step_cap=ode_step_cap,
@@ -888,11 +953,13 @@ def main():
             aux_q=aux_q,
             small_t_weight=small_t_weight,
             small_t_gamma=small_t_gamma,
+            boundary_mode=boundary_mode,
         )
         samples = sample_flow_model(
             model, opt, num_new, batch_n, points_N,
             device, sphere_radius, 0.0, clip_range, d,
             cond_loader=test_loader,
+            boundary_mode=boundary_mode,
             n_steps=pcfm_steps,
             ode_method=ode_method,
             ode_step_cap=ode_step_cap,
