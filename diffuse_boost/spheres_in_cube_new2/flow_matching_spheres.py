@@ -1,6 +1,7 @@
 import os
 import math
 import time
+import copy
 from datetime import datetime
 
 import numpy as np
@@ -8,6 +9,7 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset, Subset
+from torch.nn.utils import clip_grad_norm_
 
 import matplotlib.pyplot as plt
 from tqdm import tqdm
@@ -314,6 +316,209 @@ class SpherePackingDataset(Dataset):
         return self.data[idx], self.cond[idx]
 
 # ============================================================================
+# Reward-Guided CFM
+# ============================================================================
+class RGCFMTrainer:
+    def __init__(
+        self,
+        model: nn.Module,
+        config: dict,
+        device: torch.device,
+        sphere_radius: float,
+        clip_range: float,
+        num_points: int,
+        dim: int = 3,
+        cond_loader=None,
+    ):
+        self.device = device
+        self.dim = dim
+        self.sphere_radius = float(sphere_radius)
+        self.clip_range = float(clip_range)
+        self.num_points = int(num_points)
+        self.cond_loader = cond_loader
+        self._cond_iter = iter(cond_loader) if cond_loader is not None else None
+
+        # Models
+        self.net_model = model.to(device)
+        self.ref_model = copy.deepcopy(model).to(device)
+        for p in self.ref_model.parameters():
+            p.requires_grad_(False)
+        self.ref_model.eval()
+
+        # Optimizer
+        lr = float(config.get("learning_rate", 1e-4))
+        self.optimizer = schedulefree.RAdamScheduleFree(self.net_model.parameters(), lr=lr)
+
+        # Hyperparameters
+        self.grad_clip = float(config.get("grad_clip", 1.0))
+        self.temperature = float(config.get("temperature", 1.0))
+        self.w2_coefficient = float(config.get("w2_coefficient", 0.1))
+        self.batch_size = int(config.get("batch_size", 16))
+        self.weight_clip = float(config.get("weight_clip", 1e6))
+        self.small_t_weight = float(config.get("small_t_weight", 0.5))
+        self.small_t_gamma = float(config.get("small_t_gamma", 2.0))
+
+        # Sampler knobs (reuse PCFM defaults where possible)
+        self.pcfm_steps = int(config.get("pcfm_steps", 40))
+        self.ode_method = config.get("ode_method", "midpoint")
+        self.ode_step_cap = float(config.get("ode_step_cap", 0.05))
+        self.jitter = float(config.get("pcfm_jitter", 5e-3))
+        self.eps_nrm = float(config.get("pcfm_eps_nrm", 1e-6))
+        self.proj_outer_iters = int(config.get("proj_outer_iters", 8))
+        self.alpha_proj = float(config.get("alpha_proj", 0.25))
+        self.contact_q = float(config.get("contact_q", 1.0))
+        self.wall_weight = float(config.get("wall_weight", 1.0))
+        self.wall_margin = float(config.get("wall_margin", 0.05))
+        self.prox_iters = int(config.get("prox_iters", 10))
+        self.prox_step = float(config.get("prox_step", 0.1))
+        self.prox_lambda = float(config.get("prox_lambda", 2.0))
+        self.final_passes = int(config.get("final_passes", 6))
+        self.tol_finish = float(config.get("tol_finish", 1e-8))
+
+        self.history = []
+        self.global_step = 0
+
+    def load_pretrained(self, path: str):
+        """Load weights into net_model only; ref_model stays frozen."""
+        assert path and os.path.isfile(path), f"Reference path '{path}' is invalid."
+        ckpt = torch.load(path, map_location=self.device, weights_only=False)
+        sd = ckpt.get("model_state_dict", ckpt.get("state_dict", ckpt))
+        if isinstance(sd, dict) and len(sd) and next(iter(sd)).startswith("module."):
+            sd = {k[7:]: v for k, v in sd.items()}
+        self.net_model.load_state_dict(sd, strict=True)
+        self.ref_model.load_state_dict(sd)
+        self.ref_model.eval()
+
+    @torch.no_grad()
+    def sample_batch(self, ep: int):
+        """Sample x1 from the current sampling policy and compute rewards."""
+        samples_np, cond_batches = sample_flow_model(
+            self.net_model,
+            self.optimizer,
+            self.batch_size,
+            self.batch_size,
+            self.num_points,
+            self.device,
+            self.sphere_radius,
+            0.0,
+            self.clip_range,
+            self.dim,
+            cond_loader=self.cond_loader,
+            n_steps=self.pcfm_steps,
+            ode_method=self.ode_method,
+            ode_step_cap=self.ode_step_cap,
+            jitter=self.jitter,
+            eps_nrm=self.eps_nrm,
+            proj_outer_iters=self.proj_outer_iters,
+            alpha_proj=self.alpha_proj,
+            contact_q=self.contact_q,
+            wall_weight=self.wall_weight,
+            wall_margin=self.wall_margin,
+            prox_iters=self.prox_iters,
+            prox_step=self.prox_step,
+            prox_lambda=self.prox_lambda,
+            final_passes=self.final_passes,
+            tol_finish=self.tol_finish,
+            return_cond=True,
+        )
+        x1 = torch.from_numpy(samples_np).to(self.device, dtype=torch.float32)
+        cond_used = None
+        if cond_batches is not None and cond_batches.numel() > 0:
+            cond_used = cond_batches.to(self.device)
+            if cond_used.size(0) > x1.size(0):
+                cond_used = cond_used[:x1.size(0)]
+
+        # Reward: min pairwise distance / L
+        P = x1.permute(0, 2, 1).contiguous()  # (B, N, d)
+        dmat = torch.cdist(P, P)
+        eye = torch.eye(self.num_points, device=self.device, dtype=torch.bool)[None]
+        dmat = dmat.masked_fill(eye, float('inf'))
+        minsep = dmat.amin(dim=-1).amin(dim=-1)
+        rewards = (minsep / self.clip_range).detach()
+        return x1, rewards, cond_used
+
+    def compute_loss(self, x_data: torch.Tensor, rewards: torch.Tensor, cond: torch.Tensor = None):
+        """
+        x_data: policy sample treated as 'data' endpoint (x0 in FM_PATH).
+        Prior sample is generated as x1, matching pretraining semantics (data -> prior).
+        """
+        B, d, N = x_data.shape
+        assert d == self.dim and N == self.num_points, "Shape mismatch for x_data"
+        if cond is None and self.net_model.uses_cond:
+            cond = torch.zeros(B, self.net_model.cond_mlp[0].in_features, device=self.device, dtype=x_data.dtype)
+        elif cond is not None:
+            cond = cond.to(self.device, dtype=x_data.dtype)
+
+        x_prior = _sample_x1_box_faces_per_batch(
+            torch.empty(B, self.dim, self.num_points, device=self.device),
+            self.sphere_radius,
+            L=self.clip_range,
+            p_face_batch=None,
+            jitter=self.jitter
+        )
+        t = sample_t(B, device=self.device, small_t_weight=self.small_t_weight, gamma=self.small_t_gamma)
+
+        # Keep path semantics consistent with supervised FM: x0=data-like, x1=prior
+        path_sample = FM_PATH.sample(t=t, x_0=x_data, x_1=x_prior)
+        x_t = path_sample.x_t
+        u_t = path_sample.dx_t
+
+        x_t_clamped = _box_clamp(x_t, self.sphere_radius, self.clip_range)
+
+        v_ft = self.net_model(t, x_t_clamped, cond=cond)
+        with torch.no_grad():
+            v_ref = self.ref_model(t, x_t_clamped, cond=cond)
+
+        fm_loss_per_sample = (v_ft - u_t).pow(2).mean(dim=(1, 2))
+
+        # Reward weights
+        r_mean = rewards.mean()
+        r_std = rewards.std().clamp_min(1e-8)
+        r_norm = (rewards - r_mean) / r_std
+        w = torch.exp(self.temperature * r_norm).clamp(max=self.weight_clip)
+        w = w / (w.mean().detach() + 1e-8)
+
+        L_fm = (w * fm_loss_per_sample).mean()
+        w2_per_sample = (v_ft - v_ref).pow(2).mean(dim=(1, 2))
+        L_w2 = w2_per_sample.mean()
+        loss = L_fm + self.w2_coefficient * L_w2
+
+        metrics = {
+            "fm_loss": fm_loss_per_sample.mean().item(),
+            "fm_loss_weighted": L_fm.item(),
+            "w2_loss": L_w2.item(),
+            "loss": loss.item(),
+            "reward_mean": rewards.mean().item(),
+            "reward_max": rewards.max().item(),
+            "weight_mean": w.mean().item(),
+        }
+        return loss, metrics
+
+    def train(self, num_epochs: int, steps_per_epoch: int):
+        hist = []
+        for ep in range(num_epochs):
+            ep_metrics = []
+            for _ in range(steps_per_epoch):
+                x1_batch, rewards, cond_used = self.sample_batch(ep)
+                loss, metrics = self.compute_loss(x1_batch, rewards, cond=cond_used)
+
+                self.optimizer.zero_grad()
+                loss.backward()
+                clip_grad_norm_(self.net_model.parameters(), self.grad_clip)
+                self.optimizer.step()
+                self.global_step += 1
+
+                ep_metrics.append(metrics)
+
+            # Epoch averages
+            if ep_metrics:
+                avg = {k: float(np.mean([m[k] for m in ep_metrics])) for k in ep_metrics[0].keys()}
+                hist.append([avg["fm_loss"], avg["fm_loss_weighted"], avg["w2_loss"], avg["loss"], avg["reward_mean"]])
+                print(f"[RG-CFM] Epoch {ep+1}/{num_epochs} | FM={avg['fm_loss']:.4f} FMw={avg['fm_loss_weighted']:.4f} W2={avg['w2_loss']:.4f} Loss={avg['loss']:.4f} R={avg['reward_mean']:.4f}")
+        self.history = np.array(hist, dtype=np.float32)
+        return self.history
+
+# ============================================================================
 # Training
 # ============================================================================
 def train_flow_model(
@@ -369,7 +574,9 @@ def train_flow_model(
             u_pred = model(t_in, _box_clamp(x_t, sphere_radius, clip_max), cond=cond_in)
 
             # Flow-matching loss
-            loss_fm = mse(u_pred, dx_t)
+            diff = u_pred - dx_t
+            fm_loss_per_sample = diff.pow(2).mean(dim=(1, 2))
+            loss_fm = fm_loss_per_sample.mean()
 
             # Penalty on projected x0 from velocity
             eps_t = 1e-3
@@ -394,16 +601,23 @@ def train_flow_model(
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            ep_losses.append([loss_fm.item(), pen.item(), loss.item()])
+            ep_losses.append([
+                loss_fm.item(),
+                pen.item(),
+                loss.item()
+            ])
 
         avg = np.mean(ep_losses, axis=0)
         history.append(avg)
-        pbar.set_postfix({"FM":f"{avg[0]:.4f}", "Pen":f"{avg[1]:.4f}", "Tot":f"{avg[2]:.4f}"})
-        #print(f"Epoch {epoch+1}/{num_epochs} | FM={avg[0]:.4f} Pen={avg[1]:.4f} Tot={avg[2]:.4f}")
+        pbar.set_postfix({
+            "FM": f"{avg[0]:.4f}",
+            "Pen": f"{avg[1]:.4f}",
+            "Tot": f"{avg[2]:.4f}"
+        })
 
     hist = np.array(history, dtype=np.float32)
     ts   = datetime.now().strftime("%Y%m%d_%H%M%S")
-    name = f"spheres_fm_loss={hist[-1,2]:.6f}_{ts}.pth"
+    name = f"spheres_fm_loss={hist[-1,-1]:.6f}_{ts}.pth"
     path = os.path.join(save_model_dir, name)
 
     # save checkpoint similar to Heilbronn style
@@ -422,9 +636,9 @@ def train_flow_model(
     # also save a loss plot
     plt.figure(figsize=(12,6))
     hist_np = hist
-    plt.plot(hist_np[:,0], label="Flow MSE Loss")
-    plt.plot(hist_np[:,1], label="Distance Penalty")
-    plt.plot(hist_np[:,2], label="Total Loss")
+    labels = ["Flow MSE Loss", "Distance Penalty", "Total Loss"]
+    for idx in range(hist_np.shape[1]):
+        plt.plot(hist_np[:, idx], label=labels[idx] if idx < len(labels) else f"Loss{idx}")
     plt.yscale('log')
     plt.xlabel('Epoch'); plt.ylabel('Loss'); plt.legend()
     plt.grid(True, alpha=0.3)
@@ -466,6 +680,7 @@ def sample_flow_model(
     prox_lambda=2.0,
     final_passes=6,
     tol_finish=1e-8,
+    return_cond=False,
 ):
     """
     Physics-Constrained Flow Matching (PCFM) for hard spheres (radius r) in a box [r, L-r]^d.
@@ -603,6 +818,7 @@ def sample_flow_model(
         pass
 
     samples, remaining = [], int(num_samples)
+    cond_collected = [] if return_cond else None
     cond_iter = iter(cond_loader) if cond_loader is not None else None
 
     pbar = tqdm(total=remaining, desc="Sampling")
@@ -617,6 +833,8 @@ def sample_flow_model(
             # *** NEW: batch size must respect cond.size(0) ***
             bs = min(batch_size, remaining, cond.size(0))
             cond = cond[:bs]
+            if return_cond:
+                cond_collected.append(cond.detach().cpu())
         else:
             bs = min(batch_size, remaining)
             cond = None
@@ -650,6 +868,9 @@ def sample_flow_model(
         # Update Progess bar
         pbar.update(bs)
 
+    if return_cond:
+        cond_tensor = torch.cat(cond_collected, dim=0) if cond_collected else None
+        return np.concatenate(samples, axis=0), cond_tensor
 
     return np.concatenate(samples, axis=0)
 
@@ -673,12 +894,164 @@ def load_model_if_exists(model, opt, path, device):
         print(f"[Load] No model found at '{path}'")
     return model, opt
 
+
+def rg_cfm_main(state: PipelineState = None):
+    sec = "flow_matching"
+    # Geometry / model dims
+    d = cfg.getint(sec, "dimension", fallback=3)
+    num_spheres = cfg.getint(sec, "num_spheres", fallback=None)
+    sphere_radius = cfg.getfloat(sec, "sphere_radius", fallback=0.05)
+    clip_range = cfg.getfloat(sec, "clip_sample_range", fallback=1.0)
+    dataset_path = cfg.get(sec, "dataset_path", fallback="").strip()
+    assert dataset_path, "dataset_path required for RG-CFM (conditioning loader)."
+
+    save_model_dir = cfg.get(sec, "save_model_dir", fallback="./outputs_spheres_models")
+    stamp = datetime.now().strftime("%Y-%m-%d")
+    save_model_dir = os.path.join(save_model_dir, stamp)
+    os.makedirs(save_model_dir, exist_ok=True)
+
+    # RG-CFM hyperparameters
+    rg_lr = cfg.getfloat(sec, "rg_learning_rate", fallback=1e-4)
+    rg_w2 = cfg.getfloat(sec, "rg_w2_coefficient", fallback=1.0)
+    rg_tau = cfg.getfloat(sec, "rg_temperature", fallback=0.5)
+    rg_grad_clip = cfg.getfloat(sec, "rg_grad_clip", fallback=1.0)
+    rg_batch = cfg.getint(sec, "rg_batch_size", fallback=32)
+    rg_steps_per_epoch = cfg.getint(sec, "rg_steps_per_epoch", fallback=100)
+    rg_epochs = cfg.getint(sec, "rg_epochs", fallback=1)
+    rg_weight_clip = cfg.getfloat(sec, "rg_weight_clip", fallback=100.0)
+    rg_ref_path = cfg.get(sec, "rg_ref_path", fallback="").strip()
+    if not rg_ref_path:
+        rg_ref_path = cfg.get(sec, "resume_model_path", fallback="").strip()
+    assert rg_ref_path, "rg_ref_path (or resume_model_path) must be set for RG-CFM."
+
+    # Time sampling knobs
+    small_t_weight = cfg.getfloat(sec, "small_t_weight", fallback=0.5)
+    small_t_gamma = cfg.getfloat(sec, "small_t_gamma", fallback=2.0)
+
+    # Sampler knobs (reuse PCFM settings)
+    pcfm_steps = cfg.getint(sec, "pcfm_steps", fallback=40)
+    ode_method = cfg.get(sec, "ode_method", fallback="midpoint")
+    ode_step_cap = cfg.getfloat(sec, "ode_step_cap", fallback=0.05)
+    jitter = cfg.getfloat(sec, "pcfm_jitter", fallback=5e-3)
+    eps_nrm = cfg.getfloat(sec, "pcfm_eps_nrm", fallback=1e-6)
+    proj_outer_iters = cfg.getint(sec, "proj_outer_iters", fallback=8)
+    alpha_proj = cfg.getfloat(sec, "alpha_proj", fallback=0.25)
+    contact_q = cfg.getfloat(sec, "contact_q", fallback=1.0)
+    wall_weight = cfg.getfloat(sec, "wall_weight", fallback=1.0)
+    wall_margin = cfg.getfloat(sec, "wall_margin", fallback=0.05)
+    prox_iters = cfg.getint(sec, "prox_iters", fallback=10)
+    prox_step = cfg.getfloat(sec, "prox_step", fallback=0.1)
+    prox_lambda = cfg.getfloat(sec, "prox_lambda", fallback=2.0)
+    final_passes = cfg.getint(sec, "final_passes", fallback=6)
+    tol_finish = cfg.getfloat(sec, "tol_finish", fallback=1e-8)
+    face_tol   = cfg.getfloat(sec, "face_tolerance", fallback=1e-4)
+    minsep_chunk = cfg.getint(sec, "minsep_chunk", fallback=256)
+    scale_N    = cfg.getint(sec, "scale_N", fallback=128)
+
+    # Architecture
+    st_kwargs = {
+        'dim_hidden':     cfg.getint(sec, "st_dim_hidden", fallback=512),
+        'num_heads':      cfg.getint(sec, "st_num_heads", fallback=8),
+        'depth':          cfg.getint(sec, "st_depth", fallback=6),
+        'attn_dropout':   cfg.getfloat(sec, "st_attn_dropout", fallback=0.1),
+        'ff_dropout':     cfg.getfloat(sec, "st_ff_dropout", fallback=0.1),
+        'dim_time':       cfg.getint(sec, "st_dim_time", fallback=max(64, 4*d)),
+        'time_fourier_dim': cfg.getint(sec, "time_fourier_dim", fallback=max(16, (max(64,4*d))//2)),
+        'time_hidden':    cfg.getint(sec, "time_hidden", fallback=2*max(64,4*d)),
+        'time_fourier_sigma': cfg.getfloat(sec, "time_fourier_sigma", fallback=1.0),
+        'cond_dim_in':    cfg.getint(sec, "cond_dim_in", fallback=4),
+        'cond_hidden':    cfg.getint(sec, "cond_hidden", fallback=max(64, 4*d)),
+    }
+    st_kwargs["dim_out"] = d
+
+    if num_spheres is None:
+        raise ValueError("num_spheres must be set in config for RG-CFM.")
+    # Conditioning loader from dataset (reuse sphere packing dataset)
+    full_ds = SpherePackingDataset(
+        dataset_path,
+        radius=sphere_radius,
+        box_len=clip_range,
+        tol=face_tol,
+        chunk=minsep_chunk,
+        scale_N=scale_N
+    )
+    assert full_ds.N == num_spheres, f"num_spheres={num_spheres} but dataset N={full_ds.N}"
+    cond_loader = DataLoader(full_ds, batch_size=rg_batch, shuffle=True)
+
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    model = FlowSetTransformer(d, **st_kwargs).to(device)
+
+    trainer_cfg = {
+        "learning_rate": rg_lr,
+        "w2_coefficient": rg_w2,
+        "temperature": rg_tau,
+        "grad_clip": rg_grad_clip,
+        "batch_size": rg_batch,
+        "weight_clip": rg_weight_clip,
+        "small_t_weight": small_t_weight,
+        "small_t_gamma": small_t_gamma,
+        "pcfm_steps": pcfm_steps,
+        "ode_method": ode_method,
+        "ode_step_cap": ode_step_cap,
+        "pcfm_jitter": jitter,
+        "pcfm_eps_nrm": eps_nrm,
+        "proj_outer_iters": proj_outer_iters,
+        "alpha_proj": alpha_proj,
+        "contact_q": contact_q,
+        "wall_weight": wall_weight,
+        "wall_margin": wall_margin,
+        "prox_iters": prox_iters,
+        "prox_step": prox_step,
+        "prox_lambda": prox_lambda,
+        "final_passes": final_passes,
+        "tol_finish": tol_finish,
+    }
+
+    trainer = RGCFMTrainer(
+        model=model,
+        config=trainer_cfg,
+        device=device,
+        sphere_radius=sphere_radius,
+        clip_range=clip_range,
+        num_points=num_spheres,
+        dim=d,
+        cond_loader=cond_loader,
+    )
+    trainer.load_pretrained(rg_ref_path)
+    hist = trainer.train(num_epochs=rg_epochs, steps_per_epoch=rg_steps_per_epoch)
+
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    if hist.size > 0:
+        name = f"spheres_rgcfm_loss={hist[-1,3]:.6f}_{ts}.pth"
+    else:
+        name = f"spheres_rgcfm_{ts}.pth"
+    path = os.path.join(save_model_dir, name)
+
+    torch.save(
+        {
+            "state_dict": trainer.net_model.state_dict(),
+            "opt": trainer.optimizer.state_dict(),
+            "epochs": rg_epochs,
+            "params": st_kwargs,
+            "history": hist,
+        },
+        path
+    )
+    print(f"[RG-CFM] Saved fine-tuned model to: '{path}'")
+    if state:
+        state.set_model_path(path)
+    return path
+
 # ============================================================================
 # Main controlled by INI (flow_matching section)
 # ============================================================================
 def main(state:PipelineState=None):
     sec = "flow_matching"
     mode = cfg.get(sec, "mode", fallback="training_and_sampling").strip()
+
+    if mode == "rg_cfm":
+        rg_cfm_main(state=state)
+        return
 
     # Data / IO
     dataset_path = cfg.get(sec, "dataset_path")

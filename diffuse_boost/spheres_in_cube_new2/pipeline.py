@@ -6,6 +6,34 @@ from rich.console import Console
 """
 Pipeline that loops Training --> Sampling --> Pushing --> Training --> ...
 
+RG-CFM (reward-guided CFM) usage:
+- Set [flow_matching].mode = rg_cfm in config.cfg.
+- Provide [flow_matching].dataset_path (for cond loader) and rg_ref_path or resume_model_path (reference checkpoint).
+- RG-CFM runs only the online reward based sampling; sampling/pushing loop is unchanged unless you call rg_cfm_main directly.
+
+What are different modes:
+
+- training_and_sampling: 
+trains the FM model on the dataset 
+(supervised FM loss + penalty), 
+then samples new packings with PCFM. 
+Objective: fit the dataset distribution, then generate.
+
+- retrain_and_sampling: 
+loads a checkpoint, continues supervised FM training on the dataset, 
+then samples. Objective: fine-tune on data, then generate.
+
+- sampling_only: 
+loads a checkpoint and only runs PCFM sampling. 
+Objective: generate from an existing model, no training.
+
+- rg_cfm: 
+skips the supervised FM loop; instead runs online reward-guided fine-tuning 
+using the current model to generate candidates and weight them by reward,
+with W2 regularization to a reference. It trains the model toward higher-reward samples, 
+but does not, by itself, run the later sampling/push steps. 
+Use this when you want to fine-tune the model by reward rather than by the dataset.
+
 ####  Important parameters to check before starting the pipeline  ####
 
 [sample_generation_PP+PBTS]
