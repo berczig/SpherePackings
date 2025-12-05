@@ -105,13 +105,27 @@ if __name__ == "__main__":
         console.print(f"[Pipeline] Iteration ({i+1}/{iterations})", style="blue")
 
         if use_rg_cfm:
+            # 1) Supervised train/retrain to get a fresh base model
+            if i == 0 and start_at_step in ["train_and_sampling", "training_and_sampling", "start"]:
+                _set_cfg("flow_matching", "mode", "training_and_sampling")
+            else:
+                _set_cfg("flow_matching", "mode", "retrain_and_sampling")
+            console.print(f"[Pipeline] [Start supervised train/retrain] - Iteration ({i+1}/{iterations})", style="blue")
+            flow_matching_spheres.main(state=state)
+
+            # 2) RG-CFM fine-tune using the supervised checkpoint as reference
+            if state.model_path:
+                _set_cfg("flow_matching", "rg_ref_path", state.model_path)
+                _set_cfg("flow_matching", "resume_model_path", state.model_path)
             console.print(f"[Pipeline] [Start RG-CFM] - Iteration ({i+1}/{iterations})", style="blue")
             _set_cfg("flow_matching", "mode", "rg_cfm")
             flow_matching_spheres.main(state=state)
-            # sample using the RG-CFM fine-tuned model
+
+            # 3) Sampling with the RG-CFM fine-tuned model
+            if state.model_path:
+                _set_cfg("flow_matching", "resume_model_path", state.model_path)
             console.print(f"[Pipeline] [Start sampling_only after RG-CFM] - Iteration ({i+1}/{iterations})", style="blue")
             _set_cfg("flow_matching", "mode", "sampling_only")
-            _set_cfg("flow_matching", "resume_model_path", state.model_path)
             flow_matching_spheres.main(state=state)
         else:
             # (Re)train Model
