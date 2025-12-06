@@ -453,7 +453,7 @@ class RGCFMTrainer:
             torch.empty(B, self.dim, self.num_points, device=self.device),
             self.sphere_radius,
             L=self.clip_range,
-            p_face_batch=None,
+            p_face_batch=cond[:, 2].clamp(0, 1),
             jitter=self.jitter
         )
         t = sample_t(B, device=self.device, small_t_weight=self.small_t_weight, gamma=self.small_t_gamma)
