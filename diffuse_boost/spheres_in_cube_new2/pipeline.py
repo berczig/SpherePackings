@@ -4,7 +4,7 @@ from diffuse_boost import cfg
 from rich.console import Console
 
 """
-Pipeline that loops Training --> Sampling --> Pushing --> Training --> ...
+Pipeline that loops Training --> RG-fine tuning --> Sampling --> Pushing --> Training --> ...
 
 RG-CFM (reward-guided CFM) usage:
 - Set [flow_matching].mode = rg_cfm in config.cfg.
@@ -105,27 +105,9 @@ if __name__ == "__main__":
         console.print(f"[Pipeline] Iteration ({i+1}/{iterations})", style="blue")
 
         if use_rg_cfm:
-            # 1) Supervised train/retrain to get a fresh base model
-            if i == 0 and start_at_step in ["train_and_sampling", "training_and_sampling", "start"]:
-                _set_cfg("flow_matching", "mode", "training_and_sampling")
-            else:
-                _set_cfg("flow_matching", "mode", "retrain_and_sampling")
-            console.print(f"[Pipeline] [Start supervised train/retrain] - Iteration ({i+1}/{iterations})", style="blue")
-            flow_matching_spheres.main(state=state)
-
-            # 2) RG-CFM fine-tune using the supervised checkpoint as reference
-            if state.model_path:
-                _set_cfg("flow_matching", "rg_ref_path", state.model_path)
-                _set_cfg("flow_matching", "resume_model_path", state.model_path)
-            console.print(f"[Pipeline] [Start RG-CFM] - Iteration ({i+1}/{iterations})", style="blue")
-            _set_cfg("flow_matching", "mode", "rg_cfm")
-            flow_matching_spheres.main(state=state)
-
-            # 3) Sampling with the RG-CFM fine-tuned model
-            if state.model_path:
-                _set_cfg("flow_matching", "resume_model_path", state.model_path)
-            console.print(f"[Pipeline] [Start sampling_only after RG-CFM] - Iteration ({i+1}/{iterations})", style="blue")
-            _set_cfg("flow_matching", "mode", "sampling_only")
+            # Single call: training_and_sampling now handles RG-CFM internally (if enabled) then samples
+            _set_cfg("flow_matching", "mode", "training_and_sampling")
+            console.print(f"[Pipeline] [Start training_and_sampling (with RG-CFM enabled)] - Iteration ({i+1}/{iterations}); mode={_get_cfg('flow_matching','mode','')}", style="blue")
             flow_matching_spheres.main(state=state)
         else:
             # (Re)train Model
@@ -134,7 +116,7 @@ if __name__ == "__main__":
             else:
                 _set_cfg("flow_matching", "mode", "retrain_and_sampling")
 
-            console.print(f"[Pipeline] [Start retraining and sampling] - Iteration ({i+1}/{iterations})", style="blue")
+            console.print(f"[Pipeline] [Start retraining and sampling] - Iteration ({i+1}/{iterations}); mode={_get_cfg('flow_matching','mode','')}", style="blue")
             flow_matching_spheres.main(state=state)
 
         _set_cfg("sample_generation_PP+PBTS", "final_push_input", state.samples_path)

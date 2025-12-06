@@ -21,7 +21,7 @@ from flow_matching.path.scheduler import CondOTScheduler
 from flow_matching.path import AffineProbPath
 from flow_matching.solver import ODESolver
 
-from diffuse_boost.spheres_in_cube_new.pipeline import PipelineState
+from diffuse_boost.spheres_in_cube_new2.pipeline import PipelineState
 
 from diffuse_boost.spheres_in_cube import data_load_save
 from diffuse_boost import cfg  # assumes diffuse_boost.cfg is a ConfigParser
@@ -500,6 +500,9 @@ class RGCFMTrainer:
             ep_metrics = []
             for _ in range(steps_per_epoch):
                 x1_batch, rewards, cond_used = self.sample_batch(ep)
+                # sample_flow_model sets model/optimizer to eval; switch back for training
+                self.net_model.train()
+                self.optimizer.train()
                 loss, metrics = self.compute_loss(x1_batch, rewards, cond=cond_used)
 
                 self.optimizer.zero_grad()
@@ -516,6 +519,8 @@ class RGCFMTrainer:
                 hist.append([avg["fm_loss"], avg["fm_loss_weighted"], avg["w2_loss"], avg["loss"], avg["reward_mean"]])
                 print(f"[RG-CFM] Epoch {ep+1}/{num_epochs} | FM={avg['fm_loss']:.4f} FMw={avg['fm_loss_weighted']:.4f} W2={avg['w2_loss']:.4f} Loss={avg['loss']:.4f} R={avg['reward_mean']:.4f}")
         self.history = np.array(hist, dtype=np.float32)
+        self.net_model.eval()
+        self.optimizer.eval()
         return self.history
 
 # ============================================================================
@@ -1192,6 +1197,7 @@ def main(state:PipelineState=None):
     model_path = resume_path
 
     if mode == "training_and_sampling":
+        # Supervised training
         model, hist, model_path = train_flow_model(
             model, opt, train_loader, epochs,
             sphere_radius, mse_s, pen_s,
@@ -1203,6 +1209,24 @@ def main(state:PipelineState=None):
             small_t_weight=small_t_weight,
             small_t_gamma=small_t_gamma,
         )
+        if state:
+            state.set_model_path(model_path)
+
+        # Optional RG-CFM immediately after training
+        use_rg_after_train = cfg.getboolean("spheres_in_cube_new_pipeline", "use_rg_cfm", fallback=False)
+        if use_rg_after_train:
+            if state and state.model_path:
+                cfg.set(sec, "rg_ref_path", state.model_path)
+                cfg.set(sec, "resume_model_path", state.model_path)
+            print("[flow_matching] Starting RG-CFM immediately after supervised training.")
+            rg_cfm_main(state=state)
+            # Reload the fine-tuned model into memory before sampling
+            if state and state.model_path:
+                model, opt = load_model_if_exists(model, opt, state.model_path, device)
+                model_path = state.model_path
+            else:
+                model, opt = load_model_if_exists(model, opt, cfg.get(sec, "resume_model_path", fallback="").strip(), device)
+
         samples = sample_flow_model(
             model, opt, num_new, batch_n, points_N,
             device, sphere_radius, 0.0, clip_range, d,
