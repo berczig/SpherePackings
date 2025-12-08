@@ -8,7 +8,6 @@ if platform.system() == "Darwin" and os.environ.get("SPHEREPACK_DISABLE_KMP_HACK
 
 import torch
 import numpy as np
-import math
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 
@@ -56,28 +55,6 @@ def load_dataset(file):
     return extract_tensor(raw)
 
 
-def _to_numpy(tensor):
-    if isinstance(tensor, torch.Tensor):
-        return tensor.detach().cpu().numpy()
-    return np.asarray(tensor)
-
-
-def normalize_dataset_shape(data_3d):
-    """
-    Normalize input of shape (M, d, N) or (M, N, d) to (M, d, N).
-    Returns (data_d_n, d, N).
-    """
-    arr = _to_numpy(data_3d)
-    if arr.ndim != 3:
-        raise ValueError(f"Expected 3D tensor/array, got shape {arr.shape}")
-
-    if arr.shape[1] <= arr.shape[2]:
-        d, n = arr.shape[1], arr.shape[2]
-        return arr, d, n
-    d, n = arr.shape[2], arr.shape[1]
-    return np.transpose(arr, (0, 2, 1)), d, n
-
-
 # ============================================================
 # Geometry: min pair distance & radii
 # ============================================================
@@ -101,54 +78,39 @@ def _min_pairwise_distance_sample(points_nd: np.ndarray) -> float:
     return float(best if np.isfinite(best) else 0.0)
 
 
-def _min_pairwise_distance_sample_periodic(points_nd: np.ndarray, L: float) -> float:
-    """
-    Minimum-image distance for periodic box of side L.
-    """
-    N, d = points_nd.shape
-    if N < 2:
-        return 0.0
-    best = np.inf
-    for i in range(N):
-        xi = points_nd[i]
-        for j in range(i + 1, N):
-            delta = xi - points_nd[j]
-            delta = (delta + 0.5 * L) % L - 0.5 * L
-            d2 = float(np.dot(delta, delta))
-            if d2 < best * best:
-                best = math.sqrt(d2)
-    return float(best if np.isfinite(best) else 0.0)
-
-
-def compute_radii(tensor_data, L: float = 1.0, boundary_mode: str = "reflect"):
+def compute_radii(tensor_data):
     """
     tensor_data: expected shapes (M,d,N) or (M,N,d) or torch.Tensor.
     Returns dict with per-sample:
       - 'radii':          effective radius = 0.5 * min pairwise distance
       - 'min_distances':  min pairwise distance itself
     """
-    data_d_n, d, N = normalize_dataset_shape(tensor_data)
-    M = data_d_n.shape[0]
+    if isinstance(tensor_data, torch.Tensor):
+        arr = tensor_data.detach().cpu().numpy()
+    else:
+        arr = np.asarray(tensor_data)
+
+    if arr.ndim != 3:
+        raise ValueError(f"Expected 3D tensor, got shape {arr.shape}")
+
+    # Normalize to (M, d, N)
+    if arr.shape[1] < arr.shape[2]:
+        data_d_n = arr  # (M, d, N)
+    else:
+        data_d_n = np.transpose(arr, (0, 2, 1))  # (M, d, N)
+
+    M, d, N = data_d_n.shape
     min_dists = np.empty(M, dtype=np.float64)
     radii = np.empty(M, dtype=np.float64)
-    periodic = str(boundary_mode).lower() == "periodic"
 
     for idx in range(M):
         # data_d_n[idx]: (d, N) -> (N, d)
         pts = data_d_n[idx].T.astype(np.float64, copy=False)
-        if periodic:
-            md = _min_pairwise_distance_sample_periodic(pts, L)
-        else:
-            md = _min_pairwise_distance_sample(pts)
+        md = _min_pairwise_distance_sample(pts)
         min_dists[idx] = md
         radii[idx] = 0.5 * md
 
-    return {
-        "radii": radii,
-        "min_distances": min_dists,
-        "dimension": d,
-        "num_spheres": N,
-    }
+    return {"radii": radii, "min_distances": min_dists}
 
 
 # ============================================================
@@ -253,7 +215,7 @@ def plot(Arrays, labels, savepath,
         plt.close()
 
 
-def plot_files_combined(files, labels, savepath, boundary_mode="reflect", box_len=1.0, **kwargs):
+def plot_files_combined(files, labels, savepath, **kwargs):
     """
     files: list of .pt paths (or tensors)
     labels: list of labels (same length)
@@ -263,7 +225,7 @@ def plot_files_combined(files, labels, savepath, boundary_mode="reflect", box_le
     arrays_radii = []
     for file in files:
         dataset = load_dataset(file)
-        metr = compute_radii(dataset, L=box_len, boundary_mode=boundary_mode)
+        metr = compute_radii(dataset)
         arrays_radii.append(metr["radii"])
 
     plot(Arrays=arrays_radii,
@@ -286,10 +248,21 @@ def plot_3d(dataset, title="plot"):
     """
     if isinstance(dataset, str):
         dataset = load_dataset(dataset)
-    arr_d_n, d, _ = normalize_dataset_shape(dataset)
-    if d != 3:
-        raise ValueError(f"plot_3d only supports d=3; got d={d}")
-    data_3n = arr_d_n
+    if isinstance(dataset, torch.Tensor):
+        arr = dataset.detach().cpu().numpy()
+    else:
+        arr = np.asarray(dataset)
+
+    if arr.ndim != 3:
+        raise ValueError(f"Expected 3D tensor for plotting, got shape {arr.shape}")
+
+    # Normalize to (M, 3, N)
+    if arr.shape[1] == 3:
+        data_3n = arr
+    elif arr.shape[2] == 3:
+        data_3n = np.transpose(arr, (0, 2, 1))
+    else:
+        raise ValueError(f"Second or last dimension must be 3; got shape {arr.shape}")
 
     from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
 

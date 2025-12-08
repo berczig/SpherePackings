@@ -13,33 +13,19 @@ from scipy.optimize import minimize
 from datetime import datetime
 import numba as nb
 from numba import njit
-from pathlib import Path
-import configparser
+from diffuse_boost import cfg
 from diffuse_boost.spheres_in_cube.physics_push_PESC import eliminate_overlaps_box
 from diffuse_boost.spheres_in_cube.best_results import load_best_results
+from diffuse_boost.spheres_in_cube_12d.pipeline import PipelineState
 from tqdm import tqdm
-
-# Config loader with fallback (avoid diffuse_boost.__init__ import issues)
-try:
-    from diffuse_boost import cfg as _GLOBAL_CFG
-except Exception as e:
-    print(f"[warn] diffuse_boost cfg import failed ({e}); loading config.cfg manually.")
-    _GLOBAL_CFG = configparser.ConfigParser()
-    cfg_path = Path(__file__).resolve().parents[2] / "config.cfg"
-    if not _GLOBAL_CFG.read(cfg_path, encoding="utf8"):
-        raise FileNotFoundError(f"Could not read config file at {cfg_path}")
-cfg = _GLOBAL_CFG
 
 # -----------------------------------------------------------------------------
 # Config helper (same style as in Heilbronn script)
 # -----------------------------------------------------------------------------
 EPS_SMALL = 1e-6
-MAX_SYMMETRY_MATRICES = 5000  # guard against combinatorial explosion in high d
-BOUNDARY_PERIODIC = "periodic"
-BOUNDARY_REFLECT = "reflect"
 
 def _get_cfg(section, key, fallback):
-    global cfg
+    from diffuse_boost import cfg
     try:
         if isinstance(fallback, bool):
             return cfg.getboolean(section, key)
@@ -51,107 +37,92 @@ def _get_cfg(section, key, fallback):
     except Exception:
         return fallback
     
+def _set_cfg(section, key, value):
+    cfg.set(section, key, value)
+    print(f"[CFG] Overwriting '{section}.{key}' to {value}")
+    
 # -----------------------------------------------------------------------------
 # Utilities: Penalty gradient, energy evaluation, and clearance maximization
 # -----------------------------------------------------------------------------
 @njit(cache=True, fastmath=True)
-def _wrap_periodic(x, L):
-    return x - np.floor(x / L) * L
-
-@njit(cache=True, fastmath=True)
-def _min_image_delta(delta, L):
-    return (delta + 0.5 * L) % L - 0.5 * L
-
-@njit(cache=True, fastmath=True)
-def _random_unit_vector(dim):
+def _unit_direction(dx, dist):
     """
-    Generate a random unit vector in R^dim.
-    Used when two centers coincide (dist ~ 0), to avoid NaNs in gradients.
+    Normalize the displacement vector. If the distance is ~0, pick a random
+    direction to avoid division by zero.
     """
-    v = np.empty(dim)
-    n = 0.0
-    for k in range(dim):
+    out = np.empty_like(dx)
+    if dist >= EPS_SMALL:
+        inv = 1.0 / dist
+        for i in range(dx.size):
+            out[i] = dx[i] * inv
+        return out
+
+    norm_sq = 0.0
+    for i in range(dx.size):
         val = np.random.normal()
-        v[k] = val
-        n += val * val
-    n = math.sqrt(n) + EPS_SMALL
-    for k in range(dim):
-        v[k] /= n
-    return v
+        out[i] = val
+        norm_sq += val * val
+    norm = math.sqrt(norm_sq) + EPS_SMALL
+    for i in range(dx.size):
+        out[i] /= norm
+    return out
 
 @njit(cache=True, fastmath=True)
-def compute_EL_grad(X_rel, L, N, r, D, is_periodic):
+def compute_EL_grad(X_rel, L, N, r, D):
     """
     Compute energy and gradient in the 'relative' coordinate frame by mapping
-    through to absolute cube coordinates, computing penalties there,
-    and then chaining the gradient back.
+    through to absolute cube coordinates, computing the true overlap penalties
+    there, and then chaining the gradient back.
     X_rel: array of shape (D*N,), representing coords in [-L/2, L/2].
     """
     coords_rel = X_rel.reshape((N, D))
+    scale = (L - 2.0 * r) / L
     half = L / 2.0
-    if is_periodic:
-        coords_abs = _wrap_periodic(coords_rel + half, L)
-        scale = 1.0
-    else:
-        scale = (L - 2.0 * r) / L
-        coords_abs = (coords_rel + half) * scale + r
+    coords_abs = (coords_rel + half) * scale + r
 
     EL = 0.0
     grad_abs = np.zeros((N, D), dtype=coords_abs.dtype)
 
-    # Walls (only for non-periodic)
-    if not is_periodic:
-        for i in range(N):
-            for d in range(D):
-                x = coords_abs[i, d]
-                if x < r:
-                    over = r - x
-                    EL += over * over
-                    grad_abs[i, d] += -2.0 * over
-                elif x > L - r:
-                    over = x - (L - r)
-                    EL += over * over
-                    grad_abs[i, d] += 2.0 * over
+    # Walls
+    for i in range(N):
+        for d in range(D):
+            x = coords_abs[i, d]
+            if x < r:
+                over = r - x
+                EL += over * over
+                grad_abs[i, d] += -2.0 * over
+            elif x > L - r:
+                over = x - (L - r)
+                EL += over * over
+                grad_abs[i, d] += 2.0 * over
 
     # Sphere-sphere
     for i in range(N):
         for j in range(i + 1, N):
+            dx = coords_abs[i] - coords_abs[j]
             dist_sq = 0.0
             for d in range(D):
-                diff = coords_abs[i, d] - coords_abs[j, d]
-                if is_periodic:
-                    diff = _min_image_delta(diff, L)
-                dist_sq += diff * diff
+                dist_sq += dx[d] * dx[d]
             dist = math.sqrt(dist_sq)
             over = 2.0 * r - dist
             if over > 0.0:
                 EL += over * over
-                if dist >= EPS_SMALL:
-                    inv = 1.0 / dist
-                    for d in range(D):
-                        diff = coords_abs[i, d] - coords_abs[j, d]
-                        if is_periodic:
-                            diff = _min_image_delta(diff, L)
-                        g = 2.0 * over * diff * inv
-                        grad_abs[i, d] -= g
-                        grad_abs[j, d] += g
-                else:
-                    rnd = _random_unit_vector(D)
-                    for d in range(D):
-                        g = 2.0 * over * rnd[d]
-                        grad_abs[i, d] -= g
-                        grad_abs[j, d] += g
+                u = _unit_direction(dx, dist)
+                for d in range(D):
+                    g = 2.0 * over * u[d]
+                    grad_abs[i, d] -= g
+                    grad_abs[j, d] += g
 
     grad_rel = grad_abs * scale
     return EL, grad_rel.ravel()
 
 @njit(cache=True, fastmath=True)
-def compute_EL(X_rel, L, N, r, D, is_periodic):
-    EL, _ = compute_EL_grad(X_rel, L, N, r, D, is_periodic)
+def compute_EL(X_rel, L, N, r, D):
+    EL, _ = compute_EL_grad(X_rel, L, N, r, D)
     return EL
 
 @njit(cache=True, fastmath=True)
-def maximize_clearance(X_rel, N, D, L, is_periodic, steps=10, step_size=0.01):
+def maximize_clearance(X_rel, N, D, steps=10, step_size=0.01):
     coords = X_rel.reshape((N, D)).copy()
     for _ in range(steps):
         grad = np.zeros_like(coords)
@@ -162,19 +133,12 @@ def maximize_clearance(X_rel, N, D, L, is_periodic, steps=10, step_size=0.01):
                 dist_sq = 0.0
                 for d in range(D):
                     diff = coords[i, d] - coords[j, d]
-                    if is_periodic:
-                        diff = _min_image_delta(diff, L)
                     dist_sq += diff * diff
                 dist = math.sqrt(dist_sq) + EPS_SMALL
                 inv = 1.0 / dist
                 for d in range(D):
-                    diff = coords[i, d] - coords[j, d]
-                    if is_periodic:
-                        diff = _min_image_delta(diff, L)
-                    grad[i, d] += diff * inv
+                    grad[i, d] += (coords[i, d] - coords[j, d]) * inv
         coords += step_size * grad
-        if is_periodic:
-            coords = _wrap_periodic(coords + L/2, L) - L/2
     return coords.ravel()
 
 @njit(cache=True, fastmath=True)
@@ -187,46 +151,41 @@ def _linf_norm_with_eps(g):
     return m + EPS_SMALL
 
 @njit(cache=True, fastmath=True)
-def SRP(X_rel, L, N, r, D, Imax, m, sigma, beta, is_periodic):
+def SRP(X_rel, L, N, r, Imax, m, sigma, beta, D):
     eta = sigma
     Xc = X_rel.copy()
     for _ in range(Imax):
         Xc += np.random.uniform(-eta, eta, size=Xc.shape[0])
-        if is_periodic:
-            Xc = _wrap_periodic(Xc + L/2, L) - L/2
         for __ in range(m):
-            EL, g = compute_EL_grad(Xc, L, N, r, D, is_periodic)
+            EL, g = compute_EL_grad(Xc, L, N, r, D)
             Xc -= (sigma * eta) * (g / _linf_norm_with_eps(g))
         eta *= beta
     return Xc
 
 @njit(cache=True, fastmath=True)
-def min_pairwise_distance(centers, L, is_periodic):
-    N = centers.shape[0]
-    D = centers.shape[1]
+def min_pairwise_distance(centers):
+    N, D = centers.shape
     best = 1e300
     for i in range(N):
         for j in range(i + 1, N):
             dist_sq = 0.0
             for d in range(D):
                 diff = centers[i, d] - centers[j, d]
-                if is_periodic:
-                    diff = _min_image_delta(diff, L)
                 dist_sq += diff * diff
             d = math.sqrt(dist_sq)
             if d < best:
                 best = d
     return best
 
-def local_opt(X_rel, L, N, r, D, is_periodic, tol, maxiter):
+def local_opt(X_rel, L, N, r, D, tol, maxiter):
     """
     Local optimization in the relative frame with explicit L-BFGS-B bounds.
     """
     def objective(x):
-        EL, _ = compute_EL_grad(x, L, N, r, D, is_periodic)
+        EL, _ = compute_EL_grad(x, L, N, r, D)
         return EL
     def gradient(x):
-        _, grad = compute_EL_grad(x, L, N, r, D, is_periodic)
+        _, grad = compute_EL_grad(x, L, N, r, D)
         return grad
 
     x0 = X_rel.copy()
@@ -247,21 +206,13 @@ def local_opt(X_rel, L, N, r, D, is_periodic, tol, maxiter):
 # -----------------------------------------------------------------------------
 # Sampling & symmetries
 # -----------------------------------------------------------------------------
-def sample_uniform_points(dim, L, r, N, boundary_mode):
-    if boundary_mode == BOUNDARY_PERIODIC:
-        return np.random.uniform(0.0, L, size=(N, dim))
+def sample_uniform_points(dim, L, r, N):
     low, high = r, L - r
     if high <= low:
         raise ValueError("bounding_box_width must exceed 2*radius.")
     return np.random.uniform(low, high, size=(N, dim))
 
 def get_cube_symmetry_matrices(dim):
-    total = math.factorial(dim) * (2 ** dim)
-    if total > MAX_SYMMETRY_MATRICES:
-        raise ValueError(
-            f"Symmetry count {total} exceeds cap {MAX_SYMMETRY_MATRICES} for dim={dim}; "
-            "skipping symmetry augmentation."
-        )
     mats = []
     for perm in itertools.permutations(range(dim)):
         for signs in itertools.product([-1, 1], repeat=dim):
@@ -301,10 +252,7 @@ def generate_dataset_push_srp(verbose=True):
     dt       = _get_cfg(sec, "dt",                   1e-3)
     max_iter = _get_cfg(sec, "max_iter",             10000)
     tol      = _get_cfg(sec, "tol",                  1e-6)
-    mode_bnd = str(_get_cfg(sec, "boundary_mode", "reflect")).lower()
-    is_periodic = (mode_bnd == BOUNDARY_PERIODIC)
-    is_periodic = (str(mode_bnd).lower() == BOUNDARY_PERIODIC)
-    is_periodic = (str(mode_bnd).lower() == BOUNDARY_PERIODIC)
+    mode_bnd = _get_cfg(sec, "boundary_mode",        "reflect")
 
     Imax       = _get_cfg(sec, "srp_Imax",        500)
     m          = _get_cfg(sec, "srp_m",           20)
@@ -316,36 +264,29 @@ def generate_dataset_push_srp(verbose=True):
     num_srp_restarts = _get_cfg(sec, "num_srp_restarts", 15)
 
     physics_push_mode = _get_cfg(sec, "physics_push_mode", True)
-    if is_periodic and physics_push_mode:
-        print("[info] boundary_mode=periodic => disabling physics_push (box-based).")
-        physics_push_mode = False
-    if is_periodic and physics_push_mode:
-        print("[info] boundary_mode=periodic => disabling physics_push (box-based).")
-        physics_push_mode = False
-    if mode_bnd == BOUNDARY_PERIODIC and physics_push_mode:
-        print("[info] boundary_mode=periodic => disabling physics_push (box-based).")
-        physics_push_mode = False
+    scale = (L - 2.0 * r) / L
 
-    print(f"Generating dataset with N={N}, M={M}, SRP restarts={num_srp_restarts}, physics_push_mode={physics_push_mode}")
+    print(f"[Data Generation] Generating dataset with N={N}, M={M}, SRP restarts={num_srp_restarts}, physics_push_mode={physics_push_mode}")
 
     # Output filenames (include N in the timestamp token)
     timestamp_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     stamp_with_N = f"N{N}_{timestamp_str}"
+    day_stamp = datetime.now().strftime("%Y-%m-%d")
 
     base_metrics = _get_cfg(sec, "output_filename_metrics", "srp_metrics_{DATE}.csv")
-    metrics_fn = base_metrics.replace("{DATE}", stamp_with_N)
+    metrics_fn = base_metrics.replace("{DATE}", stamp_with_N).replace("{DAY_DATE}", day_stamp) 
 
     base_data = _get_cfg(sec, "output_filename", "srp_data_{DATE}.pt")
-    data_fn = base_data.replace("{DATE}", stamp_with_N)
+    data_fn = base_data.replace("{DATE}", stamp_with_N).replace("{DAY_DATE}", day_stamp) 
 
     base_sym = _get_cfg(sec, "output_filename_sym", data_fn.replace('.pt', '_sym.pt'))
-    sym_fn = base_sym.replace("{DATE}", stamp_with_N)
+    sym_fn = base_sym.replace("{DATE}", stamp_with_N).replace("{DAY_DATE}", day_stamp) 
 
     base_top = _get_cfg(sec, "output_filename_top", "srp_top_{DATE}.pt")
-    top_fn = base_top.replace("{DATE}", stamp_with_N)
+    top_fn = base_top.replace("{DATE}", stamp_with_N).replace("{DAY_DATE}", day_stamp) 
 
     base_sym_top = _get_cfg(sec, "output_filename_sym_top", top_fn.replace('.pt', '_sym.pt'))
-    sym_top_fn = base_sym_top.replace("{DATE}", stamp_with_N)
+    sym_top_fn = base_sym_top.replace("{DATE}", stamp_with_N).replace("{DAY_DATE}", day_stamp) 
 
     metrics_dir = os.path.dirname(metrics_fn)
     if metrics_dir:
@@ -367,7 +308,7 @@ def generate_dataset_push_srp(verbose=True):
     for i in tqdm(range(M), desc=f"Generating sample - will be used for {num_srp_restarts} restarts"):
         if verbose:
             print(f"Generating sample {i+1}/{M}...")
-        pts = sample_uniform_points(D, L, r, N, mode_bnd)
+        pts = sample_uniform_points(D, L, r, N)
 
         if physics_push_mode:
             centers0, _ = eliminate_overlaps_box(
@@ -380,7 +321,8 @@ def generate_dataset_push_srp(verbose=True):
 
         half = L / 2
         X0 = (centers0 - half).ravel()
-        init_min = min_pairwise_distance(centers0, L, is_periodic)
+        diffs0 = centers0[:, None, :] - centers0[None, :, :]
+        init_min = np.min(np.linalg.norm(diffs0, axis=-1)[np.triu_indices(N, k=1)])
         best_centers = centers0.copy()
         best_min = init_min
         excess_sample = best_d - init_min
@@ -399,23 +341,21 @@ def generate_dataset_push_srp(verbose=True):
             if verbose:
                 print(f"  SRP restart {k+1}/{num_srp_restarts} for sample {i+1}/{M}")
             eps = 1e-6
-            X_srp = SRP(X0, L, N, r, D, Imax, m, sigma, beta, is_periodic)
+            X_srp = SRP(X0, L, N, r, Imax, m, sigma, beta, D)
             X_srp_clip = np.clip(X_srp, -L/2 + eps, L/2 - eps)
-            EL_before = compute_EL(X_srp_clip, L, N, r, D, is_periodic)
+            EL_before = compute_EL(X_srp_clip, L, N, r, D)
             if verbose:
                 print(f"    SRP restart {k+1}/{num_srp_restarts}: EL before local_opt = {EL_before:.6f}")
-            X_lo, EL_after = local_opt(X_srp_clip, L, N, r, D, is_periodic, tol_opt, maxiter_opt)
+            X_lo, EL_after = local_opt(X_srp_clip, L, N, r, D, tol_opt, maxiter_opt)
             if verbose:
                 print(f"    SRP restart {k+1}/{num_srp_restarts}: EL after local_opt  = {EL_after:.6f}")
 
             coords = X_lo.reshape((N, D))
-            if is_periodic:
-                centers_opt = _wrap_periodic(coords + half, L)
-            else:
-                centers_opt = (coords + half) * ((L - 2 * r) / L) + r
-                centers_opt = np.minimum(np.maximum(centers_opt, r + EPS_SMALL), L - r - EPS_SMALL)
+            centers_opt = (coords + half) * scale + r
+            centers_opt = np.minimum(np.maximum(centers_opt, r + EPS_SMALL), L - r - EPS_SMALL)
 
-            pre_min = min_pairwise_distance(centers_opt, L, is_periodic)
+            diffs_pre = centers_opt[:, None, :] - centers_opt[None, :, :]
+            pre_min = np.min(np.linalg.norm(diffs_pre, axis=-1)[np.triu_indices(N, k=1)])
 
             if physics_push_mode:
                 centers_k, _ = eliminate_overlaps_box(
@@ -426,7 +366,8 @@ def generate_dataset_push_srp(verbose=True):
             else:
                 centers_k = centers_opt
 
-            post_min = min_pairwise_distance(centers_k, L, is_periodic)
+            diffs_k = centers_k[:, None, :] - centers_k[None, :, :]
+            post_min = np.min(np.linalg.norm(diffs_k, axis=-1)[np.triu_indices(N, k=1)])
             excess = best_d - post_min
             if verbose:
                 print(f"    min_after{'_physics_push' if physics_push_mode else ''} = {post_min:.6f}, excess = {excess:.6f}")
@@ -464,8 +405,7 @@ def generate_dataset_push_srp(verbose=True):
     if data_dir:
         os.makedirs(data_dir, exist_ok=True)
     torch.save(torch.from_numpy(data), data_fn)
-    if verbose:
-        print(f"Saved full dataset to {data_fn}")
+    print(f"[Save] Saved full dataset to {data_fn}")
 
     # Symmetrized full dataset
     try:
@@ -522,6 +462,7 @@ def generate_dataset_push_srp(verbose=True):
             )
     if verbose:
         print(f"Saved top-10 metrics to {metrics_top10_fn}")
+    return data_fn
 
 # -----------------------------------------------------------------------------
 # Multi-sphere-count training generation
@@ -585,8 +526,7 @@ def final_push_existing_samples():
     dt       = _get_cfg(sec, "dt",                   1e-3)
     max_iter = _get_cfg(sec, "max_iter",             10000)
     tol      = _get_cfg(sec, "tol",                  1e-6)
-    mode_bnd = str(_get_cfg(sec, "boundary_mode", "reflect")).lower()
-    is_periodic = (mode_bnd == BOUNDARY_PERIODIC)
+    mode_bnd = _get_cfg(sec, "boundary_mode",        "reflect")
 
     # SRP / local optimization parameters
     Imax       = _get_cfg(sec, "srp_Imax",        500)
@@ -599,12 +539,11 @@ def final_push_existing_samples():
     num_srp_restarts = _get_cfg(sec, "num_srp_restarts", 15)
 
     physics_push_mode = _get_cfg(sec, "physics_push_mode", True)
-    if is_periodic and physics_push_mode:
-        print("[info] boundary_mode=periodic => disabling physics_push (box-based).")
-        physics_push_mode = False
 
     # IO paths for final push
+    stamp      = datetime.now().strftime("%Y-%m-%d")
     out_dir    = _get_cfg(sec, "final_push_output", "./outputs_spheres_push")
+    out_dir = os.path.join(out_dir, stamp)
     input_path = _get_cfg(sec, "final_push_input",  "")
 
     assert isinstance(input_path, str) and len(input_path) > 0 and os.path.exists(input_path), \
@@ -616,6 +555,7 @@ def final_push_existing_samples():
     metrics_fn = os.path.join(out_dir, f"spheres_metrics_pushed_N{N}_{stamp}.csv")
 
     loaded = torch.load(input_path, map_location="cpu")
+    print(f"[Load] Loaded tensors from '{input_path}', shape {loaded.data.shape}")
     arr = loaded.detach().cpu().numpy() if isinstance(loaded, torch.Tensor) else None
     if arr is None or arr.ndim != 3:
         raise ValueError(f"Expected a tensor at final_push_input, got shape {getattr(loaded, 'shape', None)}")
@@ -633,7 +573,7 @@ def final_push_existing_samples():
         raise ValueError(f"Config num_spheres={N} but input samples have N={N_in}")
 
     K = M_in
-    print(f"Pushing {K} loaded samples (N={N}, D={D})")
+    print(f"[Push] Pushing {K} loaded samples (N={N}, D={D})")
 
     with open(metrics_fn, "w") as mf:
         mf.write("sample,srp_restart,EL_before,EL_after,pre_push_min,post_push_min,excess\n")
@@ -652,7 +592,7 @@ def final_push_existing_samples():
     best_excess_list    = [float('inf')] * K
     best_restart_idx_list = [-1] * K
 
-    for s in tqdm(range(K), desc="[Pushing Samples]", unit="sample"):
+    for s in tqdm(range(K), desc="Pushing Samples", unit="sample"):
         centers_in = arr[s].T.astype(np.float64)  # (N, D)
 
         if physics_push_mode:
@@ -677,20 +617,18 @@ def final_push_existing_samples():
 
         for k in range(num_srp_restarts):
             eps = 1e-6
-            X_srp = SRP(X0, L, N, r, D, Imax, m, sigma, beta, is_periodic)
+            X_srp = SRP(X0, L, N, r, Imax, m, sigma, beta, D)
             X_srp_clip = np.clip(X_srp, -L/2 + eps, L/2 - eps)
-            EL_before = compute_EL(X_srp_clip, L, N, r, D, is_periodic)
+            EL_before = compute_EL(X_srp_clip, L, N, r, D)
 
-            X_lo, EL_after = local_opt(X_srp_clip, L, N, r, D, is_periodic, tol_opt, maxiter_opt)
+            X_lo, EL_after = local_opt(X_srp_clip, L, N, r, D, tol_opt, maxiter_opt)
 
             coords = X_lo.reshape((N, D))
-            if is_periodic:
-                centers_opt = _wrap_periodic(coords + half, L)
-            else:
-                centers_opt = (coords + half) * scale + r
-                centers_opt = np.minimum(np.maximum(centers_opt, r + EPS_SMALL), L - r - EPS_SMALL)
+            centers_opt = (coords + half) * scale + r
+            centers_opt = np.minimum(np.maximum(centers_opt, r + EPS_SMALL), L - r - EPS_SMALL)
 
-            pre_min = min_pairwise_distance(centers_opt, L, is_periodic)
+            diffs_pre = centers_opt[:, None, :] - centers_opt[None, :, :]
+            pre_min = np.min(np.linalg.norm(diffs_pre, axis=-1)[np.triu_indices(N, k=1)])
 
             if physics_push_mode:
                 centers_k, _ = eliminate_overlaps_box(
@@ -701,7 +639,8 @@ def final_push_existing_samples():
             else:
                 centers_k = centers_opt
 
-            post_min = min_pairwise_distance(centers_k, L, is_periodic)
+            diffs_k = centers_k[:, None, :] - centers_k[None, :, :]
+            post_min = np.min(np.linalg.norm(diffs_k, axis=-1)[np.triu_indices(N, k=1)])
             excess = best_d - post_min
 
             with open(metrics_fn, "a") as mf:
@@ -729,7 +668,7 @@ def final_push_existing_samples():
         best_restart_idx_list[s] = best_restart
 
     torch.save(torch.from_numpy(data_out), dataset_fn)
-    print(f"\nSaved pushed dataset:  {dataset_fn}")
+    print(f"\nSaved pushed dataset:  {dataset_fn}, shape {data_out.data.shape}")
     print(f"Saved pushed metrics:  {metrics_fn}")
 
     # Top-10 metrics (minimal excess)
@@ -749,11 +688,12 @@ def final_push_existing_samples():
                 f"{best_restart_idx_list[idx]}\n"
             )
     print(f"Saved top-10 pushed metrics: {metrics_top10_fn}")
+    return dataset_fn
 
 # -----------------------------------------------------------------------------
 # Main mode switch
 # -----------------------------------------------------------------------------
-if __name__ == "__main__":
+def main(state:PipelineState=None):
     main_sec = "sample_generation_PP+PBTS"
     mode = _get_cfg(main_sec, "mode", "training_set_gen").strip().lower()
 
@@ -765,10 +705,17 @@ if __name__ == "__main__":
         if multi_active:
             generate_dataset_push_srp_different_sphere_count()
         else:
-            generate_dataset_push_srp(verbose=False)
+            data_save_path = generate_dataset_push_srp(verbose=False)
+            if state: state.set_samples_path(data_save_path)
 
     elif mode == "final_push":
-        final_push_existing_samples()
+        data_save_path = final_push_existing_samples()
+        if state: state.set_pushed_samples_path(data_save_path)
 
     else:
         raise ValueError(f"Unknown mode '{mode}'. Use 'training_set_gen' or 'final_push'.")
+    
+    
+
+if __name__ == "__main__":
+    main()

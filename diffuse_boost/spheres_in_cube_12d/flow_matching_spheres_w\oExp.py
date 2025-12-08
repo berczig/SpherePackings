@@ -21,7 +21,7 @@ from flow_matching.path.scheduler import CondOTScheduler
 from flow_matching.path import AffineProbPath
 from flow_matching.solver import ODESolver
 
-from diffuse_boost.spheres_in_cube_12d.pipeline import PipelineState
+from diffuse_boost.spheres_in_cube_new2.pipeline import PipelineState
 
 from diffuse_boost.spheres_in_cube import data_load_save
 from diffuse_boost import cfg  # assumes diffuse_boost.cfg is a ConfigParser
@@ -428,31 +428,15 @@ class RGCFMTrainer:
             if cond_used.size(0) > x1.size(0):
                 cond_used = cond_used[:x1.size(0)]
 
-         # Reward: larger minsep => better (supports larger effective radius)
+        # Reward: min pairwise distance / L
         P = x1.permute(0, 2, 1).contiguous()  # (B, N, d)
         dmat = torch.cdist(P, P)
         eye = torch.eye(self.num_points, device=self.device, dtype=torch.bool)[None]
         dmat = dmat.masked_fill(eye, float('inf'))
-        minsep = dmat.amin(dim=-1).amin(dim=-1)  # (B,)
-
-        # Overlap threshold: minsep must be >= 2 * r
-        min_allowed = 2.0 * self.sphere_radius
-        valid_mask = minsep >= min_allowed
-
-        # Base reward: normalized minsep (larger = better)
-        rewards = minsep / self.clip_range  # (B,)
-
-        # Strongly downweight overlapping configs
-        if (~valid_mask).any():
-            if valid_mask.any():
-                bad_floor = rewards[valid_mask].min() - 1.0
-            else:
-                bad_floor = rewards.min() - 1.0
-            rewards = torch.where(valid_mask, rewards, bad_floor)
-
-        rewards = rewards.detach()
+        minsep = dmat.amin(dim=-1).amin(dim=-1)
+        # Reward smaller gaps (denser packings): negative minsep
+        rewards = (-(minsep / self.clip_range)).detach()
         return x1, rewards, cond_used
-
 
     def compute_loss(self, x_data: torch.Tensor, rewards: torch.Tensor, cond: torch.Tensor = None):
         """
