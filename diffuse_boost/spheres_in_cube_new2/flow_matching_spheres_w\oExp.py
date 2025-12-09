@@ -422,19 +422,29 @@ class RGCFMTrainer:
             return_cond=True,
         )
         x1 = torch.from_numpy(samples_np).to(self.device, dtype=torch.float32)
-        cond_used = None
-        if cond_batches is not None and cond_batches.numel() > 0:
-            cond_used = cond_batches.to(self.device)
-            if cond_used.size(0) > x1.size(0):
-                cond_used = cond_used[:x1.size(0)]
-
-        # Reward: min pairwise distance / L
+        # Reward: larger minsep => better (supports larger effective radius)
         P = x1.permute(0, 2, 1).contiguous()  # (B, N, d)
         dmat = torch.cdist(P, P)
         eye = torch.eye(self.num_points, device=self.device, dtype=torch.bool)[None]
         dmat = dmat.masked_fill(eye, float('inf'))
-        minsep = dmat.amin(dim=-1).amin(dim=-1)
-        rewards = (minsep / self.clip_range).detach()
+        minsep = dmat.amin(dim=-1).amin(dim=-1)  # (B,)
+
+        # Overlap threshold: minsep must be >= 2 * r
+        min_allowed = 2.0 * self.sphere_radius
+        valid_mask = minsep >= min_allowed
+
+        # Base reward: normalized minsep (larger = better)
+        rewards = minsep / self.clip_range  # (B,)
+
+        # Strongly downweight overlapping configs
+        if (~valid_mask).any():
+            if valid_mask.any():
+                bad_floor = rewards[valid_mask].min() - 1.0
+            else:
+                bad_floor = rewards.min() - 1.0
+            rewards = torch.where(valid_mask, rewards, bad_floor)
+
+        rewards = rewards.detach()
         return x1, rewards, cond_used
 
     def compute_loss(self, x_data: torch.Tensor, rewards: torch.Tensor, cond: torch.Tensor = None):

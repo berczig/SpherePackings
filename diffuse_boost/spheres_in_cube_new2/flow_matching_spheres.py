@@ -374,6 +374,12 @@ class RGCFMTrainer:
         self.prox_lambda = float(config.get("prox_lambda", 2.0))
         self.final_passes = int(config.get("final_passes", 6))
         self.tol_finish = float(config.get("tol_finish", 1e-8))
+        #geometry-aware exploration
+        # explore_magnitude is dimensionless; actual step size ~ explore_magnitude * sphere_radius
+        self.explore_magnitude = float(config.get("explore_magnitude", 0.0))
+        self.explore_contact_frac = float(config.get("explore_contact_frac", 1.0))
+        self.explore_local_frac = float(config.get("explore_local_frac", 0.25))
+
 
         self.history = []
         self.global_step = 0
@@ -388,6 +394,124 @@ class RGCFMTrainer:
         self.net_model.load_state_dict(sd, strict=True)
         self.ref_model.load_state_dict(sd)
         self.ref_model.eval()
+
+        @torch.no_grad()
+    def _explore_actions(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Geometry-aware exploration operator E(x' | x) for static sphere packings.
+
+        x: (B, d, N) configurations sampled from the current flow policy.
+        Returns: explored configurations x', same shape, box-clamped.
+
+        Exploration direction is built from:
+          - contact overlaps and normals (pairwise constraints),
+          - soft wall pushes near the box boundaries,
+        then normalized and scaled to have magnitude ~ explore_magnitude * sphere_radius,
+        with optional additional local jitter.
+        """
+        M = self.explore_magnitude
+        if M <= 0.0:
+            return x  # exploration disabled
+
+        B, d, N = x.shape
+        device = x.device
+        r = self.sphere_radius
+        L = self.clip_range
+
+        # --- 1) Compute overlaps and normals (contact graph) ---
+        # P: (B, N, d)
+        P = x.permute(0, 2, 1).contiguous()
+        if self.eps_nrm > 0.0:
+            P = P + (self.eps_nrm * r) * torch.randn_like(P)
+
+        # pairwise differences and distances
+        diff = P[:, :, None, :] - P[:, None, :, :]    # (B, N, N, d)
+        dist = diff.norm(dim=-1).clamp_min(1e-12)     # (B, N, N)
+        n = diff / dist.unsqueeze(-1)                 # (B, N, N, d), unit normals i<-j
+
+        overlap = (2.0 * r - dist)                    # positive => penetrating
+        eye = torch.eye(N, device=device, dtype=torch.bool)[None]  # (1, N, N)
+        overlap = overlap.masked_fill(eye, 0.0)       # no self-overlap
+
+        # active contact mask, possibly top-q by overlap magnitude
+        pos = overlap > 0.0                           # (B, N, N)
+        if self.contact_q >= 1.0 or not pos.any():
+            active = pos
+        else:
+            flat = overlap.clone()
+            flat[~pos] = float('-inf')
+            # quantile per-batch over all pairs
+            thr = torch.quantile(flat.view(B, -1), 1.0 - self.contact_q, dim=1, keepdim=True)
+            thr = thr.view(B, 1, 1)
+            active = pos & (overlap >= thr)
+
+        # --- 2) Contact-relief displacement (Gauss-Newton-like) ---
+        # same structure as _JJt_inv_h_times_Jt, but local to this method
+        w = 0.5 * overlap * active.float()            # (B, N, N)
+        term_i = (w.unsqueeze(-1) * n).sum(dim=2)     # (B, N, d)
+        term_j = (
+            w.transpose(1, 2).unsqueeze(-1)
+            * n.transpose(1, 2)
+        ).sum(dim=2)                                  # (B, N, d)
+        delta_pairs = term_i - term_j                 # (B, N, d)
+        deg = active.float().sum(dim=2, keepdim=True).clamp_min(1.0)  # (B, N, 1)
+        delta_pairs = (delta_pairs / deg).permute(0, 2, 1)            # (B, d, N)
+
+        # --- 3) Soft wall push near boundaries (reusing wall_margin, wall_weight) ---
+        thr_wall = self.wall_margin * (2.0 * r)
+        delta_walls = torch.zeros_like(x)
+        if self.wall_weight > 0.0:
+            for ax in range(d):
+                dl = x[:, ax, :] - r          # distance to low face
+                dh = (L - r) - x[:, ax, :]    # distance to high face
+                near_low = dl < thr_wall
+                near_high = dh < thr_wall
+
+                delta_walls[:, ax, :] += torch.where(
+                    near_low, (thr_wall - dl), torch.zeros_like(dl)
+                )
+                delta_walls[:, ax, :] -= torch.where(
+                    near_high, (thr_wall - dh), torch.zeros_like(dh)
+                )
+            delta_walls = self.wall_weight * delta_walls
+
+        # --- 4) Combine contact and wall directions ---
+        # explore_contact_frac weights contact vs wall direction
+        c_frac = float(self.explore_contact_frac)
+        direction = c_frac * delta_pairs + (1.0 - c_frac) * delta_walls  # (B, d, N)
+
+        # Handle degenerate case where direction is (almost) zero for some samples
+        dir_norm = direction.norm(dim=(1, 2), keepdim=True)  # (B, 1, 1)
+        zero_mask = dir_norm < 1e-8
+        if zero_mask.any():
+            rand = torch.randn_like(direction)
+            rand_norm = rand.norm(dim=(1, 2), keepdim=True).clamp_min(1e-8)
+            rand_unit = rand / rand_norm
+            direction = torch.where(zero_mask, rand_unit, direction)
+            dir_norm = direction.norm(dim=(1, 2), keepdim=True).clamp_min(1e-8)
+
+        direction_unit = direction / dir_norm
+
+        # --- 5) Scale by exploration magnitude and add optional local jitter ---
+        # base step size ~ M * r
+        step = M * r * direction_unit
+
+        # randomize sign per configuration to diversify exploration
+        sign = torch.where(
+            torch.rand(B, 1, 1, device=device) < 0.5,
+            torch.tensor(1.0, device=device),
+            torch.tensor(-1.0, device=device),
+        )
+        step = step * sign
+
+        # optional additional local isotropic jitter
+        local_amp = self.explore_local_frac * M * r
+        if local_amp > 0.0:
+            step = step + torch.randn_like(step) * local_amp
+
+        x_pert = x + step
+        x_pert = _box_clamp(x_pert, r, L)
+        return x_pert
 
     @torch.no_grad()
     def sample_batch(self, ep: int):
@@ -421,7 +545,11 @@ class RGCFMTrainer:
             tol_finish=self.tol_finish,
             return_cond=True,
         )
+
         x1 = torch.from_numpy(samples_np).to(self.device, dtype=torch.float32)
+        # geometry-aware exploration:
+        # E(x' | x) uses contact graph + walls to propose nearby configurations.
+        x1 = self._explore_actions(x1)
         cond_used = None
         if cond_batches is not None and cond_batches.numel() > 0:
             cond_used = cond_batches.to(self.device)
@@ -943,6 +1071,11 @@ def rg_cfm_main(state: PipelineState = None):
     rg_ref_path = cfg.get(sec, "rg_ref_path", fallback="").strip()
     if not rg_ref_path:
         rg_ref_path = cfg.get(sec, "resume_model_path", fallback="").strip()
+    # exploration actions (dimensionless, optional; 0.0 disables)
+    rg_explore_mag = cfg.getfloat(sec, "rg_explore_magnitude", fallback=0.0)
+    rg_explore_contact_frac = cfg.getfloat(sec, "rg_explore_contact_frac", fallback=1.0)
+    rg_explore_local_frac = cfg.getfloat(sec, "rg_explore_local_frac", fallback=0.25)
+
     assert rg_ref_path, "rg_ref_path (or resume_model_path) must be set for RG-CFM."
 
     # Time sampling knobs
@@ -1026,6 +1159,9 @@ def rg_cfm_main(state: PipelineState = None):
         "prox_lambda": prox_lambda,
         "final_passes": final_passes,
         "tol_finish": tol_finish,
+        "explore_magnitude": rg_explore_mag,
+        "explore_contact_frac": rg_explore_contact_frac,
+        "explore_local_frac": rg_explore_local_frac,
     }
 
     trainer = RGCFMTrainer(
