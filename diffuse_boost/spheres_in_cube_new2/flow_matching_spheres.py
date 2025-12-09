@@ -395,7 +395,7 @@ class RGCFMTrainer:
         self.ref_model.load_state_dict(sd)
         self.ref_model.eval()
 
-        @torch.no_grad()
+    @torch.no_grad()
     def _explore_actions(self, x: torch.Tensor) -> torch.Tensor:
         """
         Geometry-aware exploration operator E(x' | x) for static sphere packings.
