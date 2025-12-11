@@ -937,15 +937,16 @@ def sample_flow_model(
         jt_walls = _wall_push(u_next, margin_frac=wall_margin, scale=1.0)  # inward normal
         return jt_pairs + wall_weight * jt_walls
 
-    def _prox_relaxed(u, u0, u_proj, tau_prime, cond):
+    def _prox_relaxed(u, u0, u_proj, tau_prime, cond, step_dt=None):
         # gradient steps
         u_hat = (1.0 - tau_prime) * u0 + tau_prime * u_proj
         t_prime = 1.0 - float(tau_prime)
+        step_scale = float(step_dt) if step_dt is not None else (1.0 - tau_prime)
         for _ in range(max(1, prox_iters)):
             # evaluate v_theta at tau'
             tb = torch.full((u.size(0),), t_prime, device=u.device, dtype=u.dtype)
             v = model(tb, u, cond=cond) if cond is not None else model(tb, u)
-            u_next = _clamp_box(u + (1.0 - tau_prime) * v)
+            u_next = _clamp_box(u + step_scale * v)
 
             jt_h = _Jt_h_at_state(u_next)
             grad = (u - u_hat) + prox_lambda * jt_h
@@ -970,6 +971,7 @@ def sample_flow_model(
     cond_collected = [] if return_cond else None
     cond_iter = iter(cond_loader) if cond_loader is not None else None
 
+    dt = 1.0 / float(n_steps)
     pbar = tqdm(total=remaining, desc="Sampling")
     while remaining > 0:
         if cond_iter is not None:
@@ -1000,14 +1002,23 @@ def sample_flow_model(
 
         # tau grid
         for k in range(n_steps):
-            tau      = k / n_steps
-            tau_next = (k + 1) / n_steps
-            # Forward shoot to tau=1 with learned field
-            u1 = _ode_solve_with_model(u, tau, 1.0, cond)
-            # Terminal projection Π_H
-            u_proj = _project_terminal(u1)
-            # Reverse OT
-            u = _prox_relaxed(u, u0, u_proj, tau_next, cond)
+            tau      = k * dt
+            tau_next = (k + 1) * dt
+            # velocity field at model time t_model = 1 - tau
+            t_model = 1.0 - tau
+            tb = torch.full((u.size(0),), t_model, device=u.device, dtype=u.dtype)
+            v = model(tb, u, cond=cond) if cond is not None else model(tb, u)
+
+            # Predict step along FM direction, then project to constraint manifold
+            u_pred = _clamp_box(u + (1.0 - tau) * v)
+            u_proj = _project_terminal(u_pred)
+
+            # PCFM-style barycentric interpolation back to path endpoints
+            u_interp = (1.0 - tau_next) * u0 + tau_next * u_proj
+            v_proj = (u_interp - u) / dt
+
+            # One explicit Euler step with projected velocity
+            u = _clamp_box(u + dt * v_proj)
 
         # final polishing
         u = _final_polish(u)

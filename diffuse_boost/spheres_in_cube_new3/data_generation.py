@@ -16,12 +16,7 @@ from numba import njit
 from diffuse_boost import cfg
 from diffuse_boost.spheres_in_cube.physics_push_PESC import eliminate_overlaps_box
 from diffuse_boost.spheres_in_cube.best_results import load_best_results
-from diffuse_boost.spheres_in_cube_new.pipeline import PipelineState
-try:
-    # prefer v2 (PCFM-aligned); fall back to v1 if needed
-    from diffuse_boost.spheres_in_cube_new2.flow_matching_spheresv2 import distance_penalty
-except Exception:  # pragma: no cover - defensive fallback
-    from diffuse_boost.spheres_in_cube_new2.flow_matching_spheresv1 import distance_penalty
+from diffuse_boost.spheres_in_cube_new3.pipeline import PipelineState
 from tqdm import tqdm
 
 # -----------------------------------------------------------------------------
@@ -173,48 +168,6 @@ def min_pairwise_distance(centers):
             d = math.sqrt(dx0*dx0 + dx1*dx1 + dx2*dx2)
             if d < best:
                 best = d
-    return best
-
-def maximize_minsep_local(x_np, box_len, env_radius, max_outer_iters=20, inner_lr=1e-2,
-                          beta=10.0, top_q=0.1, delta_frac=0.01):
-    """
-    Lightweight local refinement that pushes pairwise distances upward.
-    Treats env_radius purely as a wall clamp; the target is to increase minsep.
-    """
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    def _torch_minsep(x_bdn):  # x_bdn: (B,d,N)
-        P = x_bdn.permute(0, 2, 1).contiguous()  # (B,N,d)
-        D = torch.cdist(P, P)
-        B, N, _ = D.shape
-        eye = torch.eye(N, device=D.device, dtype=torch.bool)[None]
-        D = D.masked_fill(eye, float('inf'))
-        return D.amin(dim=-1).amin(dim=-1)  # (B,)
-
-    best = x_np.copy()
-    best_minsep = min_pairwise_distance(best)
-    for _ in range(max_outer_iters):
-        x_t = torch.tensor(best.T[None, ...], dtype=torch.float32, device=device, requires_grad=True)  # (1,d,N)
-        cur_minsep = _torch_minsep(x_t).item()
-        target = cur_minsep * (1.0 + delta_frac)
-        radius_dyn = 0.5 * target  # want distances > target
-        loss = distance_penalty(x_t, radius_dyn, margin=0.0, beta=beta, q=top_q)
-        if loss.item() < 1e-12:
-            break
-        loss.backward()
-        with torch.no_grad():
-            x_next = x_t - inner_lr * x_t.grad
-            x_next = x_next.clamp(env_radius + EPS_SMALL, box_len - env_radius - EPS_SMALL)
-        x_np_next = x_next[0].T.cpu().numpy()
-        new_minsep = min_pairwise_distance(x_np_next)
-        if new_minsep > best_minsep + 1e-9:
-            best_minsep = new_minsep
-            best = x_np_next
-        else:
-            # if we are not improving, reduce step to avoid oscillation
-            inner_lr *= 0.5
-            if inner_lr < 1e-4:
-                break
     return best
 
 def local_opt(X_rel, L, N, r, tol, maxiter):
@@ -553,7 +506,7 @@ def load_metrics_PP_p_PBTS(filename):
 # -----------------------------------------------------------------------------
 # FINAL PUSH MODE: read packings from file, apply SRP + local opt + optional physics push
 # -----------------------------------------------------------------------------
-def final_push_existing_samples():
+def final_push_existing_samples(state: "PipelineState | None" = None):
     sec = "sample_generation_PP+PBTS"
 
     # Shared geometric / physical parameters
@@ -566,7 +519,6 @@ def final_push_existing_samples():
     max_iter = _get_cfg(sec, "max_iter",             10000)
     tol      = _get_cfg(sec, "tol",                  1e-6)
     mode_bnd = _get_cfg(sec, "boundary_mode",        "reflect")
-    push_obj = _get_cfg(sec, "push_objective",       "fixed_radius").strip().lower()
 
     # SRP / local optimization parameters
     Imax       = _get_cfg(sec, "srp_Imax",        500)
@@ -679,13 +631,6 @@ def final_push_existing_samples():
             else:
                 centers_k = centers_opt
 
-            # Optional minsep maximization pass (treat r as environment clamp only)
-            if push_obj == "max_minsep":
-                centers_k = maximize_minsep_local(
-                    centers_k, box_len=L, env_radius=r,
-                    max_outer_iters=20, inner_lr=1e-2, beta=10.0, top_q=0.1, delta_frac=0.01
-                )
-
             diffs_k = centers_k[:, None, :] - centers_k[None, :, :]
             post_min = np.min(np.linalg.norm(diffs_k, axis=-1)[np.triu_indices(N, k=1)])
             excess = best_d - post_min
@@ -735,6 +680,8 @@ def final_push_existing_samples():
                 f"{best_restart_idx_list[idx]}\n"
             )
     print(f"Saved top-10 pushed metrics: {metrics_top10_fn}")
+    if state is not None:
+        state.set_metrics_path(metrics_fn)
     return dataset_fn
 
 # -----------------------------------------------------------------------------
@@ -756,7 +703,7 @@ def main(state:PipelineState=None):
             if state: state.set_samples_path(data_save_path)
 
     elif mode == "final_push":
-        data_save_path = final_push_existing_samples()
+        data_save_path = final_push_existing_samples(state=state)
         if state: state.set_pushed_samples_path(data_save_path)
 
     else:
