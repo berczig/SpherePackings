@@ -902,39 +902,46 @@ def sample_flow_model(
         Returns dict with pair/wall constraint metadata and residuals h >= 0.
         """
         B, d_, N = x.shape
-        P = x.permute(0, 2, 1).contiguous()
+        P = x.permute(0, 2, 1).contiguous() # (B,N,d)
         if eps_nrm > 0.0 and use_noise:
             P = P + (eps_nrm * r) * torch.randn_like(P)
-        dist = torch.cdist(P, P).clamp_min(1e-12)              # (B,N,N)
-        eye = torch.eye(N, device=x.device, dtype=torch.bool)[None]
-        # use upper-triangular contacts only to avoid duplicate (i,j)/(j,i)
-        tri_mask = torch.triu(torch.ones((N, N), device=x.device, dtype=torch.bool), diagonal=1)
-        active_pairs = (dist < (2.0 * r + active_margin)) & tri_mask[None] & (~eye)
-        if log_metrics:
-            with torch.no_grad():
-                min_dist_upper = dist.masked_fill(~tri_mask[None], float('inf')).amin().item()
-                thr = (2.0 * r + active_margin)
-                print(f"[PCFM-debug] shape={tuple(x.shape)} dist_min_upper={min_dist_upper:.4e} thr={thr:.4e} d_={d_} N={N}")
+        B, d_, N = x.shape
+        dist = torch.cdist(P, P).clamp_min(1e-12)  # (B,N,N)
 
-        if contact_q < 1.0 and active_pairs.any().item():
-            metric = (2.0 * r + active_margin) - dist
-            metric = metric.masked_fill(~active_pairs, float('-inf'))
-            thr = torch.quantile(metric.view(B, -1), 1.0 - contact_q, dim=1, keepdim=True)
-            active_pairs = active_pairs & (metric >= thr.view(-1, 1, 1))
+        tri = torch.triu_indices(N, N, offset=1, device=x.device)
+        dist_ut = dist[:, tri[0], tri[1]]          # (B,Pairs)
+        gap_ut  = (2.0 * r) - dist_ut              # (B,Pairs)
 
-        pair_batch, pair_i, pair_j = torch.nonzero(active_pairs, as_tuple=True)
+        # active = near violations or violations
+        active_ut = gap_ut > (-active_margin)      # (B,Pairs)
+
+        # optional thinning by contact_q (keep most violated)
+        if contact_q < 1.0 and active_ut.any():
+            metric = gap_ut.masked_fill(~active_ut, float('-inf'))
+            thr = torch.quantile(metric, 1.0 - contact_q, dim=1, keepdim=True)  # (B,1)
+            active_ut = active_ut & (metric >= thr)
+
+        pair_batch, p_idx = torch.nonzero(active_ut, as_tuple=True)
+        pair_i = tri[0][p_idx]
+        pair_j = tri[1][p_idx]
+
         if pair_batch.numel() > 0:
             vec_ij = P[pair_batch, pair_i, :] - P[pair_batch, pair_j, :]   # (P,d)
-            pair_dist = dist[pair_batch, pair_i, pair_j].clamp_min(1e-12)  # (P,)
-            pair_normals = vec_ij / pair_dist[:, None]
-            pair_gap = (2.0 * r - pair_dist)
+            pair_dist = dist_ut[pair_batch, p_idx].clamp_min(1e-12)         # (P,)
+            pair_normals = vec_ij / pair_dist[:, None]                      # (P,d)
+            pair_gap = gap_ut[pair_batch, p_idx]                            # (P,)
+
+            # residual h(gap) with h(0)=0 (your shifted softplus)
             pair_res = torch.clamp_min((F.softplus(beta_h * pair_gap) - math.log(2.0)) / beta_h, 0.0)
             max_pair_gap = torch.clamp_min(pair_gap, 0.0).max()
         else:
             pair_normals = x.new_zeros((0, d_))
-            pair_gap = x.new_zeros((0,))
-            pair_res = x.new_zeros((0,))
-            max_pair_gap = x.new_tensor(0.0, device=x.device, dtype=x.dtype)
+            pair_gap     = x.new_zeros((0,))
+            pair_res     = x.new_zeros((0,))
+            max_pair_gap = x.new_tensor(0.0)
+
+            if float(max_pair_gap) > 0.0 and pair_res.numel() == 0:
+                raise RuntimeError("Active-set bug: positive overlap exists but no active pair constraints were built.")
 
         if wall_weight > 0.0:
             wall_scale = math.sqrt(wall_weight)
