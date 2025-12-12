@@ -910,6 +910,11 @@ def sample_flow_model(
         # use upper-triangular contacts only to avoid duplicate (i,j)/(j,i)
         tri_mask = torch.triu(torch.ones((N, N), device=x.device, dtype=torch.bool), diagonal=1)
         active_pairs = (dist < (2.0 * r + active_margin)) & tri_mask[None] & (~eye)
+        if log_metrics:
+            with torch.no_grad():
+                min_dist_upper = dist.masked_fill(~tri_mask[None], float('inf')).amin().item()
+                thr = (2.0 * r + active_margin)
+                print(f"[PCFM-debug] shape={tuple(x.shape)} dist_min_upper={min_dist_upper:.4e} thr={thr:.4e} d_={d_} N={N}")
 
         if contact_q < 1.0 and active_pairs.any().item():
             metric = (2.0 * r + active_margin) - dist
