@@ -17,8 +17,7 @@
 [PCFM-debug] shape=(50, 3, 83) dist_min_upper=1.0000e-12 thr=2.4420e-01 d_=3 N=83\
 \
 radius:\
-\pard\pardeftab720\partightenfactor0
-\cf2 0.11628516041\
+0.11628516041\
 u0[0]:\
 tensor([[0.4766, 0.1163, 0.3712, 0.8835, 0.5092, 0.8320, 0.1393, 0.5529, 0.1221,\
          0.7055, 0.6128, 0.6571, 0.3071, 0.8833, 0.1275, 0.3482, 0.6854, 0.7558,\
@@ -56,7 +55,7 @@ tensor([[0.4766, 0.1163, 0.3712, 0.8835, 0.5092, 0.8320, 0.1393, 0.5529, 0.1221,
 \
 \
 \pard\pardeftab720\partightenfactor0
-\cf4 \cb3 \outl0\strokewidth0 \strokec4 File "/scratch/users/baranh/deep_0/SP-FM02/SpherePackings/diffuse_boost/spheres_in_cube_new2/pipeline.py", line 111, in <module>\
+\cf2 File "/scratch/users/baranh/deep_0/SP-FM02/SpherePackings/diffuse_boost/spheres_in_cube_new2/pipeline.py", line 111, in <module>\
     flow_matching_spheres.main(state=state)\
   File "/scratch/users/baranh/deep_0/SP-FM02/SpherePackings/diffuse_boost/spheres_in_cube_new2/flow_matching_spheres.py", line 1644, in main\
     rg_cfm_main(state=state)\
@@ -79,6 +78,25 @@ tensor([[0.4766, 0.1163, 0.3712, 0.8835, 0.5092, 0.8320, 0.1393, 0.5529, 0.1221,
   File "/scratch/users/baranh/deep_0/SP-FM02/SpherePackings/diffuse_boost/spheres_in_cube_new2/flow_matching_spheres.py", line 1021, in _build_active_set\
     raise RuntimeError(\
 RuntimeError: Active-set is empty despite a positive overlap existing. true_max_overlap=2.282030e-01 active_margin=0.011628516041 wall_active_margin=0.0 eps_nrm=0.0 contact_q=0.5\
+\
+\pard\pardeftab720\partightenfactor0
+\cf4 \cb3 \outl0\strokewidth0 \strokec4 [PCFM-debug] KKT nan=False pair_cnt=8854 wall_cnt=0 max_gap=2.3257e-01\
+[PCFM-debug] KKT nan=False pair_cnt=10540 wall_cnt=0 max_gap=2.3190e-01\
+[PCFM-debug] KKT nan=False pair_cnt=9696 wall_cnt=0 max_gap=2.3257e-01\
+[PCFM-debug] prox nan=False pair_cnt=11656 wall_cnt=0 max_gap=2.3257e-01\
+[PCFM-debug] KKT nan=True pair_cnt=0 wall_cnt=0 max_gap=nan\
+[PCFM-debug] prox nan=True pair_cnt=0 wall_cnt=0 max_gap=nan\
+[PCFM-debug] KKT nan=True pair_cnt=0 wall_cnt=0 max_gap=nan\
+[PCFM-debug] prox nan=True pair_cnt=0 wall_cnt=0 max_gap=nan\
+\pard\pardeftab720\partightenfactor0
+\cf2 \cb3 \outl0\strokewidth0 \'85\'85\
+\
+\pard\pardeftab720\partightenfactor0
+\cf4 \cb3 \outl0\strokewidth0 \strokec4 [PCFM-debug] KKT nan=True pair_cnt=0 wall_cnt=0 max_gap=nan\
+[PCFM-debug] KKT nan=True pair_cnt=0 wall_cnt=0 max_gap=nan\
+[PCFM-debug] KKT nan=True pair_cnt=0 wall_cnt=0 max_gap=nan\
+[PCFM] batch=1 frac_bad=0.000 max_gap=nan active/b=0.0 cg_iter_avg=0.0\
+[PCFM-debug] sampler knobs: active_margin=1.163e-02 wall_active_margin=0.000e+00 proj_tol=5.000e-06 beta_h=20 kkt_proj_iters=2 kkt_cg_iters=40 kkt_cg_tol=3.000e-06 kkt_damping=1.000e-04\
 \pard\pardeftab720\partightenfactor0
 \cf2 \cb3 \outl0\strokewidth0 \
 }
