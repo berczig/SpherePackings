@@ -1082,6 +1082,10 @@ def sample_flow_model(
         xi = _clamp_box(xi)
         for _ in range(max(1, kkt_proj_iters)):
             active = _build_active_set(u, use_noise=False)
+            if log_metrics:
+                nan_flag = torch.isnan(u).any().item()
+                mv = float(_max_violation(u).max())
+                print(f"[PCFM-debug] KKT nan={nan_flag} pair_cnt={active['pair_count']} wall_cnt={active['wall_count']} max_gap={mv:.4e}")
             if active["pair_count"] + active["wall_count"] == 0:
                 return _clamp_box(xi)
             h_vec = _concat_residuals(active)
@@ -1127,6 +1131,10 @@ def sample_flow_model(
                 u_next = _clamp_box(u + gamma * v_eff)
 
             active_next = _build_active_set(u_next, use_noise=False)
+            if log_metrics:
+                nan_flag = torch.isnan(u_next).any().item()
+                mv = float(_max_violation(u_next).max())
+                print(f"[PCFM-debug] prox nan={nan_flag} pair_cnt={active_next['pair_count']} wall_cnt={active_next['wall_count']} max_gap={mv:.4e}")
             h_vec = _concat_residuals(active_next)
             if h_vec is not None and h_vec.numel() > 0:
                 jt_h = _apply_Jt_combined(h_vec, active_next)
