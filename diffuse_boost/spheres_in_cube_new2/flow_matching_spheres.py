@@ -849,24 +849,19 @@ def sample_flow_model(
             return default
 
     # Internal knobs (signature unchanged)
-     kkt_proj_iters = int(_cfg_get(cfg.getint, "kkt_proj_iters", 3))
-     kkt_cg_iters = int(_cfg_get(cfg.getint, "kkt_cg_iters", 25))
-     kkt_cg_tol = float(_cfg_get(cfg.getfloat, "kkt_cg_tol", 1e-5))
-     kkt_damping = float(_cfg_get(cfg.getfloat, "kkt_damping", 1e-4))
-     active_margin = float(_cfg_get(cfg.getfloat, "active_margin", 0.1 * r))
-     wall_active_margin = float(_cfg_get(cfg.getfloat, "wall_active_margin", wall_margin * 2.0 * r))
-     proj_tol = float(_cfg_get(cfg.getfloat, "proj_tol", 1e-6))
-     beta_h = float(_cfg_get(cfg.getfloat, "beta_h", 10.0))
-     constraint_project_step = bool(_cfg_get(cfg.getboolean, "constraint_project_step", True))
-     log_metrics = bool(_cfg_get(cfg.getboolean, "sampler_debug", False))
-     log_every = int(_cfg_get(cfg.getint, "sampler_debug_every", max(1, n_steps)))
-     stats = {"cg_iters": 0, "cg_calls": 0}
+    kkt_proj_iters = int(_cfg_get(cfg.getint, "kkt_proj_iters", 3))
+    kkt_cg_iters = int(_cfg_get(cfg.getint, "kkt_cg_iters", 25))
+    kkt_cg_tol = float(_cfg_get(cfg.getfloat, "kkt_cg_tol", 1e-5))
+    kkt_damping = float(_cfg_get(cfg.getfloat, "kkt_damping", 1e-4))
+    active_margin = float(_cfg_get(cfg.getfloat, "active_margin", 0.1 * r))
+    wall_active_margin = float(_cfg_get(cfg.getfloat, "wall_active_margin", wall_margin * 2.0 * r))
+    proj_tol = float(_cfg_get(cfg.getfloat, "proj_tol", 1e-6))
+    beta_h = float(_cfg_get(cfg.getfloat, "beta_h", 10.0))
+    constraint_project_step = bool(_cfg_get(cfg.getboolean, "constraint_project_step", True))
+    log_metrics = bool(_cfg_get(cfg.getboolean, "sampler_debug", False))
+    log_every = int(_cfg_get(cfg.getint, "sampler_debug_every", max(1, n_steps)))
+    stats = {"cg_iters": 0, "cg_calls": 0}
 
-    # ----
-    # Guard against config-induced NaNs / nonsensical margins.
-    # A NaN margin makes *all* active-set comparisons False, producing:
-    #   pair_cnt=0, wall_cnt=0 while max_gap>0
-    # ----
     if (not math.isfinite(active_margin)) or (active_margin < 0.0):
         active_margin = 0.1 * r
     if (not math.isfinite(wall_active_margin)) or (wall_active_margin < 0.0):
