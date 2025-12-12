@@ -16,12 +16,8 @@ from numba import njit
 from diffuse_boost import cfg
 from diffuse_boost.spheres_in_cube.physics_push_PESC import eliminate_overlaps_box
 from diffuse_boost.spheres_in_cube.best_results import load_best_results
-from diffuse_boost.spheres_in_cube_new.pipeline import PipelineState
-try:
-    # prefer v2 (PCFM-aligned); fall back to v1 if needed
-    from diffuse_boost.spheres_in_cube_new2.flow_matching_spheresv2 import distance_penalty
-except Exception:  # pragma: no cover - defensive fallback
-    from diffuse_boost.spheres_in_cube_new2.flow_matching_spheresv1 import distance_penalty
+from diffuse_boost.spheres_in_cube_new2.pipeline import PipelineState
+from diffuse_boost.spheres_in_cube_new2.flow_matching_spheres import distance_penalty
 from tqdm import tqdm
 
 # -----------------------------------------------------------------------------
