@@ -931,18 +931,47 @@ def sample_flow_model(
 
         tri = torch.triu_indices(N, N, offset=1, device=x.device)
         dist_ut = dist[:, tri[0], tri[1]]          # (B,Pairs)
-        gap_ut  = (2.0 * r) - dist_ut              # (B,Pairs)
+        
+        gap_ut  = (2.0 * r) - dist_ut
         true_pair_overlap = torch.clamp_min(gap_ut, 0.0).amax(dim=1)  # (B,)
         # active = near violations or violations
         active_ut = gap_ut > (-active_margin)      # (B,Pairs)
         if (not active_ut.any()) and (true_pair_overlap.max().item() > 0.0):
             active_ut = gap_ut > 0.0
+        # Strict violations must NEVER be dropped
+        viol_ut = gap_ut > 0.0  # (B,Pairs)
+        # Near-active constraints (candidates for thinning)
+        near_ut = (gap_ut > (-active_margin)) & (~viol_ut)
+        # Start with all violations + all near-actives
+        active_ut = viol_ut | near_ut
+        # Thin ONLY the near-active (non-violating) constraints
+        if contact_q < 1.0 and near_ut.any():
+            keep_near = torch.zeros_like(near_ut)
 
-        # optional thinning by contact_q (keep most violated)
-        if contact_q < 1.0 and active_ut.any():
-            metric = gap_ut.masked_fill(~active_ut, float('-inf'))
-            thr = torch.quantile(metric, 1.0 - contact_q, dim=1, keepdim=True)  # (B,1)
-            active_ut = active_ut & (metric >= thr)
+            # Keep the near constraints closest to violation (largest gaps, i.e. closest to 0)
+            for b in range(B):
+                idx = torch.nonzero(near_ut[b], as_tuple=False).squeeze(-1)
+                n = int(idx.numel())
+                if n == 0:
+                    continue
+
+                k = int(math.ceil(contact_q * n))
+                if k <= 0:
+                    continue
+                if k >= n:
+                    keep_near[b, idx] = True
+                    continue
+
+                vals = gap_ut[b, idx]  # negative values; larger means closer to 0
+                topk = torch.topk(vals, k=k, largest=True).indices
+                keep_near[b, idx[topk]] = True
+
+            active_ut = viol_ut | keep_near
+
+        # Absolute safety net: if a batch has any violation, it must have at least one active constraint
+        need = viol_ut.any(dim=1) & (~active_ut.any(dim=1))  # (B,)
+        if need.any():
+            active_ut[need] = viol_ut[need]
 
         pair_batch, p_idx = torch.nonzero(active_ut, as_tuple=True)
         pair_i = tri[0][p_idx]
