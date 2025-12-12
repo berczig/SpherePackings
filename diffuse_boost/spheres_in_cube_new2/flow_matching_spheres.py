@@ -883,8 +883,13 @@ def sample_flow_model(
             f"kkt_proj_iters={kkt_proj_iters} kkt_cg_iters={kkt_cg_iters} "
             f"kkt_cg_tol={kkt_cg_tol:.3e} kkt_damping={kkt_damping:.3e}"
         )
+        
     def _clamp_box(x):
+        # Safety net: clamp does not remove NaNs.
+        mid = 0.5 * (r + (L - r))
+        x = torch.nan_to_num(x, nan=mid, posinf=(L - r), neginf=r)
         return x.clamp(r, L - r)
+
 
     # model expects t \in [1->0]
     class _FMVF:
@@ -1135,27 +1140,46 @@ def sample_flow_model(
     def _cg_solve(A_fn, b, max_iter, tol):
         if b is None or b.numel() == 0:
             return b, 0
+        # Run CG in float64 for stability, but keep output dtype consistent.
+        b0_dtype = b.dtype
+        b = b.double()
         x = torch.zeros_like(b)
-        r_vec = b - A_fn(x)
+        Ax = A_fn(x)
+        if Ax is None or Ax.numel() == 0:
+            return x.to(b0_dtype), 0
+        r_vec = b - Ax.double()
         p = r_vec.clone()
         rs_old = torch.dot(r_vec, r_vec)
-        if rs_old.sqrt() <= tol:
-            return x, 0
+        if (not torch.isfinite(rs_old)) or (rs_old.sqrt() <= tol):
+            return x.to(b0_dtype), 0
         iters_used = 0
         for i in range(max_iter):
             Ap = A_fn(p)
-            denom = torch.dot(p, Ap).clamp_min(1e-12)
+            if Ap is None or Ap.numel() == 0:
+                break
+            Ap = Ap.double()
+            denom = torch.dot(p, Ap)
+            # Critical: if denom is non-finite or too small/non-positive, stop instead of clamping.
+            if (not torch.isfinite(denom)) or (denom <= 1e-18):
+                break
             alpha = rs_old / denom
+            if not torch.isfinite(alpha):
+                break
             x = x + alpha * p
             r_vec = r_vec - alpha * Ap
+            if (not torch.isfinite(x).all()) or (not torch.isfinite(r_vec).all()):
+                break
             rs_new = torch.dot(r_vec, r_vec)
             iters_used = i + 1
-            if rs_new.sqrt() <= tol:
+            if (not torch.isfinite(rs_new)) or (rs_new.sqrt() <= tol):
                 break
-            beta_cg = rs_new / rs_old.clamp_min(1e-12)
+            beta_cg = rs_new / rs_old
+            if not torch.isfinite(beta_cg):
+                break
             p = r_vec + beta_cg * p
             rs_old = rs_new
-        return x, iters_used
+        return x.to(b0_dtype), iters_used
+
 
     def _kkt_project(u, xi=None, tol=proj_tol):
         if xi is None:
@@ -1176,10 +1200,23 @@ def sample_flow_model(
                 rhs = rhs + h_vec
             if rhs.numel() == 0:
                 return _clamp_box(xi)
-            lam, iters_used = _cg_solve(lambda v: _apply_JJt(v, active), rhs, kkt_cg_iters, kkt_cg_tol)
+            lam = None
+            iters_used = 0
+            for attempt in range(3):
+                damp = kkt_damping * (10.0 ** attempt)
+                lam_try, iters_try = _cg_solve(lambda v, dd=damp: _apply_JJt(v, active, damping=dd),
+                                            rhs, kkt_cg_iters, kkt_cg_tol)
+                if lam_try is not None and lam_try.numel() > 0 and torch.isfinite(lam_try).all():
+                    lam, iters_used = lam_try, iters_try
+                    break
+            if lam is None or (lam.numel() > 0 and (not torch.isfinite(lam).all())):
+                if log_metrics:
+                    print("[PCFM-debug] KKT: CG produced non-finite lambda; aborting projection iteration.")
+                return _clamp_box(xi)
             stats["cg_iters"] += iters_used
             stats["cg_calls"] += 1
             corr = _apply_Jt_combined(lam, active)
+
             delta = (xi - u) - corr
             u = _clamp_box(u + alpha_proj * delta)
             if float(active["max_gap"]) <= tol:
