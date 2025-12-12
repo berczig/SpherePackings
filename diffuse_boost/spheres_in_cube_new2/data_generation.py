@@ -171,47 +171,216 @@ def min_pairwise_distance(centers):
                 best = d
     return best
 
-def maximize_minsep_local(x_np, box_len, env_radius, max_outer_iters=20, inner_lr=1e-2,
-                          beta=10.0, top_q=0.1, delta_frac=0.01):
+def maximize_minsep_local(
+    x_np,
+    box_len,
+    env_radius,
+    max_outer_iters=20,
+    inner_lr=1e-2,
+    beta=40.0,
+    top_q=0.1,
+    delta_frac=0.01,
+):
     """
-    Lightweight local refinement that pushes pairwise distances upward.
-    Treats env_radius purely as a wall clamp; the target is to increase minsep.
+    local refinement for max–min sphere packing in a bounded box.
+
+    Target problem:
+        maximize   min_{i<j} ||x_i - x_j||
+        subject to x_i in [r, L-r]^d
+
+    Notes:
+      - env_radius is treated as the TRUE sphere radius r (used for overlap avoidance and wall bounds).
+      - Uses a continuation scheme:
+           (A) minimize Riesz s-energy for increasing s (repulsion becomes more "hard-core")
+           (B) maximize a soft-min approximation of the minimum distance (polish)
+      - Uses Adam (robust) + LBFGS (polish).
+
+    Args (kept for drop-in compatibility):
+      max_outer_iters: overall budget knob (roughly scales total steps).
+      inner_lr: Adam learning rate.
+      beta: stiffness for overlap penalty (larger -> stricter no-overlap).
+      top_q, delta_frac: kept for signature compatibility; not used (soft-min + continuation supersedes them).
+
+    Returns:
+      x_best: (N,d) numpy array of refined centers (float32).
     """
+    # ---- input normalization ----
+    x_np = np.asarray(x_np)
+    if x_np.ndim != 2:
+        raise ValueError(f"x_np must be 2D (N,d) or (d,N); got shape {x_np.shape}")
+    # accept either (N,d) or (d,N)
+    if x_np.shape[0] in (2, 3) and x_np.shape[1] not in (2, 3):
+        x_np = x_np.T
+    N, d = x_np.shape
+
+    L = float(box_len)
+    r = float(env_radius)
+    eps = 1e-6
+
+    lo = r + eps
+    hi = L - r - eps
+    width = hi - lo
+    if width <= 0:
+        raise ValueError(f"Invalid box/radius: L={L}, r={r} gives non-positive interior width {width}")
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    dtype = torch.float64
 
-    def _torch_minsep(x_bdn):  # x_bdn: (B,d,N)
-        P = x_bdn.permute(0, 2, 1).contiguous()  # (B,N,d)
-        D = torch.cdist(P, P)
-        B, N, _ = D.shape
-        eye = torch.eye(N, device=D.device, dtype=torch.bool)[None]
-        D = D.masked_fill(eye, float('inf'))
-        return D.amin(dim=-1).amin(dim=-1)  # (B,)
+    # sanitize and clamp
+    x0 = torch.tensor(x_np, device=device, dtype=dtype)
+    mid = 0.5 * (lo + hi)
+    x0 = torch.nan_to_num(x0, nan=mid, posinf=hi, neginf=lo).clamp(lo, hi)
 
-    best = x_np.copy()
-    best_minsep = min_pairwise_distance(best)
-    for _ in range(max_outer_iters):
-        x_t = torch.tensor(best.T[None, ...], dtype=torch.float32, device=device, requires_grad=True)  # (1,d,N)
-        cur_minsep = _torch_minsep(x_t).item()
-        target = cur_minsep * (1.0 + delta_frac)
-        radius_dyn = 0.5 * target  # want distances > target
-        loss = distance_penalty(x_t, radius_dyn, margin=0.0, beta=beta, q=top_q)
-        if loss.item() < 1e-12:
-            break
-        loss.backward()
+    # ---- unconstrained parameterization: x = lo + width * sigmoid(z) ----
+    def x_from_z(z):
+        return lo + width * torch.sigmoid(z)
+
+    def z_from_x(x):
+        # inverse sigmoid on (0,1): z = logit(u), u = (x - lo)/width
+        u = ((x - lo) / width).clamp(1e-6, 1.0 - 1e-6)
+        return torch.log(u) - torch.log1p(-u)
+
+    # upper-tri indices once
+    tri = torch.triu_indices(N, N, offset=1, device=device)
+
+    def pairwise_dists_upper(x):
+        # x: (N,d) -> dvec: (P,)
+        D = torch.cdist(x, x)  # (N,N)
+        return D[tri[0], tri[1]]
+
+    def true_minsep(x):
+        dvec = pairwise_dists_upper(x)
+        return dvec.min()
+
+    # ---- objectives ----
+    # Riesz s-energy: sum ||x_i-x_j||^{-s}. For large s, it approximates max–min.
+    def riesz_energy(dvec, s, dist_eps=1e-12):
+        return torch.mean((dvec.clamp_min(dist_eps)) ** (-s))
+
+    # Soft-min approximation to min(d): softmin_tau(d) = -tau * logsumexp(-d/tau)
+    def softmin_distance(dvec, tau):
+        return -tau * torch.logsumexp(-dvec / tau, dim=0)
+
+    # Overlap penalty (strictly discourages d < 2r)
+    # softplus(k*(2r-d))^2 is smooth and steep when beta is large.
+    def overlap_penalty(dvec, kappa):
+        return torch.mean(torch.nn.functional.softplus(kappa * (2.0 * r - dvec)) ** 2)
+
+    # ---- continuation schedule ----
+    # Budgeting: scale steps with max_outer_iters (your old code did ~max_outer_iters single steps).
+    # Here we interpret max_outer_iters as "power budget".
+    # Reasonable defaults: ~600–2000 Adam steps total, then ~50–150 LBFGS iterations.
+    total_adam_steps = int(max(200, 80 * max_outer_iters))  # e.g. max_outer_iters=20 -> 1600 steps
+    # split across Riesz stages + softmin polish
+    riesz_exponents = [2, 4, 8, 16, 32]
+    n_stages = len(riesz_exponents) + 1  # +1 for softmin stage
+    steps_per_stage = max(50, total_adam_steps // n_stages)
+
+    # softmin temperature: start relatively smooth, anneal down for a tighter min approximation
+    tau_start = 0.05 * width
+    tau_final = 0.005 * width
+
+    # overlap stiffness (beta): ensure it does not allow "cheating"
+    kappa = float(beta)
+
+    # weights (scale to be dimensionally sane)
+    # softmin term uses distances directly; overlap penalty is squared distances-like scale.
+    w_overlap = 10.0 / (width * width + 1e-12)
+
+    # ---- optional internal restarts (kept small; main restarts are your SRP restarts) ----
+    sec = "sample_generation_PP+PBTS"
+    num_restarts = int(_get_cfg(sec, "maxmin_restarts", 2))
+
+    best_x = x0.detach().clone()
+    best_min = true_minsep(best_x).item()
+
+    for rr in range(num_restarts):
+        # initialize z from x, optionally add small noise for restart
+        z = z_from_x(x0).detach()
+        if rr > 0:
+            z = z + 0.05 * torch.randn_like(z)
+        z = torch.nn.Parameter(z)
+
+        opt = torch.optim.Adam([z], lr=float(inner_lr))
+
+        # ---- Adam stages: Riesz continuation then softmin ----
+        step = 0
+        for s in riesz_exponents:
+            for _ in range(steps_per_stage):
+                step += 1
+                opt.zero_grad(set_to_none=True)
+                x = x_from_z(z)
+                dvec = pairwise_dists_upper(x)
+
+                loss = riesz_energy(dvec, s) + w_overlap * overlap_penalty(dvec, kappa)
+                if not torch.isfinite(loss):
+                    # back off if something went numerically wrong
+                    with torch.no_grad():
+                        z.data = z.data * 0.5
+                    continue
+
+                loss.backward()
+                torch.nn.utils.clip_grad_norm_([z], 1.0)
+                opt.step()
+
+        # softmin polish with Adam + annealed tau
+        for t in range(steps_per_stage):
+            step += 1
+            tau = tau_start * ((tau_final / tau_start) ** (t / max(1, steps_per_stage - 1)))
+            opt.zero_grad(set_to_none=True)
+            x = x_from_z(z)
+            dvec = pairwise_dists_upper(x)
+
+            # maximize softmin => minimize negative softmin
+            sm = softmin_distance(dvec, tau)
+            loss = (-sm) + w_overlap * overlap_penalty(dvec, kappa)
+            if not torch.isfinite(loss):
+                with torch.no_grad():
+                    z.data = z.data * 0.5
+                continue
+
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_([z], 1.0)
+            opt.step()
+
+        # ---- L-BFGS polish (best for final local refinement) ----
+        lbfgs_steps = int(_get_cfg(sec, "maxmin_lbfgs_iters", max(150, max_outer_iters * 5)))
+        lbfgs = torch.optim.LBFGS(
+            [z],
+            lr=1.0,
+            max_iter=lbfgs_steps,
+            history_size=20,
+            line_search_fn="strong_wolfe",
+        )
+
+        def closure():
+            lbfgs.zero_grad(set_to_none=True)
+            x = x_from_z(z)
+            dvec = pairwise_dists_upper(x)
+            sm = softmin_distance(dvec, tau_final)
+            loss = (-sm) + w_overlap * overlap_penalty(dvec, kappa)
+            if torch.isfinite(loss):
+                loss.backward()
+            else:
+                # if non-finite, don't step into it
+                loss = torch.tensor(1e9, device=device, dtype=dtype, requires_grad=True)
+            return loss
+
+        try:
+            lbfgs.step(closure)
+        except Exception:
+            # LBFGS can fail on pathological line searches; keep the Adam result.
+            pass
+
+        # update best
         with torch.no_grad():
-            x_next = x_t - inner_lr * x_t.grad
-            x_next = x_next.clamp(env_radius + EPS_SMALL, box_len - env_radius - EPS_SMALL)
-        x_np_next = x_next[0].T.cpu().numpy()
-        new_minsep = min_pairwise_distance(x_np_next)
-        if new_minsep > best_minsep + 1e-9:
-            best_minsep = new_minsep
-            best = x_np_next
-        else:
-            # if we are not improving, reduce step to avoid oscillation
-            inner_lr *= 0.5
-            if inner_lr < 1e-4:
-                break
-    return best
+            x_final = x_from_z(z).detach()
+            m = true_minsep(x_final).item()
+            if m > best_min + 1e-12:
+                best_min = m
+                best_x = x_final.clone()
+
+    return best_x.to(torch.float32).cpu().numpy()
 
 def local_opt(X_rel, L, N, r, tol, maxiter):
     """
