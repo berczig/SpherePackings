@@ -849,19 +849,45 @@ def sample_flow_model(
             return default
 
     # Internal knobs (signature unchanged)
-    kkt_proj_iters = int(_cfg_get(cfg.getint, "kkt_proj_iters", 3))
-    kkt_cg_iters = int(_cfg_get(cfg.getint, "kkt_cg_iters", 25))
-    kkt_cg_tol = float(_cfg_get(cfg.getfloat, "kkt_cg_tol", 1e-5))
-    kkt_damping = float(_cfg_get(cfg.getfloat, "kkt_damping", 1e-4))
-    active_margin = float(_cfg_get(cfg.getfloat, "active_margin", 0.1 * r))
-    wall_active_margin = float(_cfg_get(cfg.getfloat, "wall_active_margin", wall_margin * 2.0 * r))
-    proj_tol = float(_cfg_get(cfg.getfloat, "proj_tol", 1e-6))
-    beta_h = float(_cfg_get(cfg.getfloat, "beta_h", 10.0))
-    constraint_project_step = bool(_cfg_get(cfg.getboolean, "constraint_project_step", True))
-    log_metrics = bool(_cfg_get(cfg.getboolean, "sampler_debug", False))
-    log_every = int(_cfg_get(cfg.getint, "sampler_debug_every", max(1, n_steps)))
-    stats = {"cg_iters": 0, "cg_calls": 0}
+     kkt_proj_iters = int(_cfg_get(cfg.getint, "kkt_proj_iters", 3))
+     kkt_cg_iters = int(_cfg_get(cfg.getint, "kkt_cg_iters", 25))
+     kkt_cg_tol = float(_cfg_get(cfg.getfloat, "kkt_cg_tol", 1e-5))
+     kkt_damping = float(_cfg_get(cfg.getfloat, "kkt_damping", 1e-4))
+     active_margin = float(_cfg_get(cfg.getfloat, "active_margin", 0.1 * r))
+     wall_active_margin = float(_cfg_get(cfg.getfloat, "wall_active_margin", wall_margin * 2.0 * r))
+     proj_tol = float(_cfg_get(cfg.getfloat, "proj_tol", 1e-6))
+     beta_h = float(_cfg_get(cfg.getfloat, "beta_h", 10.0))
+     constraint_project_step = bool(_cfg_get(cfg.getboolean, "constraint_project_step", True))
+     log_metrics = bool(_cfg_get(cfg.getboolean, "sampler_debug", False))
+     log_every = int(_cfg_get(cfg.getint, "sampler_debug_every", max(1, n_steps)))
+     stats = {"cg_iters": 0, "cg_calls": 0}
 
+    # ----
+    # Guard against config-induced NaNs / nonsensical margins.
+    # A NaN margin makes *all* active-set comparisons False, producing:
+    #   pair_cnt=0, wall_cnt=0 while max_gap>0
+    # ----
+    if (not math.isfinite(active_margin)) or (active_margin < 0.0):
+        active_margin = 0.1 * r
+    if (not math.isfinite(wall_active_margin)) or (wall_active_margin < 0.0):
+        wall_active_margin = wall_margin * 2.0 * r
+    if (not math.isfinite(beta_h)) or (beta_h <= 0.0):
+        beta_h = 10.0
+    if (not math.isfinite(proj_tol)) or (proj_tol < 0.0):
+        proj_tol = 1e-6
+    if (not math.isfinite(kkt_cg_tol)) or (kkt_cg_tol <= 0.0):
+        kkt_cg_tol = 1e-5
+    if (not math.isfinite(kkt_damping)) or (kkt_damping < 0.0):
+        kkt_damping = 1e-4
+
+    if log_metrics:
+        print(
+            "[PCFM-debug] sampler knobs: "
+            f"active_margin={active_margin:.3e} wall_active_margin={wall_active_margin:.3e} "
+            f"proj_tol={proj_tol:.3e} beta_h={beta_h:g} "
+            f"kkt_proj_iters={kkt_proj_iters} kkt_cg_iters={kkt_cg_iters} "
+            f"kkt_cg_tol={kkt_cg_tol:.3e} kkt_damping={kkt_damping:.3e}"
+        )
     def _clamp_box(x):
         return x.clamp(r, L - r)
 
@@ -911,9 +937,11 @@ def sample_flow_model(
         tri = torch.triu_indices(N, N, offset=1, device=x.device)
         dist_ut = dist[:, tri[0], tri[1]]          # (B,Pairs)
         gap_ut  = (2.0 * r) - dist_ut              # (B,Pairs)
-
+        true_pair_overlap = torch.clamp_min(gap_ut, 0.0).amax(dim=1)  # (B,)
         # active = near violations or violations
         active_ut = gap_ut > (-active_margin)      # (B,Pairs)
+        if (not active_ut.any()) and (true_pair_overlap.max().item() > 0.0):
+            active_ut = gap_ut > 0.0
 
         # optional thinning by contact_q (keep most violated)
         if contact_q < 1.0 and active_ut.any():
@@ -983,6 +1011,17 @@ def sample_flow_model(
             wall_is_low = x.new_zeros((0,), dtype=torch.bool)
             wall_res = x.new_zeros((0,))
             max_wall_gap = x.new_tensor(0.0, device=x.device, dtype=x.dtype)
+        
+        # Invariant: if there is a genuine overlap (pair or wall) anywhere in the batch,
+        # the active-set builder must *not* return an empty set.
+        true_max_overlap = torch.max(true_pair_overlap, true_wall_overlap).max().item()
+        if (true_max_overlap > 0.0) and ((pair_res.numel() + wall_res.numel()) == 0):
+            raise RuntimeError(
+                "Active-set is empty despite a positive overlap existing. "
+                f"true_max_overlap={true_max_overlap:.6e} "
+                f"active_margin={active_margin!r} wall_active_margin={wall_active_margin!r} "
+                f"eps_nrm={eps_nrm!r} contact_q={contact_q!r}"
+            )
 
         return {
             "pair_batch": pair_batch,
@@ -1225,7 +1264,8 @@ def sample_flow_model(
             tau      = k / n_steps
             tau_next = (k + 1) / n_steps
             # Forward shoot to tau=1 with learned field
-            u1 = _ode_solve_with_model(u, tau, 1.0, cond)
+            #u1 = _ode_solve_with_model(u, tau, 1.0, cond)
+            u1 = _ode_solve_with_model(u, tau, tau_next, cond)
             # Terminal projection Π_H
             u_proj = _project_terminal(u1)
             # Reverse OT
