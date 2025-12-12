@@ -229,8 +229,10 @@ def distance_penalty(output, radius, margin=0.0, beta=10.0, p=2, q=0.05, eps=1e-
     return topk.mean()
 
 
-def _box_clamp(x, r, L):
-    # Snap to [r, L-r] per coordinate
+def _clamp_box(x, r, L):
+    # Safety net: clamp does not remove NaNs.
+    mid = 0.5 * (r + (L - r))
+    x = torch.nan_to_num(x, nan=mid, posinf=(L - r), neginf=r)
     return x.clamp(r, L - r)
 
 
@@ -570,13 +572,10 @@ class RGCFMTrainer:
         # Base reward: normalized minsep (larger = better)
         rewards = minsep / self.clip_range  # (B,)
 
-        # Strongly downweight overlapping configs
-        if (~valid_mask).any():
-            if valid_mask.any():
-                bad_floor = rewards[valid_mask].min() - 1.0
-            else:
-                bad_floor = rewards.min() - 1.0
-            rewards = torch.where(valid_mask, rewards, bad_floor)
+        # Keep reward differences even if all samples overlap.
+        # Penalize by how far minsep falls below 2r, but don't collapse to a constant.
+        violation = (min_allowed - minsep).clamp_min(0.0)          # (B,)
+        rewards = (minsep / self.clip_range) - 2.0 * (violation / self.clip_range)
 
         rewards = rewards.detach()
         return x1, rewards, cond_used
@@ -841,6 +840,9 @@ def sample_flow_model(
     r = float(sphere_radius)
 
     def _clamp_box(x):
+        # Safety net: clamp does not remove NaNs.
+        mid = 0.5 * (r + (L - r))
+        x = torch.nan_to_num(x, nan=mid, posinf=(L - r), neginf=r)
         return x.clamp(r, L - r)
 
     # model expects t \in [1->0]
@@ -1003,7 +1005,8 @@ def sample_flow_model(
             tau      = k / n_steps
             tau_next = (k + 1) / n_steps
             # Forward shoot to tau=1 with learned field
-            u1 = _ode_solve_with_model(u, tau, 1.0, cond)
+            #u1 = _ode_solve_with_model(u, tau, 1.0, cond)
+            u1 = _ode_solve_with_model(u, tau, tau_next, cond)
             # Terminal projection Π_H
             u_proj = _project_terminal(u1)
             # Reverse OT

@@ -570,13 +570,10 @@ class RGCFMTrainer:
         # Base reward: normalized minsep (larger = better)
         rewards = minsep / self.clip_range  # (B,)
 
-        # Strongly downweight overlapping configs
-        if (~valid_mask).any():
-            if valid_mask.any():
-                bad_floor = rewards[valid_mask].min() - 1.0
-            else:
-                bad_floor = rewards.min() - 1.0
-            rewards = torch.where(valid_mask, rewards, bad_floor)
+        # Keep reward differences even if all samples overlap.
+        # Penalize by how far minsep falls below 2r, but don't collapse to a constant.
+        violation = (min_allowed - minsep).clamp_min(0.0)          # (B,)
+        rewards = (minsep / self.clip_range) - 2.0 * (violation / self.clip_range)
 
         rewards = rewards.detach()
         return x1, rewards, cond_used
@@ -883,7 +880,7 @@ def sample_flow_model(
             f"kkt_proj_iters={kkt_proj_iters} kkt_cg_iters={kkt_cg_iters} "
             f"kkt_cg_tol={kkt_cg_tol:.3e} kkt_damping={kkt_damping:.3e}"
         )
-        
+
     def _clamp_box(x):
         # Safety net: clamp does not remove NaNs.
         mid = 0.5 * (r + (L - r))

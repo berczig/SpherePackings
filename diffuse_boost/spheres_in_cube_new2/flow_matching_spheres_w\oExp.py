@@ -229,8 +229,10 @@ def distance_penalty(output, radius, margin=0.0, beta=10.0, p=2, q=0.05, eps=1e-
     return topk.mean()
 
 
-def _box_clamp(x, r, L):
-    # Snap to [r, L-r] per coordinate
+def _clamp_box(x, r, L):
+    # Safety net: clamp does not remove NaNs.
+    mid = 0.5 * (r + (L - r))
+    x = torch.nan_to_num(x, nan=mid, posinf=(L - r), neginf=r)
     return x.clamp(r, L - r)
 
 
