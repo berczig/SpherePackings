@@ -970,8 +970,15 @@ def sample_flow_model(
             wall_scale = math.sqrt(wall_weight)
             gap_low = r - x
             gap_high = x - (L - r)
+            true_wall_overlap = torch.max(
+                torch.clamp_min(gap_low, 0.0).amax(dim=(1, 2)),
+                torch.clamp_min(gap_high, 0.0).amax(dim=(1, 2)),
+            )
             active_low = gap_low > (-wall_active_margin)
             active_high = gap_high > (-wall_active_margin)
+            if (not (active_low.any() or active_high.any())) and (true_wall_overlap.max().item() > 0.0):
+                active_low = gap_low > 0.0
+                active_high = gap_high > 0.0
             wl_b, wl_ax, wl_idx = torch.nonzero(active_low, as_tuple=True)
             wh_b, wh_ax, wh_idx = torch.nonzero(active_high, as_tuple=True)
 
@@ -993,6 +1000,7 @@ def sample_flow_model(
                     torch.clamp_min(gap_high, 0.0).amax()
                 )
             else:
+                
                 wall_batch = x.new_zeros((0,), dtype=torch.long)
                 wall_axis = x.new_zeros((0,), dtype=torch.long)
                 wall_index = x.new_zeros((0,), dtype=torch.long)
@@ -1000,6 +1008,7 @@ def sample_flow_model(
                 wall_res = x.new_zeros((0,))
                 max_wall_gap = x.new_tensor(0.0, device=x.device, dtype=x.dtype)
         else:
+            true_wall_overlap = x.new_zeros((B,), dtype=x.dtype, device=x.device)
             wall_batch = x.new_zeros((0,), dtype=torch.long)
             wall_axis = x.new_zeros((0,), dtype=torch.long)
             wall_index = x.new_zeros((0,), dtype=torch.long)
@@ -1007,8 +1016,6 @@ def sample_flow_model(
             wall_res = x.new_zeros((0,))
             max_wall_gap = x.new_tensor(0.0, device=x.device, dtype=x.dtype)
         
-        # Invariant: if there is a genuine overlap (pair or wall) anywhere in the batch,
-        # the active-set builder must *not* return an empty set.
         true_max_overlap = torch.max(true_pair_overlap, true_wall_overlap).max().item()
         if (true_max_overlap > 0.0) and ((pair_res.numel() + wall_res.numel()) == 0):
             raise RuntimeError(
