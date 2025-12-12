@@ -840,6 +840,28 @@ def sample_flow_model(
     L = float(clip_max)
     r = float(sphere_radius)
 
+    sec_name = "flow_matching"
+
+    def _cfg_get(getter, name, default):
+        try:
+            return getter(sec_name, name, fallback=default)
+        except Exception:
+            return default
+
+    # Internal knobs (signature unchanged)
+    kkt_proj_iters = int(_cfg_get(cfg.getint, "kkt_proj_iters", 3))
+    kkt_cg_iters = int(_cfg_get(cfg.getint, "kkt_cg_iters", 25))
+    kkt_cg_tol = float(_cfg_get(cfg.getfloat, "kkt_cg_tol", 1e-5))
+    kkt_damping = float(_cfg_get(cfg.getfloat, "kkt_damping", 1e-4))
+    active_margin = float(_cfg_get(cfg.getfloat, "active_margin", 0.1 * r))
+    wall_active_margin = float(_cfg_get(cfg.getfloat, "wall_active_margin", wall_margin * 2.0 * r))
+    proj_tol = float(_cfg_get(cfg.getfloat, "proj_tol", 1e-6))
+    beta_h = float(_cfg_get(cfg.getfloat, "beta_h", 10.0))
+    constraint_project_step = bool(_cfg_get(cfg.getboolean, "constraint_project_step", True))
+    log_metrics = bool(_cfg_get(cfg.getboolean, "sampler_debug", False))
+    log_every = int(_cfg_get(cfg.getint, "sampler_debug_every", max(1, n_steps)))
+    stats = {"cg_iters": 0, "cg_calls": 0}
+
     def _clamp_box(x):
         return x.clamp(r, L - r)
 
@@ -862,103 +884,283 @@ def sample_flow_model(
                               step_size=step_size, return_intermediates=False, enable_grad=False)
         return _clamp_box(x_end)
 
-    def _active_overlap(x, for_stop=False):
-        P = x.permute(0, 2, 1).contiguous()         # (B,N,d)
-        if not for_stop and eps_nrm > 0.0:
+    def _max_violation(u):
+        """Max gap (positive => violation) across pairs + walls."""
+        P = u.permute(0, 2, 1).contiguous()
+        dmat = torch.cdist(P, P)
+        Bn, Nn, _ = dmat.shape
+        eye = torch.eye(Nn, device=u.device, dtype=torch.bool)[None]
+        dmat = dmat.masked_fill(eye, float('inf'))
+        pair_gap = torch.clamp_min(2.0 * r - dmat, 0.0).amax(dim=(1, 2))
+        wall_gap_low = torch.clamp_min(r - u, 0.0).amax(dim=(1, 2))
+        wall_gap_high = torch.clamp_min(u - (L - r), 0.0).amax(dim=(1, 2))
+        return torch.max(pair_gap, torch.max(wall_gap_low, wall_gap_high))
+
+    def _build_active_set(x, use_noise=True):
+        """
+        Active-set and residual builder.
+        Returns dict with pair/wall constraint metadata and residuals h >= 0.
+        """
+        B, d_, N = x.shape
+        P = x.permute(0, 2, 1).contiguous()
+        if eps_nrm > 0.0 and use_noise:
             P = P + (eps_nrm * r) * torch.randn_like(P)
-
-        diff = P[:, :, None, :] - P[:, None, :, :]  # (B,N,N,d)
-        dist = diff.norm(dim=-1).clamp_min(1e-12)   # (B,N,N)
-        n    = diff / dist.unsqueeze(-1)            # (B,N,N,d)
-
-        overlap = (2.0 * r - dist)                  # positive => penetrating
-        B, N, _ = overlap.shape
+        dist = torch.cdist(P, P).clamp_min(1e-12)              # (B,N,N)
         eye = torch.eye(N, device=x.device, dtype=torch.bool)[None]
-        overlap = overlap.masked_fill(eye, 0.0)
-        return overlap, n, eye
+        # use upper-triangular contacts only to avoid duplicate (i,j)/(j,i)
+        tri_mask = torch.triu(torch.ones((N, N), device=x.device, dtype=torch.bool), diagonal=1)
+        active_pairs = (dist < (2.0 * r + active_margin)) & tri_mask[None] & (~eye)
 
-    def _select_active(overlap, eye, q=1.0):
-        pos = (overlap > 0) & (~eye)
-        if q >= 1.0:
-            return pos
-        flat = overlap.clone()
-        flat[~pos] = float('-inf')
-        thr = torch.quantile(flat.view(flat.size(0), -1), 1.0 - q, dim=1, keepdim=True)
-        return pos & (overlap >= thr.view(-1, 1, 1))
+        if contact_q < 1.0 and active_pairs.any().item():
+            metric = (2.0 * r + active_margin) - dist
+            metric = metric.masked_fill(~active_pairs, float('-inf'))
+            thr = torch.quantile(metric.view(B, -1), 1.0 - contact_q, dim=1, keepdim=True)
+            active_pairs = active_pairs & (metric >= thr.view(-1, 1, 1))
 
-    def _JJt_inv_h_times_Jt(overlap, n, eye, q):
-        active = _select_active(overlap, eye, q)
-        w = (0.5 * overlap * active.float())                    # (B,N,N)
-        term_i = (w.unsqueeze(-1) * n).sum(dim=2)               # (B,N,d)
-        term_j = (w.transpose(1, 2).unsqueeze(-1)
-                  * n.transpose(1, 2)).sum(dim=2)               # (B,N,d)
-        delta = term_i - term_j                                 # (B,N,d)
-        deg = active.float().sum(dim=2, keepdim=True).clamp_min(1.0)
-        delta = (delta / deg).permute(0, 2, 1)                  # (B,d,N)
-        return delta
+        pair_batch, pair_i, pair_j = torch.nonzero(active_pairs, as_tuple=True)
+        if pair_batch.numel() > 0:
+            vec_ij = P[pair_batch, pair_i, :] - P[pair_batch, pair_j, :]   # (P,d)
+            pair_dist = dist[pair_batch, pair_i, pair_j].clamp_min(1e-12)  # (P,)
+            pair_normals = vec_ij / pair_dist[:, None]
+            pair_gap = (2.0 * r - pair_dist)
+            pair_res = torch.clamp_min((F.softplus(beta_h * pair_gap) - math.log(2.0)) / beta_h, 0.0)
+            max_pair_gap = torch.clamp_min(pair_gap, 0.0).max()
+        else:
+            pair_normals = x.new_zeros((0, d_))
+            pair_gap = x.new_zeros((0,))
+            pair_res = x.new_zeros((0,))
+            max_pair_gap = x.new_tensor(0.0, device=x.device, dtype=x.dtype)
 
-    def _wall_push(u, margin_frac=0.05, scale=1.0):
-        """Soft wall ghost constraints"""
-        B, d_, N = u.shape
-        delta = torch.zeros_like(u)
-        thr = margin_frac * (2.0 * r)
-        for ax in range(d_):
-            dl = u[:, ax, :] - r              # distance to low face along axis ax
-            dh = (L - r) - u[:, ax, :]        # distance to high face
-            near_low  = (dl < thr)
-            near_high = (dh < thr)
-            delta[:, ax, :] += torch.where(near_low,  (thr - dl), 0.0)
-            delta[:, ax, :] -= torch.where(near_high, (thr - dh), 0.0)
-        return scale * delta
+        if wall_weight > 0.0:
+            wall_scale = math.sqrt(wall_weight)
+            gap_low = r - x
+            gap_high = x - (L - r)
+            active_low = gap_low > (-wall_active_margin)
+            active_high = gap_high > (-wall_active_margin)
+            wl_b, wl_ax, wl_idx = torch.nonzero(active_low, as_tuple=True)
+            wh_b, wh_ax, wh_idx = torch.nonzero(active_high, as_tuple=True)
+
+            if wl_b.numel() + wh_b.numel() > 0:
+                wall_batch = torch.cat([wl_b, wh_b], dim=0)
+                wall_axis = torch.cat([wl_ax, wh_ax], dim=0)
+                wall_index = torch.cat([wl_idx, wh_idx], dim=0)
+                wall_is_low = torch.cat(
+                    [torch.ones_like(wl_b, dtype=torch.bool), torch.zeros_like(wh_b, dtype=torch.bool)],
+                    dim=0
+                )
+                wall_gap = torch.cat(
+                    [gap_low[wl_b, wl_ax, wl_idx], gap_high[wh_b, wh_ax, wh_idx]],
+                    dim=0
+                )
+                wall_res = wall_scale * torch.clamp_min((F.softplus(beta_h * wall_gap) - math.log(2.0)) / beta_h, 0.0)
+                max_wall_gap = torch.max(
+                    torch.clamp_min(gap_low, 0.0).amax(),
+                    torch.clamp_min(gap_high, 0.0).amax()
+                )
+            else:
+                wall_batch = x.new_zeros((0,), dtype=torch.long)
+                wall_axis = x.new_zeros((0,), dtype=torch.long)
+                wall_index = x.new_zeros((0,), dtype=torch.long)
+                wall_is_low = x.new_zeros((0,), dtype=torch.bool)
+                wall_res = x.new_zeros((0,))
+                max_wall_gap = x.new_tensor(0.0, device=x.device, dtype=x.dtype)
+        else:
+            wall_batch = x.new_zeros((0,), dtype=torch.long)
+            wall_axis = x.new_zeros((0,), dtype=torch.long)
+            wall_index = x.new_zeros((0,), dtype=torch.long)
+            wall_is_low = x.new_zeros((0,), dtype=torch.bool)
+            wall_res = x.new_zeros((0,))
+            max_wall_gap = x.new_tensor(0.0, device=x.device, dtype=x.dtype)
+
+        return {
+            "pair_batch": pair_batch,
+            "pair_i": pair_i,
+            "pair_j": pair_j,
+            "pair_normals": pair_normals,
+            "pair_res": pair_res,
+            "pair_gap": pair_gap,
+            "wall_batch": wall_batch,
+            "wall_axis": wall_axis,
+            "wall_index": wall_index,
+            "wall_is_low": wall_is_low,
+            "wall_res": wall_res,
+            "shape": (B, d_, N),
+            "pair_count": int(pair_res.numel()),
+            "wall_count": int(wall_res.numel()),
+            "max_gap": torch.max(max_pair_gap, max_wall_gap),
+            "device": x.device,
+            "dtype": x.dtype,
+        }
+
+    def _concat_residuals(active):
+        if active["pair_count"] + active["wall_count"] == 0:
+            return None
+        return torch.cat([active["pair_res"], active["wall_res"]], dim=0)
+
+    def _apply_Jt_combined(lam, active):
+        if lam is None or lam.numel() == 0:
+            B, d_, N = active["shape"]
+            device = lam.device if lam is not None else active["device"]
+            dtype = lam.dtype if lam is not None else active["dtype"]
+            return torch.zeros((B, d_, N), device=device, dtype=dtype)
+        B, d_, N = active["shape"]
+        dx_flat = torch.zeros((B * N, d_), device=lam.device, dtype=lam.dtype)
+        npairs = active["pair_count"]
+        pair_lam = lam[:npairs]
+        wall_lam = lam[npairs:]
+
+        if npairs > 0:
+            n_scaled = active["pair_normals"] * pair_lam[:, None]
+            idx_i = active["pair_batch"] * N + active["pair_i"]
+            idx_j = active["pair_batch"] * N + active["pair_j"]
+            dx_flat.index_add_(0, idx_i, -n_scaled)
+            dx_flat.index_add_(0, idx_j, n_scaled)
+
+        if active["wall_count"] > 0:
+            wall_scale = math.sqrt(wall_weight) if wall_weight > 0.0 else 0.0
+            if wall_scale > 0.0:
+                sign = torch.where(active["wall_is_low"], lam.new_tensor(-wall_scale), lam.new_tensor(wall_scale))
+                idx_flat = active["wall_batch"] * N + active["wall_index"]
+                dx_flat.index_put_((idx_flat, active["wall_axis"]), sign * wall_lam, accumulate=True)
+        dx = dx_flat.view(B, N, d_).permute(0, 2, 1).contiguous()
+        return dx
+
+    def _apply_J_combined(dx, active):
+        outputs = []
+        npairs = active["pair_count"]
+        if npairs > 0:
+            diff = dx[active["pair_batch"], :, active["pair_j"]] - dx[active["pair_batch"], :, active["pair_i"]]
+            y_pairs = (active["pair_normals"] * diff).sum(dim=-1)
+            outputs.append(y_pairs)
+        if active["wall_count"] > 0:
+            if wall_weight > 0.0:
+                wall_scale = math.sqrt(wall_weight)
+                sign = torch.where(active["wall_is_low"], dx.new_tensor(-wall_scale), dx.new_tensor(wall_scale))
+                wall_terms = sign * dx[active["wall_batch"], active["wall_axis"], active["wall_index"]]
+                outputs.append(wall_terms)
+        if outputs:
+            return torch.cat(outputs, dim=0)
+        return dx.new_zeros((0,))
+
+    def _apply_JJt(lam, active, damping=kkt_damping):
+        if lam is None or lam.numel() == 0:
+            return lam
+        y = _apply_J_combined(_apply_Jt_combined(lam, active), active)
+        if damping > 0.0:
+            y = y + damping * lam
+        return y
+
+    def _cg_solve(A_fn, b, max_iter, tol):
+        if b is None or b.numel() == 0:
+            return b, 0
+        x = torch.zeros_like(b)
+        r_vec = b - A_fn(x)
+        p = r_vec.clone()
+        rs_old = torch.dot(r_vec, r_vec)
+        if rs_old.sqrt() <= tol:
+            return x, 0
+        iters_used = 0
+        for i in range(max_iter):
+            Ap = A_fn(p)
+            denom = torch.dot(p, Ap).clamp_min(1e-12)
+            alpha = rs_old / denom
+            x = x + alpha * p
+            r_vec = r_vec - alpha * Ap
+            rs_new = torch.dot(r_vec, r_vec)
+            iters_used = i + 1
+            if rs_new.sqrt() <= tol:
+                break
+            beta_cg = rs_new / rs_old.clamp_min(1e-12)
+            p = r_vec + beta_cg * p
+            rs_old = rs_new
+        return x, iters_used
+
+    def _kkt_project(u, xi=None, tol=proj_tol):
+        if xi is None:
+            xi = u
+        u = _clamp_box(u)
+        xi = _clamp_box(xi)
+        for _ in range(max(1, kkt_proj_iters)):
+            active = _build_active_set(u, use_noise=False)
+            if active["pair_count"] + active["wall_count"] == 0:
+                return _clamp_box(xi)
+            h_vec = _concat_residuals(active)
+            rhs = _apply_J_combined(xi - u, active)
+            if h_vec is not None and h_vec.numel() > 0:
+                rhs = rhs + h_vec
+            if rhs.numel() == 0:
+                return _clamp_box(xi)
+            lam, iters_used = _cg_solve(lambda v: _apply_JJt(v, active), rhs, kkt_cg_iters, kkt_cg_tol)
+            stats["cg_iters"] += iters_used
+            stats["cg_calls"] += 1
+            corr = _apply_Jt_combined(lam, active)
+            delta = (xi - u) - corr
+            u = _clamp_box(u + alpha_proj * delta)
+            if float(active["max_gap"]) <= tol:
+                break
+        return _clamp_box(u)
 
     def _project_terminal(u):
-        for _ in range(proj_outer_iters):
-            overlap, n, eye = _active_overlap(u, for_stop=False)
-            has_pairs = bool((overlap > 0).any())
-            if not has_pairs and wall_weight <= 0.0:
+        for _ in range(max(1, proj_outer_iters)):
+            prev = u
+            u = _kkt_project(u, xi=u, tol=proj_tol)
+            if float(_max_violation(u).max()) <= proj_tol:
                 break
-            delta_pairs = _JJt_inv_h_times_Jt(overlap, n, eye, contact_q) if has_pairs else 0.0
-            delta_walls = _wall_push(u, margin_frac=wall_margin, scale=wall_weight) if wall_weight > 0.0 else 0.0
-            u = _clamp_box(u + alpha_proj * (delta_pairs + delta_walls))
+            if torch.allclose(u, prev):
+                break
         return u
 
-    def _Jt_h_at_state(u_next):
-        """
-        Fast Approximatation J^T h(u_next): pairwise + wall residual gradients, shape (B,d,N).
-        """
-        overlap, n, eye = _active_overlap(u_next, for_stop=False)
-        active = (overlap > 0) & (~eye)
-        # pair contribution (same as GN but without 0.5 and without degree normalization)
-        w = overlap * active.float()
-        term_i = (-(w.unsqueeze(-1) * n).sum(dim=2))                       # (B,N,d)
-        term_j = (+(w.transpose(1, 2).unsqueeze(-1) * n.transpose(1, 2)).sum(dim=2))
-        jt_pairs = (term_i + term_j).permute(0, 2, 1)                      # (B,d,N)
-        # wall contribution
-        jt_walls = _wall_push(u_next, margin_frac=wall_margin, scale=1.0)  # inward normal
-        return jt_pairs + wall_weight * jt_walls
-
     def _prox_relaxed(u, u0, u_proj, tau_prime, cond):
-        # gradient steps
+        # gradient steps with look-ahead penalty on next state
         u_hat = (1.0 - tau_prime) * u0 + tau_prime * u_proj
         t_prime = 1.0 - float(tau_prime)
+        gamma = max(1e-3, 1.0 - float(tau_prime))
         for _ in range(max(1, prox_iters)):
-            # evaluate v_theta at tau'
             tb = torch.full((u.size(0),), t_prime, device=u.device, dtype=u.dtype)
             v = model(tb, u, cond=cond) if cond is not None else model(tb, u)
-            u_next = _clamp_box(u + (1.0 - tau_prime) * v)
+            if constraint_project_step:
+                u_next_free = _clamp_box(u + gamma * v)
+                u_next = _kkt_project(u_next_free, xi=u_next_free, tol=proj_tol)
+                v_eff = (u_next - u) / gamma
+            else:
+                v_eff = v
+                u_next = _clamp_box(u + gamma * v_eff)
 
-            jt_h = _Jt_h_at_state(u_next)
-            grad = (u - u_hat) + prox_lambda * jt_h
+            active_next = _build_active_set(u_next, use_noise=False)
+            h_vec = _concat_residuals(active_next)
+            if h_vec is not None and h_vec.numel() > 0:
+                jt_h = _apply_Jt_combined(h_vec, active_next)
+            else:
+                jt_h = torch.zeros_like(u)
+
+            grad = (u - u_hat) + prox_lambda * (2.0 * jt_h)
             u = _clamp_box(u - prox_step * grad)
         return u
 
     def _final_polish(u):
         for _ in range(final_passes):
-            overlap, _, _ = _active_overlap(u, for_stop=True)
-            if float(overlap.clamp_min(0.0).amax()) <= tol_finish:
+            u = _kkt_project(u, xi=u, tol=tol_finish)
+            if float(_max_violation(u).max()) <= tol_finish:
                 break
-            u = _project_terminal(u)
         return u
+
+    def _metric_snapshot(u):
+        P = u.permute(0, 2, 1).contiguous()
+        dmat = torch.cdist(P, P)
+        Bn, Nn, _ = dmat.shape
+        eye = torch.eye(Nn, device=u.device, dtype=torch.bool)[None]
+        dmat = dmat.masked_fill(eye, float('inf'))
+        minsep = dmat.amin(dim=-1).amin(dim=-1)
+        frac_bad = (minsep < (2.0 * r)).float().mean().item()
+        pair_gap = torch.clamp_min(2.0 * r - dmat, 0.0)
+        wall_gap_low = torch.clamp_min(r - u, 0.0)
+        wall_gap_high = torch.clamp_min(u - (L - r), 0.0)
+        max_gap_val = torch.max(pair_gap.max(), torch.max(wall_gap_low.max(), wall_gap_high.max())).item()
+        active_eval = _build_active_set(u, use_noise=False)
+        active_total = active_eval["pair_count"] + active_eval["wall_count"]
+        act_per_sample = active_total / max(1, u.size(0))
+        cg_avg = stats["cg_iters"] / max(1, stats["cg_calls"]) if stats["cg_calls"] > 0 else 0.0
+        return frac_bad, max_gap_val, act_per_sample, cg_avg
 
     model.eval()
     try:
@@ -1011,6 +1213,12 @@ def sample_flow_model(
 
         # final polishing
         u = _final_polish(u)
+        if log_metrics:
+            batches_done = len(samples) + 1
+            should_log = (batches_done % max(1, log_every) == 0) or (remaining - bs <= 0) or batches_done == 1
+            if should_log:
+                frac_bad, max_gap_val, act_avg, cg_avg = _metric_snapshot(u)
+                print(f"[PCFM] batch={batches_done} frac_bad={frac_bad:.3f} max_gap={max_gap_val:.4e} active/b={act_avg:.1f} cg_iter_avg={cg_avg:.1f}")
         samples.append(u.cpu().numpy())
         remaining -= bs
 
