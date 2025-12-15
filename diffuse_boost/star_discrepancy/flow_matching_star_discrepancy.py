@@ -1,6 +1,5 @@
 import os
 import math
-import time
 import numpy as np
 from datetime import datetime
 
@@ -16,9 +15,6 @@ from x_transformers import Encoder
 from flow_matching.path.scheduler import CondOTScheduler
 from flow_matching.path import AffineProbPath
 from flow_matching.solver import ODESolver
-from diffuse_boost.heilbronn_square.sample_generation import plot_top_k_minarea_samples
-
-import configparser
 
 try:
     from diffuse_boost import cfg
@@ -32,75 +28,187 @@ except Exception:
 FM_PATH = AffineProbPath(scheduler=CondOTScheduler())
 
 # ==========================
-# Utilities for Heilbronn
+# Utilities for Star Discrepancy
 # ==========================
 def clamp_unit_square(x):
     # x: (B,2,N)
     return x.clamp(0.0, 1.0)
 
 def sample_uniform_x1_like(x0):
-    # x0 only for shape/device
     B, d, N = x0.shape
     assert d == 2
     return torch.rand(B, d, N, device=x0.device, dtype=x0.dtype)
 
-def all_triangle_areas(points):
+def sample_latin_hypercube_x1_like(x0):
+    """
+    Geometrically efficient initialization in [0,1]^2:
+    Latin Hypercube Sampling per batch (jittered stratified).
+    Shape: (B,2,N).
+    """
+    B, d, N = x0.shape
+    assert d == 2
+    device = x0.device
+    dtype = x0.dtype
+    # bins [0..N-1], independently permuted for x and y per batch
+    bins = torch.arange(N, device=device)
+    x = torch.empty(B, N, device=device, dtype=dtype)
+    y = torch.empty(B, N, device=device, dtype=dtype)
+    # jitter in each bin
+    jx = torch.rand(B, N, device=device, dtype=dtype)
+    jy = torch.rand(B, N, device=device, dtype=dtype)
+    for b in range(B):
+        px = bins[torch.randperm(N, device=device)]
+        py = bins[torch.randperm(N, device=device)]
+        x[b] = (px.to(dtype) + jx[b]) / float(N)
+        y[b] = (py.to(dtype) + jy[b]) / float(N)
+    out = torch.stack([x, y], dim=1)  # (B,2,N)
+    return out
+
+def make_uniform_grid_torch(Gx, Gy, device, dtype):
+    Ax = torch.linspace(1.0 / float(Gx), 1.0, int(Gx), device=device, dtype=dtype)
+    Ay = torch.linspace(1.0 / float(Gy), 1.0, int(Gy), device=device, dtype=dtype)
+    return Ax, Ay
+
+def _sigmoid_torch(z):
+    return torch.sigmoid(z)
+
+def star_surrogate_torch(points, Ax, Ay, beta_softmax=200.0, tau_sigmoid=0.01, eps_abs=1e-12):
     """
     points: (B,2,N) in [0,1]
-    returns: tensor (B, K) of areas per batch (K = C(N,3))
+    Ax: (U,), Ay: (V,)
+    returns: (B,) smooth star discrepancy surrogate:
+        (1/beta) log sum_{u,v} exp(beta * |C(u,v) - a*b|)
+    where C(u,v) = (1/N) sum_i sigmoid((a-x_i)/tau)*sigmoid((b-y_i)/tau).
     """
-    B, _, N = points.shape
-    device = points.device
-    dtype = points.dtype
-    idx = []
-    for i in range(N - 2):
-        for j in range(i + 1, N - 1):
-            for k in range(j + 1, N):
-                idx.append((i, j, k))
-    K = len(idx)
-    areas = torch.empty(B, K, device=device, dtype=dtype)
-    P = points.permute(0, 2, 1)  # (B,N,2)
+    B, d, N = points.shape
+    assert d == 2
+    x = points[:, 0, :]  # (B,N)
+    y = points[:, 1, :]  # (B,N)
 
-    for t, (i, j, k) in enumerate(idx):
-        A = P[:, i, :]  # (B,2)
-        Bp = P[:, j, :]
-        C = P[:, k, :]
-        BA = Bp - A
-        CA = C - A
-        cross = BA[:, 0] * CA[:, 1] - BA[:, 1] * CA[:, 0]
-        areas[:, t] = 0.5 * cross.abs()
-    return areas  # (B,K)
+    # gates: Sx (B,U,N), Sy (B,V,N)
+    Sx = _sigmoid_torch((Ax.view(1, -1, 1) - x.view(B, 1, N)) / tau_sigmoid)
+    Sy = _sigmoid_torch((Ay.view(1, -1, 1) - y.view(B, 1, N)) / tau_sigmoid)
 
-def softmin_triangle_area(points, tau=1e-3, sample_K=None, rng=None):
+    # C (B,U,V) via einsum over N
+    # C[u,v] = (1/N) sum_i Sx[u,i]*Sy[v,i]
+    C = torch.einsum("bun,bvn->buv", Sx, Sy) / float(N)
+
+    # a*b grid (U,V) broadcast
+    AB = (Ax.view(-1, 1) * Ay.view(1, -1)).to(points.dtype)  # (U,V)
+    Delta = C - AB.view(1, *AB.shape)  # (B,U,V)
+    Dabs = torch.sqrt(Delta * Delta + float(eps_abs))  # smooth abs
+
+    # log-sum-exp
+    Xlog = beta_softmax * Dabs
+    # (B,)
+    return (torch.logsumexp(Xlog.flatten(1), dim=1) / beta_softmax)
+
+def star_abs_grid_torch(points, Ax, Ay, tau_sigmoid=0.01, eps_abs=1e-12):
     """
-    Smooth approximation to min area via soft-min: a_soft = -tau * logsumexp(-A/tau)
-    Optionally subsample K triangles for efficiency.
-    Returns: (B,)
+    Returns Dabs grid: (B,U,V) of smooth |C(u,v)-a*b|.
+    Useful for top-k refinement.
     """
-    B, _, N = points.shape
-    if sample_K is None:
-        A = all_triangle_areas(points)  # (B, K)
+    B, d, N = points.shape
+    assert d == 2
+    x = points[:, 0, :]
+    y = points[:, 1, :]
+    Sx = _sigmoid_torch((Ax.view(1, -1, 1) - x.view(B, 1, N)) / tau_sigmoid)
+    Sy = _sigmoid_torch((Ay.view(1, -1, 1) - y.view(B, 1, N)) / tau_sigmoid)
+    C = torch.einsum("bun,bvn->buv", Sx, Sy) / float(N)
+    AB = (Ax.view(-1, 1) * Ay.view(1, -1)).to(points.dtype)
+    Delta = C - AB.view(1, *AB.shape)
+    return torch.sqrt(Delta * Delta + float(eps_abs))
+
+# =======================
+# Exact star discrepancy (numpy; used for conditioning + plotting only)
+# =======================
+def exact_star_discrepancy_2d_numpy(pts_np):
+    """
+    Exact 2D star discrepancy on the critical grid.
+    Checks open [0,a)×[0,b) and closed [0,a]×[0,b].
+    pts_np: (N,2) in [0,1]
+    """
+    pts = np.asarray(pts_np, dtype=np.float64)
+    N = pts.shape[0]
+    if N == 0:
+        return 0.0, {"open_max": 0.0, "closed_max": 0.0}
+
+    x = np.clip(pts[:, 0], 0.0, 1.0)
+    y = np.clip(pts[:, 1], 0.0, 1.0)
+
+    Ax = np.unique(np.concatenate([x, [1.0]]))
+    Ay = np.unique(np.concatenate([y, [1.0]]))
+    U, V = Ax.size, Ay.size
+
+    # OPEN (<,<)
+    iu = np.searchsorted(Ax, x, side="left")
+    iv = np.searchsorted(Ay, y, side="left")
+    M_open = np.zeros((U, V), dtype=np.int64)
+    for i, j in zip(iu, iv):
+        M_open[i, j] += 1
+    C_open = M_open.cumsum(axis=0).cumsum(axis=1)
+    frac_open = C_open / float(N)
+
+    Agrid, Bgrid = np.meshgrid(Ax, Ay, indexing="ij")
+    D_minus = Agrid * Bgrid - frac_open
+    D_minus_max = float(D_minus.max())
+
+    # CLOSED (<=,<=)
+    iu2 = np.searchsorted(Ax, x, side="right") - 1
+    iv2 = np.searchsorted(Ay, y, side="right") - 1
+    M_closed = np.zeros((U, V), dtype=np.int64)
+    for i, j in zip(iu2, iv2):
+        M_closed[i, j] += 1
+    C_closed = M_closed.cumsum(axis=0).cumsum(axis=1)
+    frac_closed = C_closed / float(N)
+
+    D_plus = frac_closed - Agrid * Bgrid
+    D_plus_max = float(D_plus.max())
+
+    return max(D_minus_max, D_plus_max), {"open_max": D_minus_max, "closed_max": D_plus_max}
+
+def plot_top_k_lowdiscrepancy_samples(samples_np, k, out_dir, filename_prefix="star_disc"):
+    """
+    samples_np: (M,2,N) OR (M,N,2) numpy array
+    Plots the best K by exact star discrepancy.
+    """
+    import matplotlib.pyplot as plt
+    os.makedirs(out_dir, exist_ok=True)
+
+    arr = samples_np
+    if arr.ndim != 3:
+        raise ValueError(f"Expected (M,2,N) or (M,N,2), got {arr.shape}")
+    if arr.shape[1] == 2:
+        M, _, N = arr.shape
+        get_pts = lambda s: arr[s].T
+    elif arr.shape[-1] == 2:
+        M, N, _ = arr.shape
+        get_pts = lambda s: arr[s]
     else:
-        if rng is None: rng = np.random
-        idx = []
-        for _ in range(sample_K):
-            i, j, k = sorted(rng.choice(N, 3, replace=False).tolist())
-            idx.append((i, j, k))
-        P = points.permute(0, 2, 1)  # (B,N,2)
-        A_list = []
-        for (i, j, k) in idx:
-            A = P[:, i, :]
-            Bp = P[:, j, :]
-            C = P[:, k, :]
-            BA = Bp - A
-            CA = C - A
-            cross = BA[:, 0] * CA[:, 1] - BA[:, 1] * CA[:, 0]
-            A_list.append(0.5 * cross.abs())
-        A = torch.stack(A_list, dim=1)  # (B,sample_K)
+        raise ValueError(f"Bad shape {arr.shape}")
 
-    m = torch.amax(-A, dim=1, keepdim=True)
-    a_soft = -tau * (m + torch.log(torch.clamp(torch.sum(torch.exp(-A / tau - m), dim=1, keepdim=True), min=1e-20)))
-    return a_soft.squeeze(1)  # (B,)
+    Ds = np.zeros(M, dtype=np.float64)
+    for s in range(M):
+        pts = get_pts(s).astype(np.float64)
+        Ds[s], _ = exact_star_discrepancy_2d_numpy(pts)
+
+    order = np.argsort(Ds)  # smaller better
+    for rank in range(min(k, M)):
+        s = int(order[rank])
+        pts = get_pts(s).astype(np.float64)
+        D, info = exact_star_discrepancy_2d_numpy(pts)
+        fig, ax = plt.subplots(figsize=(5, 5))
+        ax.plot([0, 1, 1, 0, 0], [0, 0, 1, 1, 0], color="black")
+        ax.scatter(pts[:, 0], pts[:, 1], s=12)
+        ax.set_aspect("equal", adjustable="box")
+        ax.set_xlim(0, 1); ax.set_ylim(0, 1)
+        ax.set_title(f"Rank {rank+1} (sample {s}) N={pts.shape[0]}  D*={D:.8f}")
+        out_path = os.path.join(
+            out_dir,
+            f"{filename_prefix}_n={pts.shape[0]}_rank={rank+1}_D={D:.8f}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+        )
+        fig.savefig(out_path, dpi=150, bbox_inches="tight")
+        plt.close(fig)
 
 # =======================
 # Transformer velocity
@@ -144,7 +252,7 @@ class FlowSetTransformer(nn.Module):
         time_F  = int(st_kwargs.get("time_fourier_dim", max(16, dim_time // 2)))
         time_h  = int(st_kwargs.get("time_hidden", 2 * dim_time))
         sigma   = float(st_kwargs.get("time_fourier_sigma", 1.0))
-        cond_in = int(st_kwargs.get("cond_dim_in", 2))  # [N/scale_N, target_min_area]
+        cond_in = int(st_kwargs.get("cond_dim_in", 2))  # [N/scale_N, target_star_discrepancy]
         self.uses_cond = cond_in > 0
 
         self.time_emb = self.TimeEmbedFourier(dim_time, time_F, time_h, sigma)
@@ -205,26 +313,27 @@ class FlowSetTransformer(nn.Module):
 # ===================================
 # Dataset (points + per-sample conds)
 # ===================================
-class HeilbronnPointsetDataset(Dataset):
-    def __init__(self, path, tol=1e-12, scale_N=128):
-        data = torch.load(path)  # (M, 2, N)
+class StarDiscrepancyPointsetDataset(Dataset):
+    def __init__(self, path, scale_N=128):
+        data = torch.load(path)  # (M, 2, N) expected
         assert data.ndim == 3 and data.shape[1] == 2
         self.data = data.contiguous()
         self.M, self.d, self.N = self.data.shape
 
-        # exact min triangle area per sample
-        mins = []
+        # exact star discrepancy per sample (numpy, critical grid)
+        ds = []
         with torch.no_grad():
-            for s in range(self.M):
-                A = all_triangle_areas(self.data[s:s+1].to(torch.float64)).squeeze(0)
-                mins.append(float(A.min().item()))
-        self.min_area = torch.tensor(mins, dtype=self.data.dtype)
+            for s in tqdm(range(self.M), desc="[Dataset] exact star discrepancy"):
+                pts = self.data[s].permute(1, 0).cpu().numpy().astype(np.float64)  # (N,2)
+                D, _ = exact_star_discrepancy_2d_numpy(pts)
+                ds.append(float(D))
+        self.star_disc = torch.tensor(ds, dtype=self.data.dtype)
 
-        # cond = [N/scale_N, min_area]
-        N_scaled = torch.full((self.M,), float(self.N)/float(scale_N), dtype=self.data.dtype)
-        self.cond = torch.stack([N_scaled, self.min_area], dim=1)
+        # cond = [N/scale_N, star_disc]
+        N_scaled = torch.full((self.M,), float(self.N) / float(scale_N), dtype=self.data.dtype)
+        self.cond = torch.stack([N_scaled, self.star_disc], dim=1)
 
-        print(f"Loaded {path}, shape {tuple(self.data.shape)}; precomputed min areas.")
+        print(f"Loaded {path}, shape {tuple(self.data.shape)}; precomputed exact star discrepancy.")
 
     def __len__(self): return self.M
     def __getitem__(self, i): return self.data[i], self.cond[i]
@@ -240,7 +349,10 @@ def sample_t(B, device, small_t_weight=0.5, gamma=2.0):
 
 def train_flow_model(
     model, optimizer, loader, num_epochs,
-    mse_strength, heil_penalty_strength, device, params, save_dir
+    mse_strength, star_penalty_strength, device, params, save_dir,
+    # star discrepancy surrogate knobs
+    grid_x=64, grid_y=64, beta_softmax=200.0, tau_sigmoid=0.01, eps_abs=1e-12,
+    penalty_kappa=80.0,
 ):
     model.train().to(device)
     optimizer.train()
@@ -249,16 +361,21 @@ def train_flow_model(
 
     os.makedirs(save_dir, exist_ok=True)
 
+    # fixed uniform grid for differentiable surrogate in training
+    Ax, Ay = make_uniform_grid_torch(grid_x, grid_y, device=device, dtype=torch.float32)
+
     for epoch in range(num_epochs):
         ep_losses = []
         ratio = 0.5 * (1 - math.cos(math.pi * min(1.0, epoch / max(1, int(0.5 * num_epochs)))))
 
         for x_0, cond in loader:
             x_0 = x_0.to(device)       # (B,2,N) in [0,1]
-            cond = cond.to(device)     # (B,2)   [N_scaled, min_area]
+            cond = cond.to(device)     # (B,2)   [N_scaled, target_star_disc]
 
             B = x_0.size(0)
-            x_1 = sample_uniform_x1_like(x_0)
+
+            # source distribution x_1: use LHS (more geometric than pure uniform)
+            x_1 = sample_latin_hypercube_x1_like(x_0)
 
             t_in = sample_t(B, device=device)
             path_sample = FM_PATH.sample(t=t_in, x_0=x_0, x_1=x_1)
@@ -269,7 +386,7 @@ def train_flow_model(
             # Flow-matching loss
             loss_fm = mse(u_pred, dx_t)
 
-            # Auxiliary: encourage high min-triangle area near projected x0
+            # Auxiliary: encourage low star discrepancy near projected x0
             eps_t = 1e-3
             with torch.no_grad():
                 sch0 = FM_PATH.scheduler(t_in)
@@ -277,29 +394,40 @@ def train_flow_model(
             alpha_dot = ((sch1.alpha_t - sch0.alpha_t) / eps_t).view(-1, 1, 1).to(x_t.dtype)
             sigma_dot = ((sch1.sigma_t - sch0.sigma_t) / eps_t).view(-1, 1, 1).to(x_t.dtype)
             alpha_dot_safe = alpha_dot.sign() * alpha_dot.abs().clamp_min(1e-6)
+
+            # x0_proj ~ inferred x0 from u_pred and x1
             x0_proj = (u_pred - sigma_dot * x_1) / alpha_dot_safe
             x0_proj = clamp_unit_square(x0_proj)
 
-            target = cond[:, 1]  # (B,)
-            a_soft = softmin_triangle_area(x0_proj, tau=1e-3, sample_K=None)
-            deficit = (target - a_soft).clamp_min(0.0)
-            loss_heil = F.softplus(80.0 * deficit).mean() / 80.0
+            target = cond[:, 1]  # (B,) exact discrepancy of training sample
 
-            loss = mse_strength * loss_fm + heil_penalty_strength * ratio * loss_heil
+            # surrogate discrepancy to minimize
+            disc_soft = star_surrogate_torch(
+                x0_proj.to(torch.float32), Ax, Ay,
+                beta_softmax=float(beta_softmax),
+                tau_sigmoid=float(tau_sigmoid),
+                eps_abs=float(eps_abs),
+            ).to(x0_proj.dtype)
+
+            # penalize if disc_soft > target (we want <= target)
+            deficit = (disc_soft - target).clamp_min(0.0)
+            loss_star = F.softplus(float(penalty_kappa) * deficit).mean() / float(penalty_kappa)
+
+            loss = mse_strength * loss_fm + star_penalty_strength * ratio * loss_star
 
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
-            ep_losses.append([float(loss_fm.item()), float(loss_heil.item()), float(loss.item())])
+            ep_losses.append([float(loss_fm.item()), float(loss_star.item()), float(loss.item())])
 
         avg = np.mean(ep_losses, axis=0)
         history.append(avg)
-        print(f"Epoch {epoch+1}/{num_epochs} | FM={avg[0]:.5f} HeilPen={avg[1]:.5f} Tot={avg[2]:.5f}")
+        print(f"Epoch {epoch+1}/{num_epochs} | FM={avg[0]:.5f} StarPen={avg[1]:.5f} Tot={avg[2]:.5f}")
 
     hist = np.array(history, dtype=np.float32)
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    name = f"heilbronn_fm_loss={hist[-1,2]:.6f}_{ts}.pth"
+    name = f"star_fm_loss={hist[-1,2]:.6f}_{ts}.pth"
     path = os.path.join(save_dir, name)
     torch.save(
         {
@@ -318,7 +446,11 @@ def train_flow_model(
 # PCFM-style sampler (+ polishing)
 # ================================
 def sample_flow_model(model, optimizer, num_samples, batch_size, num_points, device,
-                      cond_loader=None, polish_steps=20, polish_lr=0.02, tau=1e-3,
+                      cond_loader=None,
+                      # star surrogate knobs
+                      grid_x=64, grid_y=64, beta_softmax=200.0, tau_sigmoid=0.01, eps_abs=1e-12,
+                      # polishing knobs
+                      polish_steps=20, polish_lr=0.02,
                       # PCFM knobs
                       n_steps=40,
                       ode_method="midpoint",
@@ -328,14 +460,15 @@ def sample_flow_model(model, optimizer, num_samples, batch_size, num_points, dev
                       prox_steps=6,
                       prox_lr=0.1,
                       prox_lambda=1.0,
-                      de_novo_minarea_bump=0.0,
-                      # soft-min annealing
-                      tau_start=None,
-                      tau_end=None,
-                      # optional hard-min refinement
-                      hardmin_topk=0,
-                      hardmin_steps=0,
-                      hardmin_lr_frac=0.5):
+                      # optional conditioning bump: ask for slightly smaller discrepancy
+                      de_novo_disc_bump=0.0,
+                      # optional anneal tau_sigmoid in projection/prox (geometric)
+                      tau_sigmoid_start=None,
+                      tau_sigmoid_end=None,
+                      # optional top-k max-box refinement
+                      hardmax_topk=0,
+                      hardmax_steps=0,
+                      hardmax_lr_frac=0.5):
     model.eval().to(device)
     if optimizer is not None:
         try:
@@ -343,28 +476,40 @@ def sample_flow_model(model, optimizer, num_samples, batch_size, num_points, dev
         except Exception:
             pass
 
-    # Terminal projection: increase soft-min area via gradient ascent
-    def _terminal_projection_softmin(u, steps=6, lr=0.05, tau_soft=1e-3):
+    Ax, Ay = make_uniform_grid_torch(grid_x, grid_y, device=device, dtype=torch.float32)
+
+    # Terminal projection: decrease star surrogate via gradient descent
+    def _terminal_projection_star(u, steps=6, lr=0.05, tau_gate=0.01):
         x = u.clone()
         for _ in range(max(1, steps)):
             x.requires_grad_(True)
-            a_soft = softmin_triangle_area(x, tau=tau_soft, sample_K=None).mean()
-            loss = -a_soft
+            disc = star_surrogate_torch(
+                x.to(torch.float32), Ax, Ay,
+                beta_softmax=float(beta_softmax),
+                tau_sigmoid=float(tau_gate),
+                eps_abs=float(eps_abs),
+            ).mean()
+            loss = disc  # minimize
             (grad,) = torch.autograd.grad(loss, x, retain_graph=False, create_graph=False)
             with torch.no_grad():
                 x = x - lr * grad
                 x = clamp_unit_square(x)
         return x.detach()
 
-    # Proximal relaxation: min 0.5||x - x_hat||^2 - lam * a_soft(x)
-    def _prox_relaxed_softmin(u, u0, u_proj, tau_prime, steps=6, lr=0.1, lam=1.0, tau_soft=1e-3):
+    # Proximal relaxation: min 0.5||x - u_hat||^2 + lam * disc(x)
+    def _prox_relaxed_star(u, u0, u_proj, tau_prime, steps=6, lr=0.1, lam=1.0, tau_gate=0.01):
         u_hat = (1.0 - tau_prime) * u0 + tau_prime * u_proj
         x = u.clone()
         for _ in range(max(1, steps)):
             x.requires_grad_(True)
-            a_soft = softmin_triangle_area(x, tau=tau_soft, sample_K=None).mean()
+            disc = star_surrogate_torch(
+                x.to(torch.float32), Ax, Ay,
+                beta_softmax=float(beta_softmax),
+                tau_sigmoid=float(tau_gate),
+                eps_abs=float(eps_abs),
+            ).mean()
             quad = 0.5 * (x - u_hat).pow(2).mean()
-            loss = quad - lam * a_soft
+            loss = quad + lam * disc
             (grad,) = torch.autograd.grad(loss, x, retain_graph=False, create_graph=False)
             with torch.no_grad():
                 x = x - lr * grad
@@ -382,11 +527,7 @@ def sample_flow_model(model, optimizer, num_samples, batch_size, num_points, dev
             return self.mdl(tb, x, cond=self.c) if self.c is not None else self.mdl(tb, x)
 
     while remaining > 0:
-        # Print progress using tqdm bar
-        with tqdm(total=remaining, desc="[Sampling]", unit="sample") as pbar:
-            pbar.update(0)
-
-        # Conditioning batch (+ optional de-novo bump on min-area target)
+        # Conditioning batch
         if cond_iter is not None:
             try:
                 _, cond = next(cond_iter)
@@ -396,30 +537,29 @@ def sample_flow_model(model, optimizer, num_samples, batch_size, num_points, dev
             cond = cond.to(device)
             bs = min(batch_size, remaining, cond.size(0))
             cond = cond[:bs]
-            if de_novo_minarea_bump > 0.0:
+            # Ask for smaller discrepancy than training target if desired
+            if de_novo_disc_bump != 0.0:
                 cond = cond.clone()
-                cond[:, 1] = (cond[:, 1] + float(de_novo_minarea_bump)).clamp(max=1.0)
+                cond[:, 1] = (cond[:, 1] + float(de_novo_disc_bump)).clamp(min=0.0)
         else:
             bs = min(batch_size, remaining)
             cond = None
 
-        # Initialize from x1 ~ U([0,1]^2)
-        u0 = torch.rand(bs, 2, num_points, device=device)
+        # Initialize from geometrically efficient x1: LHS
+        u0 = sample_latin_hypercube_x1_like(torch.empty(bs, 2, num_points, device=device, dtype=torch.float32))
         u = u0.clone()
 
         solver = ODESolver(velocity_model=_FMVF(model, cond))
 
-        # PCFM loop over tau in [0,1]
         for k in range(max(1, n_steps)):
             tau_k = k / max(1, n_steps)
             tau_n = (k + 1) / max(1, n_steps)
 
-            # Soft-min temperature (anneal if provided)
-            if (tau_start is not None) and (tau_end is not None):
-                # geometric schedule
-                tau_k_use = float(tau_start) * ((float(tau_end) / float(tau_start)) ** (k / max(1, n_steps - 1)))
+            # Anneal gate temperature (optional)
+            if (tau_sigmoid_start is not None) and (tau_sigmoid_end is not None):
+                tau_gate = float(tau_sigmoid_start) * ((float(tau_sigmoid_end) / float(tau_sigmoid_start)) ** (k / max(1, n_steps - 1)))
             else:
-                tau_k_use = tau
+                tau_gate = float(tau_sigmoid)
 
             # 1) ODE integrate a small step (t = 1 - tau)
             t0, t1 = 1.0 - tau_k, 1.0 - tau_n
@@ -429,46 +569,55 @@ def sample_flow_model(model, optimizer, num_samples, batch_size, num_points, dev
                               step_size=step_size, return_intermediates=False, enable_grad=False)
             u = clamp_unit_square(u)
 
-            # 2) Terminal projection: increase soft-min area
-            u_proj = _terminal_projection_softmin(u, steps=proj_steps, lr=proj_lr, tau_soft=tau_k_use)
+            # 2) Projection: reduce star surrogate
+            u_proj = _terminal_projection_star(u, steps=proj_steps, lr=proj_lr, tau_gate=tau_gate)
 
-            # 3) Proximal relaxation: balance projection with source-target blend
-            u = _prox_relaxed_softmin(u, u0, u_proj, tau_prime=tau_n,
-                                      steps=prox_steps, lr=prox_lr, lam=prox_lambda, tau_soft=tau_k_use)
+            # 3) Prox: balance projection with source-target blend
+            u = _prox_relaxed_star(u, u0, u_proj, tau_prime=tau_n,
+                                   steps=prox_steps, lr=prox_lr, lam=prox_lambda, tau_gate=tau_gate)
 
-        # Optional light polishing (soft-min)
-        tau_polish = tau_end if (tau_start is not None and tau_end is not None) else tau
+        # Optional light polishing: further reduce surrogate
         if polish_steps > 0:
             u = u.clone().detach().requires_grad_(True)
             opt = torch.optim.SGD([u], lr=polish_lr)
             for _ in range(polish_steps):
                 opt.zero_grad()
-                a_soft = softmin_triangle_area(u, tau=tau_polish, sample_K=None)
-                loss = -a_soft.mean()
+                disc = star_surrogate_torch(
+                    u.to(torch.float32), Ax, Ay,
+                    beta_softmax=float(beta_softmax),
+                    tau_sigmoid=float(tau_sigmoid),
+                    eps_abs=float(eps_abs),
+                )
+                loss = disc.mean()
                 loss.backward()
                 with torch.no_grad():
                     u[:] = clamp_unit_square(u)
                 opt.step()
             u = u.detach()
 
-        # Optional hard-min top-k refinement (targets true min more directly)
-        if hardmin_topk > 0 and hardmin_steps > 0:
+        # Optional “hard max” refinement: minimize mean of top-k box errors (closest to sup)
+        if hardmax_topk > 0 and hardmax_steps > 0:
             u = u.clone().detach().requires_grad_(True)
-            hm_lr = max(1e-5, float(polish_lr) * float(hardmin_lr_frac))
+            hm_lr = max(1e-5, float(polish_lr) * float(hardmax_lr_frac))
             opt_hm = torch.optim.SGD([u], lr=hm_lr)
-            for _ in range(hardmin_steps):
+            for _ in range(hardmax_steps):
                 opt_hm.zero_grad()
-                A = all_triangle_areas(u)  # (B, K)
-                k = min(int(hardmin_topk), A.size(1))
-                vals, _ = torch.topk(A, k, dim=1, largest=False)  # k smallest per batch
-                loss_hard = -vals.mean()  # maximize worst areas
+                Dabs = star_abs_grid_torch(
+                    u.to(torch.float32), Ax, Ay,
+                    tau_sigmoid=float(tau_sigmoid),
+                    eps_abs=float(eps_abs),
+                )  # (B,U,V)
+                flat = Dabs.flatten(1)  # (B, U*V)
+                kk = min(int(hardmax_topk), flat.size(1))
+                vals, _ = torch.topk(flat, kk, dim=1, largest=True)  # largest discrepancies
+                loss_hard = vals.mean()
                 loss_hard.backward()
                 with torch.no_grad():
                     u[:] = clamp_unit_square(u)
                 opt_hm.step()
             u = u.detach()
 
-        samples.append(u.cpu().numpy())
+        samples.append(u.detach().cpu().numpy())
         remaining -= bs
 
     return np.concatenate(samples, axis=0)
@@ -488,20 +637,24 @@ def load_model_if_exists(model, opt, path, device):
     return model, opt
 
 # ======================
-# Main controlled by INI
+# Main controlled by INI (3 modes preserved)
 # ======================
 def main(state=None):
-    sec = "heilbronn_flow"
+    # Prefer "star_flow" but keep backward compatibility if you still have "heilbronn_flow"
+    sec = "star_flow"
+    if HAS_CFG and not cfg.has_section(sec):
+        sec = "heilbronn_flow"
+
     mode = cfg.get(sec, "mode", fallback="training_and_sampling").strip()
 
     # Data / IO
-    dataset_path = cfg.get(sec, "dataset_path")
+    dataset_path = cfg.get(sec, "dataset_path", fallback="")
     assert dataset_path, "dataset_path required (torch tensor file of shape (M,2,N))"
 
-    save_model_dir = cfg.get(sec, "save_model_dir", fallback="./outputs_heilbronn_models")
+    save_model_dir = cfg.get(sec, "save_model_dir", fallback="./outputs_star_models")
     os.makedirs(save_model_dir, exist_ok=True)
 
-    save_generated_dir = cfg.get(sec, "save_generated_dir", fallback="./outputs_heilbronn_samples")
+    save_generated_dir = cfg.get(sec, "save_generated_dir", fallback="./outputs_star_samples")
     os.makedirs(save_generated_dir, exist_ok=True)
 
     # Model + train params
@@ -510,22 +663,29 @@ def main(state=None):
     lr = cfg.getfloat(sec, "learning_rate", fallback=1e-4)
     epochs = cfg.getint(sec, "num_epochs", fallback=200)
     mse_s = cfg.getfloat(sec, "mse_strength", fallback=1.0)
-    heil_s= cfg.getfloat(sec, "heilbronn_penalty_strength", fallback=0.2)
+    star_s = cfg.getfloat(sec, "star_penalty_strength", fallback=0.2)
+    penalty_kappa = cfg.getfloat(sec, "penalty_kappa", fallback=80.0)
     test_fraction = cfg.getfloat(sec, "test_fraction", fallback=0.1)
     split_seed = cfg.getint(sec, "split_seed", fallback=1234)
-    
+
+    # Star discrepancy surrogate knobs (train + sampling)
+    grid_x = cfg.getint(sec, "grid_x", fallback=64)
+    grid_y = cfg.getint(sec, "grid_y", fallback=64)
+    beta_softmax = cfg.getfloat(sec, "beta_softmax", fallback=200.0)
+    tau_sigmoid = cfg.getfloat(sec, "tau_sigmoid", fallback=0.01)
+    eps_abs = cfg.getfloat(sec, "abs_eps", fallback=1e-12)
+
     # Sampling params
     num_new = cfg.getint(sec, "num_generated_samples", fallback=1000)
     batch_n = cfg.getint(sec, "generation_batch_size", fallback=50)
-    points_N = cfg.getint(sec, "num_points", fallback=None)  # if None, use N from dataset
+    points_N = cfg.getint(sec, "num_points", fallback=-1)  # if -1, use N from dataset
     polish_steps = cfg.getint(sec, "polish_steps", fallback=20)
     polish_lr = cfg.getfloat(sec, "polish_lr", fallback=0.02)
-    tau_softmin = cfg.getfloat(sec, "tau_softmin", fallback=1e-3)
     plot_k = cfg.getint(sec, "plot_top_k_samples", fallback=5)
-    plot_dir = cfg.get(sec, "plot_save_dir", fallback="./outputs_heilbronn_plots")
+    plot_dir = cfg.get(sec, "plot_save_dir", fallback="./outputs_star_plots")
     os.makedirs(plot_dir, exist_ok=True)
 
-    # NEW: PCFM sampling knobs
+    # PCFM sampling knobs
     pcfm_steps = cfg.getint(sec, "pcfm_steps", fallback=40)
     ode_method = cfg.get(sec, "ode_method", fallback="midpoint")
     ode_step_cap = cfg.getfloat(sec, "ode_step_cap", fallback=0.05)
@@ -534,14 +694,16 @@ def main(state=None):
     prox_steps = cfg.getint(sec, "prox_steps", fallback=6)
     prox_lr = cfg.getfloat(sec, "prox_lr", fallback=0.1)
     prox_lambda = cfg.getfloat(sec, "prox_lambda", fallback=1.0)
-    de_novo_minarea_bump = cfg.getfloat(sec, "de_novo_minarea_bump", fallback=0.0)
-    # soft-min annealing
-    tau_softmin_start = cfg.getfloat(sec, "tau_softmin_start", fallback=tau_softmin)
-    tau_softmin_end   = cfg.getfloat(sec, "tau_softmin_end",   fallback=tau_softmin)
-    # hard-min top-k refinement
-    hardmin_topk    = cfg.getint(sec, "hardmin_topk",    fallback=0)
-    hardmin_steps   = cfg.getint(sec, "hardmin_steps",   fallback=0)
-    hardmin_lr_frac = cfg.getfloat(sec, "hardmin_lr_frac", fallback=0.5)
+    de_novo_disc_bump = cfg.getfloat(sec, "de_novo_disc_bump", fallback=0.0)
+
+    # Gate annealing in sampling (optional)
+    tau_sigmoid_start = cfg.getfloat(sec, "tau_sigmoid_start", fallback=tau_sigmoid)
+    tau_sigmoid_end   = cfg.getfloat(sec, "tau_sigmoid_end",   fallback=tau_sigmoid)
+
+    # Optional hard-max refinement
+    hardmax_topk    = cfg.getint(sec, "hardmax_topk",    fallback=0)
+    hardmax_steps   = cfg.getint(sec, "hardmax_steps",   fallback=0)
+    hardmax_lr_frac = cfg.getfloat(sec, "hardmax_lr_frac", fallback=0.5)
 
     # Architecture
     st_kwargs = {
@@ -559,8 +721,9 @@ def main(state=None):
     }
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-    full_ds = HeilbronnPointsetDataset(dataset_path)
-    if points_N is None:
+
+    full_ds = StarDiscrepancyPointsetDataset(dataset_path)
+    if points_N is None or points_N < 0:
         points_N = full_ds.N
     assert points_N == full_ds.N, f"Config num_points={points_N} but dataset N={full_ds.N}"
 
@@ -570,32 +733,29 @@ def main(state=None):
     test_idx = perm[:test_size].tolist()
     train_idx = perm[test_size:].tolist()
 
-    # Keep only the top-X% (by min triangle area) within the training split
+    # Keep only the top-X% (by *low* discrepancy) within the training split
     train_top_fraction = cfg.getfloat(sec, "train_top_fraction", fallback=0.5)
-    try:
-        frac = float(train_top_fraction)
-    except Exception:
-        frac = 0.5
+    frac = float(train_top_fraction)
     if frac < 1.0 and len(train_idx) > 0:
         k = max(1, int(math.ceil(len(train_idx) * frac)))
         if k < len(train_idx):
-            # min_area is precomputed in the dataset
-            min_area_all = full_ds.min_area  # tensor shape (M,)
+            disc_all = full_ds.star_disc  # (M,)
             idx_tensor = torch.tensor(train_idx, dtype=torch.long)
-            min_area_train = min_area_all[idx_tensor]
-            _, top_pos = torch.topk(min_area_train, k=k, largest=True)
-            filtered_train_idx = idx_tensor[top_pos].tolist()
-            print(f"[Heilbronn] Filtering training to top {100.0*frac:.1f}% by min-area: {len(filtered_train_idx)} of {len(train_idx)}")
+            disc_train = disc_all[idx_tensor]
+            # smallest discrepancy => best
+            vals, pos = torch.topk(-disc_train, k=k, largest=True)  # equivalent to taking k smallest
+            filtered_train_idx = idx_tensor[pos].tolist()
+            print(f"[Star] Filtering training to top {100.0*frac:.1f}% by LOW discrepancy: {len(filtered_train_idx)} of {len(train_idx)}")
             train_idx = filtered_train_idx
         else:
-            print(f"[Heilbronn] train_top_fraction keeps all {len(train_idx)} training samples.")
+            print(f"[Star] train_top_fraction keeps all {len(train_idx)} training samples.")
 
     train_ds = Subset(full_ds, train_idx)
     test_ds  = Subset(full_ds,  test_idx)
     train_loader = DataLoader(train_ds, batch_size=bs, shuffle=True)
     test_loader  = DataLoader(test_ds,  batch_size=batch_n, shuffle=False)
 
-    print(f"[Heilbronn] Train size: {len(train_ds)} | Test size: {len(test_ds)} | N={points_N}")
+    print(f"[Star] Train size: {len(train_ds)} | Test size: {len(test_ds)} | N={points_N}")
 
     model = FlowSetTransformer(d, **st_kwargs).to(device)
     opt = schedulefree.RAdamScheduleFree(model.parameters(), lr=lr)
@@ -605,30 +765,39 @@ def main(state=None):
     if mode == "training_and_sampling":
         model, hist, model_path = train_flow_model(
             model, opt, train_loader, epochs,
-            mse_s, heil_s, device, st_kwargs, save_model_dir
+            mse_s, star_s, device, st_kwargs, save_model_dir,
+            grid_x=grid_x, grid_y=grid_y,
+            beta_softmax=beta_softmax, tau_sigmoid=tau_sigmoid, eps_abs=eps_abs,
+            penalty_kappa=penalty_kappa,
         )
         samples = sample_flow_model(
             model, opt, num_new, batch_n, points_N, device,
-            cond_loader=test_loader, polish_steps=polish_steps, polish_lr=polish_lr, tau=tau_softmin,
+            cond_loader=test_loader,
+            grid_x=grid_x, grid_y=grid_y,
+            beta_softmax=beta_softmax, tau_sigmoid=tau_sigmoid, eps_abs=eps_abs,
+            polish_steps=polish_steps, polish_lr=polish_lr,
             n_steps=pcfm_steps, ode_method=ode_method, ode_step_cap=ode_step_cap,
             proj_steps=proj_steps, proj_lr=proj_lr,
             prox_steps=prox_steps, prox_lr=prox_lr, prox_lambda=prox_lambda,
-            de_novo_minarea_bump=de_novo_minarea_bump,
-            tau_start=tau_softmin_start, tau_end=tau_softmin_end,
-            hardmin_topk=hardmin_topk, hardmin_steps=hardmin_steps, hardmin_lr_frac=hardmin_lr_frac
+            de_novo_disc_bump=de_novo_disc_bump,
+            tau_sigmoid_start=tau_sigmoid_start, tau_sigmoid_end=tau_sigmoid_end,
+            hardmax_topk=hardmax_topk, hardmax_steps=hardmax_steps, hardmax_lr_frac=hardmax_lr_frac,
         )
     elif mode == "sampling_only":
         assert resume_path and os.path.isfile(resume_path), "resume_model_path must point to a saved model"
         model, opt = load_model_if_exists(model, opt, resume_path, device)
         samples = sample_flow_model(
             model, opt, num_new, batch_n, points_N, device,
-            cond_loader=test_loader, polish_steps=polish_steps, polish_lr=polish_lr, tau=tau_softmin,
+            cond_loader=test_loader,
+            grid_x=grid_x, grid_y=grid_y,
+            beta_softmax=beta_softmax, tau_sigmoid=tau_sigmoid, eps_abs=eps_abs,
+            polish_steps=polish_steps, polish_lr=polish_lr,
             n_steps=pcfm_steps, ode_method=ode_method, ode_step_cap=ode_step_cap,
             proj_steps=proj_steps, proj_lr=proj_lr,
             prox_steps=prox_steps, prox_lr=prox_lr, prox_lambda=prox_lambda,
-            de_novo_minarea_bump=de_novo_minarea_bump,
-            tau_start=tau_softmin_start, tau_end=tau_softmin_end,
-            hardmin_topk=hardmin_topk, hardmin_steps=hardmin_steps, hardmin_lr_frac=hardmin_lr_frac
+            de_novo_disc_bump=de_novo_disc_bump,
+            tau_sigmoid_start=tau_sigmoid_start, tau_sigmoid_end=tau_sigmoid_end,
+            hardmax_topk=hardmax_topk, hardmax_steps=hardmax_steps, hardmax_lr_frac=hardmax_lr_frac,
         )
         model_path = resume_path
     elif mode == "retrain_and_sampling":
@@ -636,35 +805,42 @@ def main(state=None):
         model, opt = load_model_if_exists(model, opt, resume_path, device)
         model, hist, model_path = train_flow_model(
             model, opt, train_loader, epochs,
-            mse_s, heil_s, device, st_kwargs, save_model_dir
+            mse_s, star_s, device, st_kwargs, save_model_dir,
+            grid_x=grid_x, grid_y=grid_y,
+            beta_softmax=beta_softmax, tau_sigmoid=tau_sigmoid, eps_abs=eps_abs,
+            penalty_kappa=penalty_kappa,
         )
         samples = sample_flow_model(
             model, opt, num_new, batch_n, points_N, device,
-            cond_loader=test_loader, polish_steps=polish_steps, polish_lr=polish_lr, tau=tau_softmin,
+            cond_loader=test_loader,
+            grid_x=grid_x, grid_y=grid_y,
+            beta_softmax=beta_softmax, tau_sigmoid=tau_sigmoid, eps_abs=eps_abs,
+            polish_steps=polish_steps, polish_lr=polish_lr,
             n_steps=pcfm_steps, ode_method=ode_method, ode_step_cap=ode_step_cap,
             proj_steps=proj_steps, proj_lr=proj_lr,
             prox_steps=prox_steps, prox_lr=prox_lr, prox_lambda=prox_lambda,
-            de_novo_minarea_bump=de_novo_minarea_bump,
-            tau_start=tau_softmin_start, tau_end=tau_softmin_end,
-            hardmin_topk=hardmin_topk, hardmin_steps=hardmin_steps, hardmin_lr_frac=hardmin_lr_frac
+            de_novo_disc_bump=de_novo_disc_bump,
+            tau_sigmoid_start=tau_sigmoid_start, tau_sigmoid_end=tau_sigmoid_end,
+            hardmax_topk=hardmax_topk, hardmax_steps=hardmax_steps, hardmax_lr_frac=hardmax_lr_frac,
         )
     else:
         raise ValueError(f"Unknown mode: {mode}")
 
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    out_path = os.path.join(save_generated_dir, f"heilbronn_gen_{num_new}x{points_N}_{ts}.pt")
+    out_path = os.path.join(save_generated_dir, f"star_gen_{num_new}x{points_N}_{ts}.pt")
     torch.save(torch.from_numpy(samples), out_path)
     print(f"Saved {num_new} generated pointsets to {out_path}")
     print(f"(Model path: {model_path})")
 
-    # Save plots for the top_k samples (by minimum triangle area)
     if plot_k > 0:
-        plot_top_k_minarea_samples(samples, plot_k, plot_dir, filename_prefix="heilbronn_mintriangles")
+        plot_top_k_lowdiscrepancy_samples(samples, plot_k, plot_dir, filename_prefix="star_lowdisc")
         print(f"Saved plots:   {plot_dir}")
-
+    
     if state is not None:
         state.set_model_path(model_path)
         state.set_samples_path(out_path)
+
+    return model_path, out_path
 
 if __name__ == "__main__":
     main()

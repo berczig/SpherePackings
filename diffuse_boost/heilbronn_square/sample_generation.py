@@ -584,10 +584,10 @@ def final_push_existing_samples():
 
     data = np.zeros((K,2,N), dtype=np.float32)
 
-    for s in range(K):
-        # Print progress using tqdm
-        with tqdm(total=K, desc="[Pushing Samples]", unit="sample") as pbar:
-            pbar.update(s)
+    with tqdm(total=K, desc="[Pushing Samples]", unit="sample") as pbar:
+        for s in range(K):
+            pbar.update(1)
+
         pts0 = arr[s].T.astype(np.float64)
         X0_  = pts0.ravel()
 
@@ -621,12 +621,26 @@ def final_push_existing_samples():
     if plot_k > 0:
         plot_top_k_minarea_samples(data, plot_k, plot_dir, filename_prefix="heilbronn_pushed_mintriangles")
 
-if __name__ == "__main__":
+
+def main(state=None):
     sec  = "heilbronn_SRP"
     mode = _get_cfg(sec, "mode", "training_set_gen").strip().lower()
+
     if mode == "training_set_gen":
         generate_heilbronn_dataset()
+        out_dir = _get_cfg(sec, "output_dir", "./outputs_heilbronn")
     elif mode == "final_push":
         final_push_existing_samples()
+        out_dir = _get_cfg(sec, "final_push_output", "./outputs_heilbronn_push")
     else:
-        raise ValueError(f"Unknown mode '{mode}'. Use 'training_set_gen' or 'final_push'.")
+        raise ValueError(f"Unknown mode '{mode}' (use training_set_gen|final_push)")
+
+    # pick newest .pt in out_dir and store in state.pushed_samples_path
+    if state is not None and os.path.isdir(out_dir):
+        pts = [os.path.join(out_dir, f) for f in os.listdir(out_dir) if f.endswith(".pt")]
+        if pts:
+            newest = max(pts, key=os.path.getmtime)
+            state.set_pushed_samples_path(newest)
+
+if __name__ == "__main__":
+    main()

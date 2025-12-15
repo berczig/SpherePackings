@@ -46,6 +46,7 @@ def _set_cfg(section, key, value):
 # -----------------------------------------------------------------------------
 @njit(cache=True, fastmath=True)
 def _unit_direction(dx0, dx1, dx2, dist):
+    # NOTE: kept for backward compatibility but no longer used
     if dist >= EPS_SMALL:
         inv = 1.0 / dist
         return dx0 * inv, dx1 * inv, dx2 * inv
@@ -61,50 +62,77 @@ def compute_EL_grad(X_rel, L, N, r):
     Compute energy and gradient in the 'relative' coordinate frame by mapping
     through to absolute cube coordinates, computing the true overlap penalties
     there, and then chaining the gradient back.
-    X_rel: array of shape (3N,), representing coords in [-L/2, L/2].
+
+    Modifications:
+      * Dimension D is inferred from X_rel.size // N (no hard-coded 3D).
+      * Sphere-sphere penalties still use fixed radius r (overlap if dist < 2r).
+      * Wall clearance is set to wall_margin = min_pairwise_distance / 2,
+        so that spheres of radius (min_pairwise_distance / 2) do not intersect
+        the walls at an energy minimum.
     """
-    coords_rel = X_rel.reshape((N, 3))
+    D = X_rel.size // N
+    coords_rel = X_rel.reshape((N, D))
     scale = (L - 2.0 * r) / L
     half = L / 2.0
     coords_abs = (coords_rel + half) * scale + r
 
     EL = 0.0
-    grad_abs = np.zeros((N, 3), dtype=coords_abs.dtype)
+    grad_abs = np.zeros((N, D), dtype=coords_abs.dtype)
 
-    # Walls
+    # --------------------------------------------------------------
+    # 1) Sphere-sphere penalties (radius r) + compute min distance
+    # --------------------------------------------------------------
+    min_d = 1e300
     for i in range(N):
-        for d in range(3):
-            x = coords_abs[i, d]
-            if x < r:
-                over = r - x
-                EL += over * over
-                grad_abs[i, d] += -2.0 * over
-            elif x > L - r:
-                over = x - (L - r)
-                EL += over * over
-                grad_abs[i, d] += 2.0 * over
-
-    # Sphere-sphere
-    for i in range(N):
-        xi0 = coords_abs[i, 0]
-        xi1 = coords_abs[i, 1]
-        xi2 = coords_abs[i, 2]
         for j in range(i + 1, N):
-            dx0 = xi0 - coords_abs[j, 0]
-            dx1 = xi1 - coords_abs[j, 1]
-            dx2 = xi2 - coords_abs[j, 2]
-            dist = math.sqrt(dx0*dx0 + dx1*dx1 + dx2*dx2)
+            dist_sq = 0.0
+            for d in range(D):
+                diff = coords_abs[i, d] - coords_abs[j, d]
+                dist_sq += diff * diff
+            dist = math.sqrt(dist_sq)
+
+            if dist < min_d:
+                min_d = dist
+
             over = 2.0 * r - dist
             if over > 0.0:
                 EL += over * over
-                u0, u1, u2 = _unit_direction(dx0, dx1, dx2, dist)
-                g0 = 2.0 * over * u0
-                g1 = 2.0 * over * u1
-                g2 = 2.0 * over * u2
-                grad_abs[i, 0] -= g0; grad_abs[j, 0] += g0
-                grad_abs[i, 1] -= g1; grad_abs[j, 1] += g1
-                grad_abs[i, 2] -= g2; grad_abs[j, 2] += g2
+                # unit direction and gradient contribution
+                if dist >= EPS_SMALL:
+                    inv = 1.0 / dist
+                else:
+                    inv = 0.0
+                for d in range(D):
+                    dx = coords_abs[i, d] - coords_abs[j, d]
+                    u = dx * inv
+                    g = 2.0 * over * u
+                    grad_abs[i, d] -= g
+                    grad_abs[j, d] += g
 
+    # Handle degenerate case N < 2 or weird numeric issues
+    if min_d == 1e300:
+        # fallback: use 2r as a neutral default min distance
+        min_d = 2.0 * r
+
+    # Effective wall clearance: half of current min pairwise distance
+    wall_margin = 0.5 * min_d
+
+    # --------------------------------------------------------------
+    # 2) Wall penalties, using wall_margin instead of fixed r
+    # --------------------------------------------------------------
+    for i in range(N):
+        for d in range(D):
+            x = coords_abs[i, d]
+            if x < wall_margin:
+                over = wall_margin - x
+                EL += over * over
+                grad_abs[i, d] += -2.0 * over
+            elif x > L - wall_margin:
+                over = x - (L - wall_margin)
+                EL += over * over
+                grad_abs[i, d] += 2.0 * over
+
+    # Map gradient back to relative coordinates
     grad_rel = grad_abs * scale
     return EL, grad_rel.ravel()
 
@@ -115,22 +143,25 @@ def compute_EL(X_rel, L, N, r):
 
 @njit(cache=True, fastmath=True)
 def maximize_clearance(X_rel, N, steps=10, step_size=0.01):
-    coords = X_rel.reshape((N, 3)).copy()
+    """
+    Simple gradient-like clearance maximizer, now dimension-agnostic.
+    """
+    D = X_rel.size // N
+    coords = X_rel.reshape((N, D)).copy()
     for _ in range(steps):
         grad = np.zeros_like(coords)
         for i in range(N):
-            xi0, xi1, xi2 = coords[i, 0], coords[i, 1], coords[i, 2]
             for j in range(N):
                 if i == j:
                     continue
-                dx0 = xi0 - coords[j, 0]
-                dx1 = xi1 - coords[j, 1]
-                dx2 = xi2 - coords[j, 2]
-                dist = math.sqrt(dx0*dx0 + dx1*dx1 + dx2*dx2) + EPS_SMALL
+                dist_sq = 0.0
+                for d in range(D):
+                    diff = coords[i, d] - coords[j, d]
+                    dist_sq += diff * diff
+                dist = math.sqrt(dist_sq) + EPS_SMALL
                 inv = 1.0 / dist
-                grad[i, 0] += dx0 * inv
-                grad[i, 1] += dx1 * inv
-                grad[i, 2] += dx2 * inv
+                for d in range(D):
+                    grad[i, d] += (coords[i, d] - coords[j, d]) * inv
         coords += step_size * grad
     return coords.ravel()
 
@@ -139,16 +170,20 @@ def _linf_norm_with_eps(g):
     m = 0.0
     for k in range(g.size):
         a = g[k]
-        if a < 0: a = -a
-        if a > m: m = a
+        if a < 0:
+            a = -a
+        if a > m:
+            m = a
     return m + EPS_SMALL
 
 @njit(cache=True, fastmath=True)
-def SRP(X_rel, L, N, r, Imax, m, sigma, beta):
+def SRP(X_rel, L, N, r, Imax, m, sigma, beta, add_noise):
     eta = sigma
     Xc = X_rel.copy()
     for _ in range(Imax):
-        Xc += np.random.uniform(-eta, eta, size=Xc.shape[0])
+        # Only add random noise if requested
+        if add_noise:
+            Xc += np.random.uniform(-eta, eta, size=Xc.shape[0])
         for __ in range(m):
             EL, g = compute_EL_grad(Xc, L, N, r)
             Xc -= (sigma * eta) * (g / _linf_norm_with_eps(g))
@@ -157,15 +192,19 @@ def SRP(X_rel, L, N, r, Imax, m, sigma, beta):
 
 @njit(cache=True, fastmath=True)
 def min_pairwise_distance(centers):
-    N = centers.shape[0]
+    """
+    Dimension-agnostic min pairwise distance.
+    centers: (N, D)
+    """
+    N, D = centers.shape
     best = 1e300
     for i in range(N):
-        x0, x1, x2 = centers[i, 0], centers[i, 1], centers[i, 2]
         for j in range(i + 1, N):
-            dx0 = x0 - centers[j, 0]
-            dx1 = x1 - centers[j, 1]
-            dx2 = x2 - centers[j, 2]
-            d = math.sqrt(dx0*dx0 + dx1*dx1 + dx2*dx2)
+            dist_sq = 0.0
+            for d in range(D):
+                diff = centers[i, d] - centers[j, d]
+                dist_sq += diff * diff
+            d = math.sqrt(dist_sq)
             if d < best:
                 best = d
     return best
@@ -173,10 +212,12 @@ def min_pairwise_distance(centers):
 def local_opt(X_rel, L, N, r, tol, maxiter):
     """
     Local optimization in the relative frame with explicit L-BFGS-B bounds.
+    Now dimension-agnostic: bounds length = D * N.
     """
     def objective(x):
         EL, _ = compute_EL_grad(x, L, N, r)
         return EL
+
     def gradient(x):
         _, grad = compute_EL_grad(x, L, N, r)
         return grad
@@ -184,7 +225,8 @@ def local_opt(X_rel, L, N, r, tol, maxiter):
     x0 = X_rel.copy()
     half = L / 2
     eps = 1e-6
-    bounds = [(-half + eps, half - eps)] * (3 * N)
+    D = x0.size // N
+    bounds = [(-half + eps, half - eps)] * (D * N)
 
     res = minimize(
         fun=objective,
@@ -329,11 +371,13 @@ def generate_dataset_push_srp(verbose=True):
         best_excess    = best_d - init_min
         best_restart   = -1
 
+        
         for k in range(num_srp_restarts):
             if verbose:
                 print(f"  SRP restart {k+1}/{num_srp_restarts} for sample {i+1}/{M}")
             eps = 1e-6
-            X_srp = SRP(X0, L, N, r, Imax, m, sigma, beta)
+            add_noise = (k > 0)
+            X_srp = SRP(X0, L, N, r, Imax, m, sigma, beta, add_noise)
             X_srp_clip = np.clip(X_srp, -L/2 + eps, L/2 - eps)
             EL_before = compute_EL(X_srp_clip, L, N, r)
             if verbose:
@@ -342,7 +386,8 @@ def generate_dataset_push_srp(verbose=True):
             if verbose:
                 print(f"    SRP restart {k+1}/{num_srp_restarts}: EL after local_opt  = {EL_after:.6f}")
 
-            coords = X_lo.reshape((N, 3))
+            D_eff = X_lo.size // N
+            coords = X_lo.reshape((N, D_eff))
             centers_opt = (coords + half) * ((L - 2 * r) / L) + r
             centers_opt = np.minimum(np.maximum(centers_opt, r + EPS_SMALL), L - r - EPS_SMALL)
 
@@ -609,13 +654,15 @@ def final_push_existing_samples():
 
         for k in range(num_srp_restarts):
             eps = 1e-6
-            X_srp = SRP(X0, L, N, r, Imax, m, sigma, beta)
+            add_noise = (k > 0)
+            X_srp = SRP(X0, L, N, r, Imax, m, sigma, beta, add_noise)
             X_srp_clip = np.clip(X_srp, -L/2 + eps, L/2 - eps)
             EL_before = compute_EL(X_srp_clip, L, N, r)
 
             X_lo, EL_after = local_opt(X_srp_clip, L, N, r, tol_opt, maxiter_opt)
 
-            coords = X_lo.reshape((N, 3))
+            D_eff = X_lo.size // N
+            coords = X_lo.reshape((N, D_eff))
             centers_opt = (coords + half) * scale + r
             centers_opt = np.minimum(np.maximum(centers_opt, r + EPS_SMALL), L - r - EPS_SMALL)
 
@@ -650,7 +697,6 @@ def final_push_existing_samples():
 
             data_out[s * num_srp_restarts + k] = centers_k.copy().T.astype(np.float32)
 
-        #data_out[s] = best_centers.T.astype(np.float32)
         min_dists.append(best_post_min_sample)
         best_EL_before_list[s] = best_EL_before
         best_EL_after_list[s]  = best_EL_after
@@ -706,8 +752,6 @@ def main(state:PipelineState=None):
 
     else:
         raise ValueError(f"Unknown mode '{mode}'. Use 'training_set_gen' or 'final_push'.")
-    
-    
 
 if __name__ == "__main__":
     main()

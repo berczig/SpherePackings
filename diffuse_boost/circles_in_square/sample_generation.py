@@ -39,6 +39,19 @@ def _get_cfg(section, key, fallback):
             return fallback
     return fallback
 
+def _set_cfg(section, key, value):
+    """
+    Minimal setter used by pipeline scripts.
+    Safe no-op if cfg is unavailable.
+    """
+    if HAS_CFG:
+        try:
+            if not cfg.has_section(section):
+                cfg.add_section(section)
+            cfg.set(section, key, str(value))
+        except Exception:
+            pass
+
 # =============================================================================
 # Random initialization
 # =============================================================================
@@ -114,12 +127,11 @@ def loss_and_grad(X, N, w_overlap, w_wall, alpha):
                 # j center  (opposite)
                 g[2*j + 0] +=  c * ux
                 g[2*j + 1] +=  c * uy
-                # radii stay the same
+                # radii
                 g[2*N + i] +=  c
                 g[2*N + j] +=  c
 
-
-    # Maximize sum radii
+    # Maximize sum radii (minimize -sum radii)
     L += -alpha * np.sum(radii)
     for i in range(N):
         g[2*N + i] += -alpha
@@ -264,6 +276,19 @@ def hard_project_max_sum_radii(centers, radii, safety=1e-9, pair_safety_mul=1.0)
     import numpy as np
     from scipy.optimize import linprog
 
+    # --- diagnostics helpers ---
+    def _min_wall_clear(cent, rr):
+        xi, yi = cent[:, 0], cent[:, 1]
+        return float(np.min([xi - rr, 1.0 - xi - rr, yi - rr, 1.0 - yi - rr]))
+
+    def _min_pair_clear(cent, rr):
+        dx = cent[:, None, 0] - cent[None, :, 0]
+        dy = cent[:, None, 1] - cent[None, :, 1]
+        D = np.sqrt(dx * dx + dy * dy)
+        np.fill_diagonal(D, np.inf)
+        S = rr[:, None] + rr[None, :]
+        return float(np.min(D - S))
+
     N = centers.shape[0]
     x = centers[:, 0]
     y = centers[:, 1]
@@ -285,14 +310,11 @@ def hard_project_max_sum_radii(centers, radii, safety=1e-9, pair_safety_mul=1.0)
     bounds = [(0.0, float(wall_ub[i])) for i in range(N)]
 
     # Inequalities A_ub @ r <= b_ub
-    # For each pair (i<j): r_i + r_j <= d_ij - safety
-    # We do not need to include wall constraints in A_ub; they’re in `bounds`.
     rows = []
     rhs = []
     for i in range(N):
         for j in range(i + 1, N):
             dij = D[i, j]
-            # Optional: a multiplicative slack on pairwise distance if desired
             rhs_ij = max(dij * pair_safety_mul - safety, 0.0)
             row = np.zeros(N, dtype=float)
             row[i] = 1.0
@@ -304,7 +326,6 @@ def hard_project_max_sum_radii(centers, radii, safety=1e-9, pair_safety_mul=1.0)
         A_ub = np.vstack(rows)
         b_ub = np.asarray(rhs, dtype=float)
     else:
-        # N < 2: trivial case
         A_ub = None
         b_ub = None
 
@@ -317,17 +338,21 @@ def hard_project_max_sum_radii(centers, radii, safety=1e-9, pair_safety_mul=1.0)
     )
 
     info = {
-        "success": res.success,
-        "status": res.status,
-        "message": res.message,
+        "success": bool(res.success),
+        "status": int(res.status),
+        "message": str(res.message),
         "sum_r": None,
         "violations": None,
     }
 
     if not res.success:
-        # Fallback: clamp to wall_ub (feasible w.r.t. walls; pairs may still violate)
+        # Fallback: clamp to wall_ub (feasible w.r.t. walls; pairs may violate)
         r_proj = np.minimum(radii, wall_ub).copy()
         info["sum_r"] = float(np.sum(r_proj))
+        info["violations"] = {
+            "min_wall_clear": _min_wall_clear(centers, r_proj),
+            "min_pair_clear": _min_pair_clear(centers, r_proj),
+        }
         info["message"] = f"LP failed; returned clamped radii. HiGHS status {res.status}: {res.message}"
         return r_proj, info
 
@@ -336,20 +361,6 @@ def hard_project_max_sum_radii(centers, radii, safety=1e-9, pair_safety_mul=1.0)
     # Final tiny shrink to guarantee strict feasibility in plotting
     r_proj = np.maximum(0.0, r_star - safety)
 
-    # Diagnostics: check min clearances
-    def _min_wall_clear(cent, rr):
-        xi, yi = cent[:, 0], cent[:, 1]
-        return float(np.min([xi - rr, 1.0 - xi - rr, yi - rr, 1.0 - yi - rr]))
-
-    def _min_pair_clear(cent, rr):
-        dx = cent[:, None, 0] - cent[None, :, 0]
-        dy = cent[:, None, 1] - cent[None, :, 1]
-        D = np.sqrt(dx * dx + dy * dy)
-        # set diagonal to large so it won't affect min
-        np.fill_diagonal(D, np.inf)
-        S = rr[:, None] + rr[None, :]
-        return float(np.min(D - S))
-
     mwc = _min_wall_clear(centers, r_proj)
     mpc = _min_pair_clear(centers, r_proj)
 
@@ -357,10 +368,8 @@ def hard_project_max_sum_radii(centers, radii, safety=1e-9, pair_safety_mul=1.0)
     info["violations"] = {"min_wall_clear": mwc, "min_pair_clear": mpc}
     return r_proj, info
 
-
-
 # =============================================================================
-# Plotting (NEW)
+# Plotting
 # =============================================================================
 def plot_first_k_samples(data_tensor, k, out_dir, filename_prefix="sample"):
     """
@@ -429,7 +438,7 @@ def generate_circle_packing_dataset():
 
     # I/O + plotting
     out_dir    = _get_cfg(sec, "output_dir",      "./outputs_circle_packing")
-    plot_k     = _get_cfg(sec, "plot_k",          0) 
+    plot_k     = _get_cfg(sec, "plot_k",          0)
     plot_dir   = os.path.join(out_dir, "plots")
 
     os.makedirs(out_dir, exist_ok=True)
@@ -476,10 +485,13 @@ def generate_circle_packing_dataset():
         # Replace radii for saving / plotting
         radii = r_proj
 
-        # Optional: log diagnostics
-        print(f"[hard-project] success={info['success']} sum_r={info['sum_r']:.6f} "
-        f"min_wall={info['violations']['min_wall_clear']:.3e} "
-        f"min_pair={info['violations']['min_pair_clear']:.3e}")
+        # Optional: log diagnostics (guarded)
+        viol = info.get("violations") or {}
+        print(
+            f"[hard-project] success={info.get('success', False)} sum_r={info.get('sum_r', float(np.sum(radii))):.6f} "
+            f"min_wall={viol.get('min_wall_clear', float('nan')):.3e} "
+            f"min_pair={viol.get('min_pair_clear', float('nan')):.3e}"
+        )
 
         # Metrics
         sum_r   = float(np.sum(radii))
@@ -499,17 +511,18 @@ def generate_circle_packing_dataset():
     sum_radii = data[:, 2, :].sum(axis=1)
     sorted_indices = np.argsort(-sum_radii)  # descending
     data = data[sorted_indices]
-    
+
     # Save dataset
     torch.save(torch.from_numpy(data), dataset_fn)
     print(f"\nSaved dataset:  {dataset_fn}")
     print(f"Saved metrics:  {metrics_fn}")
 
-    # Save plots for the first top_k samples
+    # Save plots for the first plot_k samples
     if plot_k > 0:
         plot_first_k_samples(data, plot_k, plot_dir, filename_prefix="circle_packing")
-        print(f"Saved plots:   {plot_dir}") 
+        print(f"Saved plots:   {plot_dir}")
 
+    return dataset_fn, metrics_fn
 
 # =============================================================================
 # Final-push pass over an existing dataset tensor (M,3,N)
@@ -541,7 +554,7 @@ def main_final_push(input_path=None):
     maxcor     = _get_cfg(sec, "lbfgs_maxcor",    20)
 
     out_dir    = _get_cfg(sec, "output_dir",      "./outputs_circle_packing")
-    plot_k     = _get_cfg(sec, "plot_k",          0)  # optional quick look
+    plot_k     = _get_cfg(sec, "plot_k",          0)
 
     # Input path (can come from cfg or argument)
     if input_path is None:
@@ -580,13 +593,11 @@ def main_final_push(input_path=None):
 
     bar = tqdm(range(M), desc="Final-push SRP")
     for s in bar:
-        # Use provided centers/radii as the starting point
         centers0 = data_in[s, :2, :].T.astype(np.float64)  # (N,2)
         radii0   = data_in[s, 2, :].astype(np.float64)     # (N,)
 
         X0 = np.concatenate([centers0.ravel(), radii0], axis=0)
 
-        # SRP exploration from provided init
         X_srp = srp_adaptive(
             X0, N,
             Imax=Imax, m=m,
@@ -596,7 +607,6 @@ def main_final_push(input_path=None):
             w_overlap=w_overlap, w_wall=w_wall, alpha=alpha
         )
 
-        # Local refinement
         X_fin, L_fin = local_optimize(
             X_srp, N,
             w_overlap=w_overlap, w_wall=w_wall, alpha=alpha,
@@ -606,13 +616,9 @@ def main_final_push(input_path=None):
         centers = X_fin[:2*N].reshape(N, 2)
         radii   = X_fin[2*N:2*N+N]
 
-        # Hard projection to feasible radii with max sum
         r_proj, info = hard_project_max_sum_radii(centers, radii, safety=1e-9)
-
-        # Replace radii for saving / plotting
         radii = r_proj
 
-        # Diagnostics (same metrics as generator)
         sum_r   = float(np.sum(radii))
         mwc     = float(min_wall_clearance(centers, radii))
         mpc     = float(min_pair_clearance(centers, radii))
@@ -626,12 +632,10 @@ def main_final_push(input_path=None):
 
         bar.set_postfix(sum_r=f"{sum_r:.3f}", clr=f"{min(mwc, mpc):.4f}")
 
-    # Sort by sum of radii (descending), mirroring training set convention
     sum_radii = data_out[:, 2, :].sum(axis=1)
     sorted_idx = np.argsort(-sum_radii)
     data_out = data_out[sorted_idx]
 
-    # Save pushed tensor and optional plots
     torch.save(torch.from_numpy(data_out), pushed_fn)
     print(f"\nSaved pushed tensor: {pushed_fn}")
     print(f"Saved metrics:       {metrics_fn}")
@@ -640,22 +644,24 @@ def main_final_push(input_path=None):
         plot_first_k_samples(data_out, plot_k, plot_dir, filename_prefix="final_push")
         print(f"Saved plots:         {plot_dir}")
 
+    return pushed_fn, metrics_fn
 
 # =============================================================================
-# Final-push pass over an existing dataset tensor (M,3,N)
+# Final-push modified (two initializations, pick best)
 # =============================================================================
 def main_final_push_modified(input_path=None, output_path=None):
     """
     Read an existing tensor of shape (M, 3, N) with rows [x, y, r] (centers+radii from flow-model),
     and for each sample:
-      - keep the centers, discard the flow radii → initialize small radii
-      - also optionally use the original radii
+      - keep the centers, option A: keep the original radii
+      - option B: reset to small radii
       - run SRP+local+projection for both initializations
       - pick the one with the larger sum of radii
+    Returns (pushed_tensor_path, metrics_path).
     """
     sec = "circle_packing_SRP"
 
-    # Core SRP / local config (reuse your settings)
+    # Core SRP / local config
     Imax        = _get_cfg(sec, "srp_Imax",        400)
     m           = _get_cfg(sec, "srp_m",           30)
     beta        = _get_cfg(sec, "srp_beta",        0.985)
@@ -672,7 +678,16 @@ def main_final_push_modified(input_path=None, output_path=None):
     maxiter     = _get_cfg(sec, "lbfgs_maxiter",   1000)
     maxcor      = _get_cfg(sec, "lbfgs_maxcor",    20)
 
-    out_dir     = _get_cfg(sec, "final_push_output", "./outputs_circle_packing")
+    # Output dir (pipeline-friendly):
+    # prefer explicit output_path arg, else prefer push_output_dir, else final_push_output, else output_dir.
+    out_dir = output_path
+    if out_dir is None:
+        out_dir = _get_cfg(sec, "push_output_dir", None)
+    if out_dir is None:
+        out_dir = _get_cfg(sec, "final_push_output", None)
+    if out_dir is None:
+        out_dir = _get_cfg(sec, "output_dir", "./outputs_circle_packing")
+
     plot_k      = _get_cfg(sec, "plot_k",          0)
 
     # Input path
@@ -680,6 +695,7 @@ def main_final_push_modified(input_path=None, output_path=None):
         input_path = _get_cfg(sec, "final_push_input", None)
         if input_path is None:
             raise ValueError("main_final_push_modified: No input_path provided.")
+
     tin = torch.load(input_path)
     if isinstance(tin, np.ndarray):
         data_in = tin
@@ -700,7 +716,7 @@ def main_final_push_modified(input_path=None, output_path=None):
     metrics_fn  = os.path.join(final_dir, f"circle_final_push_mod_metrics_{M}x{N}_{stamp}.csv")
 
     with open(metrics_fn, "w") as mf:
-        mf.write("sample,sum_r_old,sum_r_smallr,sum_r_chosen,which,clr_old,clr_smallr,loss_after\n")
+        mf.write("sample,sum_r_old,sum_r_flowr,sum_r_smallr,sum_r_chosen,which,clr_old_wall,clr_old_pair,loss_after\n")
 
     data_out = np.zeros((M, 3, N), dtype=np.float32)
 
@@ -709,58 +725,55 @@ def main_final_push_modified(input_path=None, output_path=None):
         centers0 = data_in[s, :2, :].T.astype(np.float64)  # (N,2)
         radii_flow = data_in[s, 2, :].astype(np.float64)   # original radii from flow model
 
-        # compute old clearances
-        clr_old_pair = min_pair_clearance(centers0, radii_flow)
-        clr_old_wall = min_wall_clearance(centers0, radii_flow)
+        clr_old_pair = float(min_pair_clearance(centers0, radii_flow))
+        clr_old_wall = float(min_wall_clearance(centers0, radii_flow))
+        sum_r_old    = float(np.sum(radii_flow))
 
         # --- Option A: keep original radii
         X0a = np.concatenate([centers0.ravel(), radii_flow], axis=0)
-        X_srp_a = srp_adaptive(X0a, N,
-                               Imax=Imax, m=m,
-                               step_center=step_center,
-                               step_radius=step_radius,
-                               beta=beta,
-                               backtrack=backtrack,
-                               w_overlap=w_overlap,
-                               w_wall=w_wall,
-                               alpha=alpha)
-        X_fin_a, L_fin_a = local_optimize(X_srp_a, N,
-                                          w_overlap=w_overlap,
-                                          w_wall=w_wall,
-                                          alpha=alpha,
-                                          gtol=gtol, ftol=ftol,
-                                          maxiter=maxiter, maxcor=maxcor)
+        X_srp_a = srp_adaptive(
+            X0a, N,
+            Imax=Imax, m=m,
+            step_center=step_center,
+            step_radius=step_radius,
+            beta=beta, backtrack=backtrack,
+            w_overlap=w_overlap, w_wall=w_wall, alpha=alpha
+        )
+        X_fin_a, L_fin_a = local_optimize(
+            X_srp_a, N,
+            w_overlap=w_overlap, w_wall=w_wall, alpha=alpha,
+            gtol=gtol, ftol=ftol, maxiter=maxiter, maxcor=maxcor
+        )
         centers_a = X_fin_a[:2*N].reshape((N,2))
         radii_a   = X_fin_a[2*N:2*N+N]
-        r_proj_a, info_a = hard_project_max_sum_radii(centers_a, radii_a, safety=1e-9)
+        r_proj_a, _ = hard_project_max_sum_radii(centers_a, radii_a, safety=1e-9)
         sum_r_a = float(np.sum(r_proj_a))
 
         # --- Option B: reset to small radii
-        r0_small  = _get_cfg(sec, "init_r0_small",    0.01)
-        rj_small  = _get_cfg(sec, "init_rjitter_small", 0.005)
+        r0_small  = _get_cfg(sec, "init_r0_small",       0.01)
+        rj_small  = _get_cfg(sec, "init_rjitter_small",  0.005)
         radii0_b  = init_radii(N, r0=r0_small, jitter=rj_small)
         X0b = np.concatenate([centers0.ravel(), radii0_b], axis=0)
+
         # optionally use smaller SRP step sizes
         step_center_b = step_center * 0.2
         step_radius_b = step_radius * 0.2
-        X_srp_b = srp_adaptive(X0b, N,
-                               Imax=Imax, m=m,
-                               step_center=step_center_b,
-                               step_radius=step_radius_b,
-                               beta=beta,
-                               backtrack=backtrack,
-                               w_overlap=w_overlap,
-                               w_wall=w_wall,
-                               alpha=alpha)
-        X_fin_b, L_fin_b = local_optimize(X_srp_b, N,
-                                          w_overlap=w_overlap,
-                                          w_wall=w_wall,
-                                          alpha=alpha,
-                                          gtol=gtol, ftol=ftol,
-                                          maxiter=maxiter, maxcor=maxcor)
+        X_srp_b = srp_adaptive(
+            X0b, N,
+            Imax=Imax, m=m,
+            step_center=step_center_b,
+            step_radius=step_radius_b,
+            beta=beta, backtrack=backtrack,
+            w_overlap=w_overlap, w_wall=w_wall, alpha=alpha
+        )
+        X_fin_b, L_fin_b = local_optimize(
+            X_srp_b, N,
+            w_overlap=w_overlap, w_wall=w_wall, alpha=alpha,
+            gtol=gtol, ftol=ftol, maxiter=maxiter, maxcor=maxcor
+        )
         centers_b = X_fin_b[:2*N].reshape((N,2))
         radii_b   = X_fin_b[2*N:2*N+N]
-        r_proj_b, info_b = hard_project_max_sum_radii(centers_b, radii_b, safety=1e-9)
+        r_proj_b, _ = hard_project_max_sum_radii(centers_b, radii_b, safety=1e-9)
         sum_r_b = float(np.sum(r_proj_b))
 
         # Choose better
@@ -769,19 +782,20 @@ def main_final_push_modified(input_path=None, output_path=None):
             centers_chosen = centers_b
             radii_chosen   = r_proj_b
             sum_r_chosen   = sum_r_b
-            loss_after     = L_fin_b
+            loss_after     = float(L_fin_b)
         else:
             chosen = "flowr"
             centers_chosen = centers_a
             radii_chosen   = r_proj_a
             sum_r_chosen   = sum_r_a
-            loss_after     = L_fin_a
+            loss_after     = float(L_fin_a)
 
-        # Save metrics
         with open(metrics_fn, "a") as mf:
-            mf.write(f"{s},{sum_r_a:.8f},{sum_r_b:.8f},{sum_r_chosen:.8f},{chosen},{clr_old_wall:.6e},{clr_old_pair:.6e},{loss_after:.8e}\n")
+            mf.write(
+                f"{s},{sum_r_old:.8f},{sum_r_a:.8f},{sum_r_b:.8f},{sum_r_chosen:.8f},"
+                f"{chosen},{clr_old_wall:.6e},{clr_old_pair:.6e},{loss_after:.8e}\n"
+            )
 
-        # Fill output tensor
         data_out[s, 0, :] = centers_chosen[:,0].astype(np.float32)
         data_out[s, 1, :] = centers_chosen[:,1].astype(np.float32)
         data_out[s, 2, :] = radii_chosen.astype(np.float32)
@@ -801,28 +815,59 @@ def main_final_push_modified(input_path=None, output_path=None):
         plot_first_k_samples(data_out, plot_k, plot_dir, filename_prefix="final_push_mod")
         print(f"Saved plots:         {plot_dir}")
 
+    return pushed_fn, metrics_fn
+
+# =============================================================================
+# Pipeline-friendly entrypoint
+# =============================================================================
+def main(state=None):
+    """
+    Pipeline-friendly entrypoint.
+
+    Reads circle_packing_SRP.mode:
+      - training_set_gen : generate fresh SRP dataset -> state.samples_path
+      - push_only        : push an existing dataset  -> state.pushed_samples_path
+
+    For push_only, reads:
+      - circle_packing_SRP.push_input (preferred)
+      - circle_packing_SRP.final_push_input (legacy fallback)
+
+    Writes paths into `state` if provided:
+      state.set_samples_path(...)
+      state.set_pushed_samples_path(...)
+    """
+    sec = "circle_packing_SRP"
+    mode = str(_get_cfg(sec, "mode", "training_set_gen")).strip().lower()
+
+    if mode in ("training_set_gen", "training_set_generation", "generate", "gen"):
+        dataset_fn, _ = generate_circle_packing_dataset()
+        if state is not None:
+            state.set_samples_path(dataset_fn)
+        return dataset_fn
+
+    if mode in ("push_only", "push", "final_push", "final-push"):
+        in_path = _get_cfg(sec, "push_input", None)
+        if in_path is None:
+            in_path = _get_cfg(sec, "final_push_input", None)
+        if in_path is None:
+            raise ValueError("push_only requires circle_packing_SRP.push_input (or legacy final_push_input).")
+
+        # allow cfg-driven output dir for pushed results
+        out_dir = _get_cfg(sec, "push_output_dir", None)
+        if out_dir is None:
+            out_dir = _get_cfg(sec, "final_push_output", None)
+
+        pushed_fn, _ = main_final_push_modified(input_path=in_path, output_path=out_dir)
+        if state is not None:
+            state.set_pushed_samples_path(pushed_fn)
+        return pushed_fn
+
+    raise ValueError(
+        f"Unknown circle_packing_SRP.mode='{mode}'. Expected: training_set_gen / push_only."
+    )
 
 # =============================================================================
 # Entrypoint (config-driven)
 # =============================================================================
 if __name__ == "__main__":
-    sec = "circle_packing_SRP"
-    # default to 'generate' if not provided
-    mode = str(_get_cfg(sec, "mode", "generate")).strip().lower()
-
-    if mode in ("generate", "gen"):
-        generate_circle_packing_dataset()
-
-    elif mode in ("final_push", "final-push", "push"):
-        # Will read the path from config: circle_packing_SRP.final_push_input
-        # if not supplied explicitly to main_final_push(...)
-        in_path = _get_cfg(sec, "final_push_input", None)
-        out_path = _get_cfg(sec, "final_push_output", None)
-        
-        main_final_push_modified(input_path=in_path, output_path=out_path)
-
-    else:
-        raise ValueError(
-            f"Unknown mode '{mode}'. Expected one of: "
-            "'generate', 'gen', 'final_push', 'final-push', 'push'."
-        )
+    main(state=None)
