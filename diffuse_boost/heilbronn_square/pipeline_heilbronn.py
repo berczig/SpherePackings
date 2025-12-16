@@ -105,8 +105,11 @@ if __name__ == "__main__":
         console.print(f"[Heilbronn Pipeline] Iteration ({i+1}/{iterations})", style="blue")
 
         # Train + sample
-        if i == 0 and start_at_step == "train_and_sampling":
+        if i == 0 and start_at_step in {"start", "push", "train_and_sampling"}:
+            # First iteration after dataset creation/push trains a fresh model.
+            # (Resume only makes sense once we have a model from a previous iteration.)
             _set_cfg("heilbronn_flow", "mode", "training_and_sampling")
+            _set_cfg("heilbronn_flow", "resume_model_path", "")
         else:
             _set_cfg("heilbronn_flow", "mode", "retrain_and_sampling")
 

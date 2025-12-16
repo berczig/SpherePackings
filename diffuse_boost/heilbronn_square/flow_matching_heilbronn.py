@@ -207,7 +207,11 @@ class FlowSetTransformer(nn.Module):
 # ===================================
 class HeilbronnPointsetDataset(Dataset):
     def __init__(self, path, tol=1e-12, scale_N=128):
-        data = torch.load(path)  # (M, 2, N)
+        # Prefer safe tensor-only loading when supported by the installed PyTorch.
+        try:
+            data = torch.load(path, weights_only=True)  # (M, 2, N)
+        except TypeError:
+            data = torch.load(path)  # (M, 2, N)
         assert data.ndim == 3 and data.shape[1] == 2
         self.data = data.contiguous()
         self.M, self.d, self.N = self.data.shape

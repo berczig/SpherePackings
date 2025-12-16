@@ -10,6 +10,7 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+from datetime import datetime
 
 
 # ============================================================
@@ -152,7 +153,9 @@ def plot(Arrays, labels, savepath,
          plotmode="overlay",
          n_xticks=15,
          show=True,
-         filename="star_discrepancy_hist.png"):
+         filename="star_discrepancy_hist.png",
+         include_stats=True,
+         stats_decimals=6):
     """
     Arrays: list of 1D numpy arrays (metric per dataset)
     labels: list of labels (same length as Arrays)
@@ -195,7 +198,17 @@ def plot(Arrays, labels, savepath,
             hist_data = hist_counts / max(1, len(values))
             color = mpl.colors.hsv_to_rgb((index / max(1, len(Arrays)), 1, 1))
             max_freq = max(max_freq, float(np.max(hist_data)))
-            label = f"{labels[index]} [{len(values)} samples]"
+            if include_stats:
+                mean_v = float(np.mean(values))
+                min_v = float(np.min(values))
+                max_v = float(np.max(values))
+                label = (
+                    f"{labels[index]} "
+                    f"[n={len(values)}, mean={mean_v:.{stats_decimals}f}, "
+                    f"min={min_v:.{stats_decimals}f}, max={max_v:.{stats_decimals}f}]"
+                )
+            else:
+                label = f"{labels[index]} [n={len(values)}]"
             plt.bar(bar_x_positions,
                     hist_data,
                     width=bin_widths,
@@ -242,7 +255,7 @@ def plot(Arrays, labels, savepath,
         plt.close()
 
 
-def plot_files_combined(files, labels, savepath, **kwargs):
+def plot_files_combined(files, labels, savepath, title=None, **kwargs):
     """
     files: list of .pt paths (or tensors)
     labels: list of labels (same length)
@@ -255,13 +268,57 @@ def plot_files_combined(files, labels, savepath, **kwargs):
         metr = compute_star_discrepancies(dataset)
         arrays_metric.append(metr["star_discrepancy"])
 
+    if title is None:
+        title = "Exact star discrepancy distribution"
+
     plot(Arrays=arrays_metric,
          labels=labels,
          savepath=savepath,
-         title="Exact star discrepancy distribution",
+         title=title,
          xlabel="Exact star discrepancy D* (smaller is better)",
          ylabel="Frequency",
          **kwargs)
+
+
+def _split_file_label(item):
+    """Normalize file spec.
+
+    Supports:
+      - "path/to/file.pt"
+      - ("path/to/file.pt", "Label")
+      - {"file": "path/to/file.pt", "label": "Label"}
+      - CLI strings like "path/to/file.pt=Label" (first '=' only)
+    """
+    if isinstance(item, (tuple, list)) and len(item) == 2:
+        return item[0], item[1]
+
+    if isinstance(item, dict):
+        if "file" in item:
+            return item.get("file"), item.get("label")
+        raise ValueError("Dict file specs must include a 'file' key.")
+
+    if isinstance(item, str) and "=" in item:
+        path, label = item.split("=", 1)
+        return path, label
+
+    return item, None
+
+
+def _infer_num_points(dataset) -> int:
+    """Infer N from dataset shaped (M,2,N) or (M,N,2) (torch or numpy)."""
+    if isinstance(dataset, torch.Tensor):
+        arr = dataset.detach().cpu().numpy()
+    else:
+        arr = np.asarray(dataset)
+
+    if arr.ndim != 3:
+        raise ValueError(f"Expected 3D tensor, got shape {arr.shape}")
+
+    if arr.shape[1] == 2:
+        return int(arr.shape[2])
+    if arr.shape[2] == 2:
+        return int(arr.shape[1])
+    raise ValueError(f"Could not infer N: second or last dimension must be 2; got {arr.shape}")
 
 
 # ============================================================
@@ -318,48 +375,69 @@ def main():
     if len(sys.argv) > 1:
         files = sys.argv[1:]
     else:
+        # You can provide plot names directly in this list:
+        #   files = [("path/to/file.pt", "Nice label"), ...]
         files = [
-            "diffuse_boost/output/star_discrepancy/final_pushed/star_srp_pushed_2025-12-14_125652.pt",
-            "diffuse_boost/output/star_discrepancy/final_pushed/star_srp_pushed_2025-12-14_125908.pt",
-            "diffuse_boost/output/star_discrepancy/final_pushed/star_srp_pushed_2025-12-14_130129.pt",
+            ("diffuse_boost/output/star_discrepancy/training_sets/star_srp_1000x20_2025-12-15_104724.pt", "Training set"),
+            (
+                "diffuse_boost/output/star_discrepancy/final_pushed/star_srp_pushed_2025-12-15_135317.pt",
+                "1st iteration",
+            ),
+            (
+                "diffuse_boost/output/star_discrepancy/final_pushed/star_srp_pushed_2025-12-15_172541.pt",
+                "2nd iteration",
+            ),
+            (
+                "diffuse_boost/output/star_discrepancy/final_pushed/star_srp_pushed_2025-12-15_210502.pt",
+                "3rd iteration",
+            ),
         ]
 
     if not files:
         print("No files provided. Exiting.")
         sys.exit(0)
 
+    file_paths = []
     labels = []
-    for f in files:
-        default_label = os.path.splitext(os.path.basename(str(f)))[0]
-        lab = input(f"Label for {f} (default: {default_label}): ").strip()
+    for item in files:
+        fpath, lab = _split_file_label(item)
+        file_paths.append(fpath)
         if not lab:
-            lab = default_label
+            lab = os.path.splitext(os.path.basename(str(fpath)))[0]
         labels.append(lab)
 
-    out_dir_default = "diffuse_boost/output/star_discrepancy/distribution_plots"
-    out_dir = input(f"Output directory for plots (default: {out_dir_default}): ").strip()
-    if not out_dir:
-        out_dir = out_dir_default
-    else:
-        out_dir = os.path.join(out_dir_default, out_dir)
+    # Save under final_pushed/plot/distribution_plots
+    out_dir = "diffuse_boost/output/star_discrepancy/final_pushed/plot/distribution_plots"
+
+    # Build a filename that includes the number of points and current date.
+    # (Assumes all datasets have the same N; if they differ, uses the first.)
+    first_dataset = load_dataset(file_paths[0])
+    n_points = _infer_num_points(first_dataset)
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+    out_filename = f"star_discrepancy_hist_N{n_points}_{timestamp}.png"
 
     plot_files_combined(
-        files,
+        file_paths,
         labels,
         savepath=out_dir,
+        title=f"Exact star discrepancy distribution (N={n_points} points)",
         plotmode="overlay",   # or "stacked"
         n_bins=80,
         show=True,
-        filename="star_discrepancy_hist.png",
+        filename=out_filename,
+        include_stats=True,
     )
 
     # Optional: print best (min) discrepancy per set
     print("\n=== Summary: best (minimum) exact star discrepancy per dataset ===")
-    for f, lab in zip(files, labels):
+    for f, lab in zip(file_paths, labels):
         td = load_dataset(f)
         metr = compute_star_discrepancies(td)
         vals = metr["star_discrepancy"]
-        print(f"{lab}: min D* = {np.min(vals):.8f} | median D* = {np.median(vals):.8f} | max D* = {np.max(vals):.8f} (over {len(vals)} samples)")
+        print(
+            f"{lab}: mean D* = {np.mean(vals):.8f} | min D* = {np.min(vals):.8f} | max D* = {np.max(vals):.8f} "
+            f"(over {len(vals)} samples)"
+        )
 
 
 if __name__ == "__main__":
