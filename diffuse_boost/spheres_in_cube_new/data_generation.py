@@ -7,11 +7,8 @@ if platform.system() == "Darwin" and os.environ.get("SPHEREPACK_DISABLE_KMP_HACK
 import numpy as np
 import math
 import torch
-from torch.utils.data import DataLoader, Dataset
 import itertools
-from scipy.optimize import minimize
 from datetime import datetime
-import numba as nb
 from numba import njit
 from diffuse_boost import cfg
 from diffuse_boost.spheres_in_cube.physics_push_PESC import eliminate_overlaps_box
@@ -20,9 +17,9 @@ from diffuse_boost.spheres_in_cube_new.pipeline import PipelineState
 from tqdm import tqdm
 
 # -----------------------------------------------------------------------------
-# Config helper (same style as in Heilbronn script)
+# Config helper
 # -----------------------------------------------------------------------------
-EPS_SMALL = 1e-6
+EPS_SMALL = 1e-8
 
 def _get_cfg(section, key, fallback):
     from diffuse_boost import cfg
@@ -36,135 +33,10 @@ def _get_cfg(section, key, fallback):
         return cfg.get(section, key)
     except Exception:
         return fallback
-    
-def _set_cfg(section, key, value):
-    cfg.set(section, key, value)
-    print(f"[CFG] Overwriting '{section}.{key}' to {value}")
-    
+
 # -----------------------------------------------------------------------------
-# Utilities: Penalty gradient, energy evaluation, and clearance maximization
+# Small utilities
 # -----------------------------------------------------------------------------
-@njit(cache=True, fastmath=True)
-def _unit_direction(dx0, dx1, dx2, dist):
-    # NOTE: kept for backward compatibility but no longer used
-    if dist >= EPS_SMALL:
-        inv = 1.0 / dist
-        return dx0 * inv, dx1 * inv, dx2 * inv
-    v0 = np.random.normal()
-    v1 = np.random.normal()
-    v2 = np.random.normal()
-    n = math.sqrt(v0*v0 + v1*v1 + v2*v2) + EPS_SMALL
-    return v0/n, v1/n, v2/n
-
-@njit(cache=True, fastmath=True)
-def compute_EL_grad(X_rel, L, N, r):
-    """
-    Compute energy and gradient in the 'relative' coordinate frame by mapping
-    through to absolute cube coordinates, computing the true overlap penalties
-    there, and then chaining the gradient back.
-
-    Modifications:
-      * Dimension D is inferred from X_rel.size // N (no hard-coded 3D).
-      * Sphere-sphere penalties still use fixed radius r (overlap if dist < 2r).
-      * Wall clearance is set to wall_margin = min_pairwise_distance / 2,
-        so that spheres of radius (min_pairwise_distance / 2) do not intersect
-        the walls at an energy minimum.
-    """
-    D = X_rel.size // N
-    coords_rel = X_rel.reshape((N, D))
-    scale = (L - 2.0 * r) / L
-    half = L / 2.0
-    coords_abs = (coords_rel + half) * scale + r
-
-    EL = 0.0
-    grad_abs = np.zeros((N, D), dtype=coords_abs.dtype)
-
-    # --------------------------------------------------------------
-    # 1) Sphere-sphere penalties (radius r) + compute min distance
-    # --------------------------------------------------------------
-    min_d = 1e300
-    for i in range(N):
-        for j in range(i + 1, N):
-            dist_sq = 0.0
-            for d in range(D):
-                diff = coords_abs[i, d] - coords_abs[j, d]
-                dist_sq += diff * diff
-            dist = math.sqrt(dist_sq)
-
-            if dist < min_d:
-                min_d = dist
-
-            over = 2.0 * r - dist
-            if over > 0.0:
-                EL += over * over
-                # unit direction and gradient contribution
-                if dist >= EPS_SMALL:
-                    inv = 1.0 / dist
-                else:
-                    inv = 0.0
-                for d in range(D):
-                    dx = coords_abs[i, d] - coords_abs[j, d]
-                    u = dx * inv
-                    g = 2.0 * over * u
-                    grad_abs[i, d] -= g
-                    grad_abs[j, d] += g
-
-    # Handle degenerate case N < 2 or weird numeric issues
-    if min_d == 1e300:
-        # fallback: use 2r as a neutral default min distance
-        min_d = 2.0 * r
-
-    # Effective wall clearance: half of current min pairwise distance
-    wall_margin = 0.5 * min_d
-
-    # --------------------------------------------------------------
-    # 2) Wall penalties, using wall_margin instead of fixed r
-    # --------------------------------------------------------------
-    for i in range(N):
-        for d in range(D):
-            x = coords_abs[i, d]
-            if x < wall_margin:
-                over = wall_margin - x
-                EL += over * over
-                grad_abs[i, d] += -2.0 * over
-            elif x > L - wall_margin:
-                over = x - (L - wall_margin)
-                EL += over * over
-                grad_abs[i, d] += 2.0 * over
-
-    # Map gradient back to relative coordinates
-    grad_rel = grad_abs * scale
-    return EL, grad_rel.ravel()
-
-@njit(cache=True, fastmath=True)
-def compute_EL(X_rel, L, N, r):
-    EL, _ = compute_EL_grad(X_rel, L, N, r)
-    return EL
-
-@njit(cache=True, fastmath=True)
-def maximize_clearance(X_rel, N, steps=10, step_size=0.01):
-    """
-    Simple gradient-like clearance maximizer, now dimension-agnostic.
-    """
-    D = X_rel.size // N
-    coords = X_rel.reshape((N, D)).copy()
-    for _ in range(steps):
-        grad = np.zeros_like(coords)
-        for i in range(N):
-            for j in range(N):
-                if i == j:
-                    continue
-                dist_sq = 0.0
-                for d in range(D):
-                    diff = coords[i, d] - coords[j, d]
-                    dist_sq += diff * diff
-                dist = math.sqrt(dist_sq) + EPS_SMALL
-                inv = 1.0 / dist
-                for d in range(D):
-                    grad[i, d] += (coords[i, d] - coords[j, d]) * inv
-        coords += step_size * grad
-    return coords.ravel()
-
 @njit(cache=True, fastmath=True)
 def _linf_norm_with_eps(g):
     m = 0.0
@@ -176,27 +48,40 @@ def _linf_norm_with_eps(g):
             m = a
     return m + EPS_SMALL
 
+# -----------------------------------------------------------------------------
+# Min pairwise distance (flat and matrix forms)
+# -----------------------------------------------------------------------------
 @njit(cache=True, fastmath=True)
-def SRP(X_rel, L, N, r, Imax, m, sigma, beta, add_noise):
-    eta = sigma
-    Xc = X_rel.copy()
-    for _ in range(Imax):
-        # Only add random noise if requested
-        if add_noise:
-            Xc += np.random.uniform(-eta, eta, size=Xc.shape[0])
-        for __ in range(m):
-            EL, g = compute_EL_grad(Xc, L, N, r)
-            Xc -= (sigma * eta) * (g / _linf_norm_with_eps(g))
-        eta *= beta
-    return Xc
+def min_pairwise_distance_flat(X_flat, N):
+    """
+    X_flat: (N*D,) in absolute coords
+    returns min_{i<j} ||x_i - x_j||  (float)
+    """
+    if N < 2:
+        return 0.0
+    D = X_flat.size // N
+    best = 1e300
+    for i in range(N):
+        for j in range(i + 1, N):
+            dist_sq = 0.0
+            base_i = i * D
+            base_j = j * D
+            for d in range(D):
+                diff = X_flat[base_i + d] - X_flat[base_j + d]
+                dist_sq += diff * diff
+            dist = math.sqrt(dist_sq)
+            if dist < best:
+                best = dist
+    return best
 
 @njit(cache=True, fastmath=True)
 def min_pairwise_distance(centers):
     """
-    Dimension-agnostic min pairwise distance.
     centers: (N, D)
     """
     N, D = centers.shape
+    if N < 2:
+        return 0.0
     best = 1e300
     for i in range(N):
         for j in range(i + 1, N):
@@ -204,48 +89,179 @@ def min_pairwise_distance(centers):
             for d in range(D):
                 diff = centers[i, d] - centers[j, d]
                 dist_sq += diff * diff
-            d = math.sqrt(dist_sq)
-            if d < best:
-                best = d
+            dist = math.sqrt(dist_sq)
+            if dist < best:
+                best = dist
     return best
 
-def local_opt(X_rel, L, N, r, tol, maxiter):
+# -----------------------------------------------------------------------------
+# HARD CONSTRAINT PROJECTION:
+# Enforce x_{i,d} in [m(X), L - m(X)], where m(X)=0.5*d_min(X)
+# Projection is done via reflection (NOT clipping).
+# -----------------------------------------------------------------------------
+@njit(cache=True, fastmath=True)
+def _reflect_into_interval_inplace(x, a, b):
     """
-    Local optimization in the relative frame with explicit L-BFGS-B bounds.
-    Now dimension-agnostic: bounds length = D * N.
+    Reflect each coordinate into [a,b] even if far outside.
+    a < b required.
     """
-    def objective(x):
-        EL, _ = compute_EL_grad(x, L, N, r)
-        return EL
+    length = b - a
+    if length <= EPS_SMALL:
+        # Degenerate interval: force to midpoint
+        mid = 0.5 * (a + b)
+        for k in range(x.size):
+            x[k] = mid
+        return
 
-    def gradient(x):
-        _, grad = compute_EL_grad(x, L, N, r)
-        return grad
+    twoL = 2.0 * length
+    for k in range(x.size):
+        v = x[k] - a  # shift to [0, length] target
+        # bring into [0, 2*length)
+        v = v - twoL * math.floor(v / twoL)
+        # reflect if needed
+        if v > length:
+            v = twoL - v
+        x[k] = a + v
 
-    x0 = X_rel.copy()
-    half = L / 2
-    eps = 1e-6
-    D = x0.size // N
-    bounds = [(-half + eps, half - eps)] * (D * N)
+@njit(cache=True, fastmath=True)
+def project_minwall_inplace(X_flat, L, N, proj_iters=3):
+    """
+    Iteratively project into the configuration-dependent box:
+      [m(X), L-m(X)]^D,  where m(X)=0.5*d_min(X).
 
-    res = minimize(
-        fun=objective,
-        x0=x0,
-        method='L-BFGS-B',
-        jac=gradient,
-        bounds=bounds,
-        options={'ftol': tol, 'gtol': tol, 'maxiter': maxiter}
-    )
-    return res.x, res.fun
+    Because m depends on X, we do a few fixed-point iterations.
+    """
+    for _ in range(proj_iters):
+        dmin = min_pairwise_distance_flat(X_flat, N)
+        m = 0.5 * dmin
+
+        # Keep it sane:
+        if m < 0.0:
+            m = 0.0
+        # If m >= L/2, box collapses; keep a tiny feasible interval
+        if m >= 0.5 * L:
+            m = 0.5 * L - EPS_SMALL
+            if m < 0.0:
+                m = 0.0
+
+        a = m
+        b = L - m
+        if b <= a + EPS_SMALL:
+            # fall back: whole cube
+            a = 0.0
+            b = L
+
+        _reflect_into_interval_inplace(X_flat, a, b)
+
+# -----------------------------------------------------------------------------
+# Objective for "true sphere packing at radius r" WITHOUT wall penalty:
+# - Hard wall constraint handled by projection above.
+# - Energy only penalizes sphere-sphere overlaps (dist < 2r).
+# -----------------------------------------------------------------------------
+@njit(cache=True, fastmath=True)
+def compute_overlap_EL_grad_abs(X_flat, L, N, r):
+    """
+    Overlap-only energy in absolute coords:
+      EL = sum_{i<j} max(0, 2r - dist)^2
+    Gradient is w.r.t. X_flat.
+    """
+    D = X_flat.size // N
+    EL = 0.0
+    g = np.zeros(X_flat.size, dtype=X_flat.dtype)
+
+    for i in range(N):
+        base_i = i * D
+        for j in range(i + 1, N):
+            base_j = j * D
+            dist_sq = 0.0
+            for d in range(D):
+                diff = X_flat[base_i + d] - X_flat[base_j + d]
+                dist_sq += diff * diff
+            dist = math.sqrt(dist_sq)
+
+            over = 2.0 * r - dist
+            if over > 0.0:
+                EL += over * over
+                inv = (1.0 / dist) if dist >= EPS_SMALL else 0.0
+                for d in range(D):
+                    u = (X_flat[base_i + d] - X_flat[base_j + d]) * inv
+                    gg = 2.0 * over * u
+                    g[base_i + d] -= gg
+                    g[base_j + d] += gg
+
+    return EL, g
+
+@njit(cache=True, fastmath=True)
+def compute_overlap_EL_abs(X_flat, L, N, r):
+    EL, _ = compute_overlap_EL_grad_abs(X_flat, L, N, r)
+    return EL
+
+# -----------------------------------------------------------------------------
+# SRP with hard minwall constraint via projection
+# -----------------------------------------------------------------------------
+@njit(cache=True, fastmath=True)
+def SRP_hardwall(X0_flat, L, N, r, Imax, m_inner, sigma, beta, add_noise):
+    """
+    SRP-like annealed normalized gradient descent on overlap energy,
+    with hard constraint: min distance to wall >= 0.5 * d_min(current config).
+    """
+    Xc = X0_flat.copy()
+    project_minwall_inplace(Xc, L, N, proj_iters=3)
+
+    eta = sigma
+    for _ in range(Imax):
+        if add_noise:
+            Xc += np.random.uniform(-eta, eta, size=Xc.shape[0])
+            project_minwall_inplace(Xc, L, N, proj_iters=3)
+
+        for __ in range(m_inner):
+            _, g = compute_overlap_EL_grad_abs(Xc, L, N, r)
+            Xc -= (sigma * eta) * (g / _linf_norm_with_eps(g))
+            project_minwall_inplace(Xc, L, N, proj_iters=2)
+
+        eta *= beta
+
+    return Xc
+
+# -----------------------------------------------------------------------------
+# Local optimizer replacement: projected gradient descent with backtracking
+# (because bounds depend on X, L-BFGS-B isn't applicable)
+# -----------------------------------------------------------------------------
+def local_opt_projected(X0_flat, L, N, r, tol, maxiter, lr=0.05, backtrack_steps=10):
+    x = X0_flat.copy()
+    project_minwall_inplace(x, L, N, proj_iters=4)
+
+    EL = float(compute_overlap_EL_abs(x, L, N, r))
+    for _ in range(maxiter):
+        EL_curr, g = compute_overlap_EL_grad_abs(x, L, N, r)
+        g_inf = float(np.max(np.abs(g))) if g.size else 0.0
+        if g_inf < tol:
+            return x, float(EL_curr)
+
+        step = lr
+        improved = False
+        for __ in range(backtrack_steps):
+            x_try = x - step * g
+            project_minwall_inplace(x_try, L, N, proj_iters=3)
+            EL_try = float(compute_overlap_EL_abs(x_try, L, N, r))
+            if EL_try <= float(EL_curr) + 1e-15:
+                x = x_try
+                EL = EL_try
+                improved = True
+                break
+            step *= 0.5
+
+        if not improved:
+            # no progress; stop
+            return x, float(EL_curr)
+
+    return x, float(EL)
 
 # -----------------------------------------------------------------------------
 # Sampling & symmetries
 # -----------------------------------------------------------------------------
-def sample_uniform_points(dim, L, r, N):
-    low, high = r, L - r
-    if high <= low:
-        raise ValueError("bounding_box_width must exceed 2*radius.")
-    return np.random.uniform(low, high, size=(N, dim))
+def sample_uniform_points_full(dim, L, N, eps=1e-6):
+    return np.random.uniform(eps, L - eps, size=(N, dim))
 
 def get_cube_symmetry_matrices(dim):
     mats = []
@@ -258,13 +274,16 @@ def get_cube_symmetry_matrices(dim):
     return mats
 
 def apply_symmetries_to_data(data, L):
+    """
+    data: (M, D, N)
+    """
     M, D, N = data.shape
     mats = get_cube_symmetry_matrices(D)
     out = np.zeros((M * len(mats), D, N), dtype=data.dtype)
     center = L / 2
     idx = 0
     for i in range(M):
-        coords = data[i].T
+        coords = data[i].T  # (N,D)
         for mat in mats:
             T = (mat @ (coords - center).T).T + center
             out[idx] = T.T
@@ -272,12 +291,11 @@ def apply_symmetries_to_data(data, L):
     return out
 
 # -----------------------------------------------------------------------------
-# Main generation: SRP + local_opt + optional physics push (TRAINING MODE)
+# Main generation: optional physics push + SRP_hardwall + local_opt_projected
 # -----------------------------------------------------------------------------
 def generate_dataset_push_srp(verbose=True):
     sec = "sample_generation_PP+PBTS"
 
-    # Read parameters
     D        = _get_cfg(sec, "dimension",            3)
     L        = _get_cfg(sec, "bounding_box_width",   1.0)
     r        = _get_cfg(sec, "sphere_radius",        0.1)
@@ -290,80 +308,79 @@ def generate_dataset_push_srp(verbose=True):
     mode_bnd = _get_cfg(sec, "boundary_mode",        "reflect")
 
     Imax       = _get_cfg(sec, "srp_Imax",        500)
-    m          = _get_cfg(sec, "srp_m",           20)
+    m_inner    = _get_cfg(sec, "srp_m",           20)
     sigma_frac = _get_cfg(sec, "srp_sigma_frac",  0.2)
     sigma      = sigma_frac * L
     beta       = _get_cfg(sec, "srp_beta",        0.95)
-    tol_opt    = _get_cfg(sec, "srp_tol",         1e-8)
-    maxiter_opt= _get_cfg(sec, "srp_maxiter",     300)
+
+    tol_opt     = _get_cfg(sec, "srp_tol",        1e-8)
+    maxiter_opt = _get_cfg(sec, "srp_maxiter",    300)
     num_srp_restarts = _get_cfg(sec, "num_srp_restarts", 15)
 
     physics_push_mode = _get_cfg(sec, "physics_push_mode", True)
 
-    print(f"[Data Generation] Generating dataset with N={N}, M={M}, SRP restarts={num_srp_restarts}, physics_push_mode={physics_push_mode}")
+    print(f"[HardWall SRP] N={N}, D={D}, L={L}, r={r}, M={M}, restarts={num_srp_restarts}")
+    print("[HardWall SRP] Hard constraint: dist-to-wall >= 0.5 * current min pairwise distance.")
 
-    # Output filenames (include N in the timestamp token)
+    # Output filenames
     timestamp_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     stamp_with_N = f"N{N}_{timestamp_str}"
     day_stamp = datetime.now().strftime("%Y-%m-%d")
 
     base_metrics = _get_cfg(sec, "output_filename_metrics", "srp_metrics_{DATE}.csv")
-    metrics_fn = base_metrics.replace("{DATE}", stamp_with_N).replace("{DAY_DATE}", day_stamp) 
+    metrics_fn = base_metrics.replace("{DATE}", stamp_with_N).replace("{DAY_DATE}", day_stamp)
 
     base_data = _get_cfg(sec, "output_filename", "srp_data_{DATE}.pt")
-    data_fn = base_data.replace("{DATE}", stamp_with_N).replace("{DAY_DATE}", day_stamp) 
+    data_fn = base_data.replace("{DATE}", stamp_with_N).replace("{DAY_DATE}", day_stamp)
 
-    base_sym = _get_cfg(sec, "output_filename_sym", data_fn.replace('.pt', '_sym.pt'))
-    sym_fn = base_sym.replace("{DATE}", stamp_with_N).replace("{DAY_DATE}", day_stamp) 
+    base_sym = _get_cfg(sec, "output_filename_sym", data_fn.replace(".pt", "_sym.pt"))
+    sym_fn = base_sym.replace("{DATE}", stamp_with_N).replace("{DAY_DATE}", day_stamp)
 
     base_top = _get_cfg(sec, "output_filename_top", "srp_top_{DATE}.pt")
-    top_fn = base_top.replace("{DATE}", stamp_with_N).replace("{DAY_DATE}", day_stamp) 
+    top_fn = base_top.replace("{DATE}", stamp_with_N).replace("{DAY_DATE}", day_stamp)
 
-    base_sym_top = _get_cfg(sec, "output_filename_sym_top", top_fn.replace('.pt', '_sym.pt'))
-    sym_top_fn = base_sym_top.replace("{DATE}", stamp_with_N).replace("{DAY_DATE}", day_stamp) 
+    base_sym_top = _get_cfg(sec, "output_filename_sym_top", top_fn.replace(".pt", "_sym.pt"))
+    sym_top_fn = base_sym_top.replace("{DATE}", stamp_with_N).replace("{DAY_DATE}", day_stamp)
 
     metrics_dir = os.path.dirname(metrics_fn)
     if metrics_dir:
         os.makedirs(metrics_dir, exist_ok=True)
-    with open(metrics_fn, 'w') as mf:
-        mf.write("sample,srp_restart,EL_before,EL_after,pre_push_min,post_push_min,excess\n")
+    with open(metrics_fn, "w") as mf:
+        mf.write("sample,srp_restart,EL_before,EL_after,pre_min,post_min,excess\n")
 
     data = np.zeros((M * num_srp_restarts, D, N), dtype=np.float32)
     min_dists = []
 
-    # For per-sample best stats (for top10 metrics)
+    # per-sample best stats
     best_EL_before_list = [0.0] * M
     best_EL_after_list  = [0.0] * M
     best_pre_min_list   = [0.0] * M
     best_post_min_list  = [0.0] * M
-    best_excess_list    = [float('inf')] * M
+    best_excess_list    = [float("inf")] * M
     best_restart_idx_list = [-1] * M
 
-    for i in tqdm(range(M), desc=f"Generating sample - will be used for {num_srp_restarts} restarts"):
-        if verbose:
-            print(f"Generating sample {i+1}/{M}...")
-        pts = sample_uniform_points(D, L, r, N)
+    for i in tqdm(range(M), desc=f"Generating samples (hard-wall)"):
+        pts = sample_uniform_points_full(D, L, N).astype(np.float64)
 
+        # Optional physics push (uses radius r). If enabled, we still project afterwards.
         if physics_push_mode:
             centers0, _ = eliminate_overlaps_box(
                 pts, r, [L] * D,
                 max_iter=max_iter, dt=dt, tol=tol,
                 boundary_mode=mode_bnd, visualize=False, verbose=False
             )
+            centers0 = centers0.astype(np.float64)
         else:
-            centers0 = pts.copy()
+            centers0 = pts
 
-        half = L / 2
-        X0 = (centers0 - half).ravel()
-        diffs0 = centers0[:, None, :] - centers0[None, :, :]
-        init_min = np.min(np.linalg.norm(diffs0, axis=-1)[np.triu_indices(N, k=1)])
-        best_centers = centers0.copy()
+        X0 = centers0.ravel().astype(np.float64)
+        # enforce hard wall constraint from the beginning
+        project_minwall_inplace(X0, L, N, proj_iters=6)
+        centers0 = X0.reshape((N, D))
+
+        init_min = float(min_pairwise_distance(centers0))
         best_min = init_min
-        excess_sample = best_d - init_min
-        if verbose:
-            print(f"Sample {i+1}/{M}: initial min distance = {init_min:.6f}, excess = {excess_sample:.6f}")
 
-        # "best" metrics for this sample
         best_EL_before = math.inf
         best_EL_after  = math.inf
         best_pre_min   = init_min
@@ -371,60 +388,49 @@ def generate_dataset_push_srp(verbose=True):
         best_excess    = best_d - init_min
         best_restart   = -1
 
-        
         for k in range(num_srp_restarts):
-            if verbose:
-                print(f"  SRP restart {k+1}/{num_srp_restarts} for sample {i+1}/{M}")
-            eps = 1e-6
             add_noise = (k > 0)
-            X_srp = SRP(X0, L, N, r, Imax, m, sigma, beta, add_noise)
-            X_srp_clip = np.clip(X_srp, -L/2 + eps, L/2 - eps)
-            EL_before = compute_EL(X_srp_clip, L, N, r)
-            if verbose:
-                print(f"    SRP restart {k+1}/{num_srp_restarts}: EL before local_opt = {EL_before:.6f}")
-            X_lo, EL_after = local_opt(X_srp_clip, L, N, r, tol_opt, maxiter_opt)
-            if verbose:
-                print(f"    SRP restart {k+1}/{num_srp_restarts}: EL after local_opt  = {EL_after:.6f}")
 
-            D_eff = X_lo.size // N
-            coords = X_lo.reshape((N, D_eff))
-            centers_opt = (coords + half) * ((L - 2 * r) / L) + r
-            centers_opt = np.minimum(np.maximum(centers_opt, r + EPS_SMALL), L - r - EPS_SMALL)
+            X_srp = SRP_hardwall(X0, L, N, r, Imax, m_inner, sigma, beta, add_noise)
+            EL_before = float(compute_overlap_EL_abs(X_srp, L, N, r))
 
-            diffs_pre = centers_opt[:, None, :] - centers_opt[None, :, :]
-            pre_min = np.min(np.linalg.norm(diffs_pre, axis=-1)[np.triu_indices(N, k=1)])
+            # local projected improvement
+            X_lo, EL_after = local_opt_projected(X_srp, L, N, r, tol_opt, maxiter_opt, lr=0.05)
 
+            centers_opt = X_lo.reshape((N, D))
+            pre_min = float(min_pairwise_distance(centers_opt))
+
+            # Optional physics push again, then hard-wall projection again
             if physics_push_mode:
                 centers_k, _ = eliminate_overlaps_box(
                     centers_opt, r, [L] * D,
                     max_iter=max_iter, dt=dt, tol=tol,
                     boundary_mode=mode_bnd, visualize=False, verbose=False
                 )
+                Xk = centers_k.astype(np.float64).ravel()
+                project_minwall_inplace(Xk, L, N, proj_iters=6)
+                centers_k = Xk.reshape((N, D))
             else:
+                # already projected by local_opt_projected
                 centers_k = centers_opt
 
-            diffs_k = centers_k[:, None, :] - centers_k[None, :, :]
-            post_min = np.min(np.linalg.norm(diffs_k, axis=-1)[np.triu_indices(N, k=1)])
+            post_min = float(min_pairwise_distance(centers_k))
             excess = best_d - post_min
-            if verbose:
-                print(f"    min_after{'_physics_push' if physics_push_mode else ''} = {post_min:.6f}, excess = {excess:.6f}")
 
-            with open(metrics_fn, 'a') as mf:
+            with open(metrics_fn, "a") as mf:
                 mf.write(f"{i},{k+1},{EL_before:.6f},{EL_after:.6f},{pre_min:.6f},{post_min:.6f},{excess:.6f}\n")
 
-            # Update best over restarts
             if post_min > best_min:
                 best_min = post_min
-                best_centers = centers_k.copy()
             if excess < best_excess:
-                best_excess   = excess
-                best_EL_before = EL_before
-                best_EL_after  = EL_after
-                best_pre_min   = pre_min
-                best_post_min  = post_min
-                best_restart   = k + 1
+                best_excess     = excess
+                best_EL_before  = EL_before
+                best_EL_after   = EL_after
+                best_pre_min    = pre_min
+                best_post_min   = post_min
+                best_restart    = k + 1
 
-            data[i * num_srp_restarts + k] = centers_k.copy().T
+            data[i * num_srp_restarts + k] = centers_k.T.astype(np.float32)
 
         min_dists.append(best_min)
         best_EL_before_list[i] = best_EL_before
@@ -433,9 +439,6 @@ def generate_dataset_push_srp(verbose=True):
         best_post_min_list[i]  = best_post_min
         best_excess_list[i]    = best_excess
         best_restart_idx_list[i] = best_restart
-
-        if verbose:
-            print(f"Finished sample {i+1}/{M}, best_min = {best_min:.6f}\n")
 
     # Save full dataset
     data_dir = os.path.dirname(data_fn)
@@ -451,12 +454,11 @@ def generate_dataset_push_srp(verbose=True):
         if sym_dir:
             os.makedirs(sym_dir, exist_ok=True)
         torch.save(torch.from_numpy(sym_data), sym_fn)
-        if verbose:
-            print(f"Saved symmetrized dataset to {sym_fn}")
+        print(f"[Save] Saved symmetrized dataset to {sym_fn}")
     except ValueError as e:
         print(f"Skipping symmetry enrichment: {e}")
 
-    # Top-k subset (by min distance)
+    # Top subset (~25% by best min distance per sample)
     k_top = max(1, int(np.ceil(0.25 * M)))
     best_idx = np.argsort(min_dists)[-k_top:]
     top_data = data[best_idx]
@@ -464,8 +466,7 @@ def generate_dataset_push_srp(verbose=True):
     if top_dir:
         os.makedirs(top_dir, exist_ok=True)
     torch.save(torch.from_numpy(top_data), top_fn)
-    if verbose:
-        print(f"Saved top {k_top} samples to {top_fn}")
+    print(f"[Save] Saved top {k_top} samples to {top_fn}")
 
     # Symmetrized top subset
     try:
@@ -474,19 +475,16 @@ def generate_dataset_push_srp(verbose=True):
         if sym_top_dir:
             os.makedirs(sym_top_dir, exist_ok=True)
         torch.save(torch.from_numpy(sym_top), sym_top_fn)
-        if verbose:
-            print(f"Saved symmetrized top dataset to {sym_top_fn}")
+        print(f"[Save] Saved symmetrized top dataset to {sym_top_fn}")
     except ValueError as e:
         print(f"Skipping symmetry enrichment for top samples: {e}")
 
-    # -----------------------------------------------------------------
-    # Save metrics of TOP 10 samples (minimal excess) into separate file
-    # -----------------------------------------------------------------
+    # Top-10 metrics (minimal excess)
     num_top10 = min(10, M)
-    order_top10 = np.argsort(best_excess_list)[:num_top10]  # smaller excess is better
+    order_top10 = np.argsort(best_excess_list)[:num_top10]
     metrics_top10_fn = metrics_fn.replace(".csv", "_top10.csv")
     with open(metrics_top10_fn, "w") as mf:
-        mf.write("sample,EL_before,EL_after,pre_push_min,post_push_min,excess,srp_restart\n")
+        mf.write("sample,EL_before,EL_after,pre_min,post_min,excess,srp_restart\n")
         for idx in order_top10:
             mf.write(
                 f"{idx},"
@@ -497,12 +495,11 @@ def generate_dataset_push_srp(verbose=True):
                 f"{best_excess_list[idx]:.6f},"
                 f"{best_restart_idx_list[idx]}\n"
             )
-    if verbose:
-        print(f"Saved top-10 metrics to {metrics_top10_fn}")
+    print(f"[Save] Saved top-10 metrics to {metrics_top10_fn}")
     return data_fn
 
 # -----------------------------------------------------------------------------
-# Multi-sphere-count training generation
+# Multi-sphere-count training generation (unchanged logic)
 # -----------------------------------------------------------------------------
 def generate_dataset_push_srp_different_sphere_count():
     secmul = "sample_generation_PP+PBTS_multiple_sphere_num"
@@ -515,69 +512,53 @@ def generate_dataset_push_srp_different_sphere_count():
     base_output_filename         = _get_cfg(secmul, "output_filename",           "srp_mult_{SPHERE_NUM}_{DATE}.pt").replace("{DATE}", timestamp_str)
     base_output_filename_top     = _get_cfg(secmul, "output_filename_top",       "srp_mult_top_{SPHERE_NUM}_{DATE}.pt").replace("{DATE}", timestamp_str)
     base_output_filename_metrics = _get_cfg(secmul, "output_filename_metrics",   "srp_mult_metrics_{SPHERE_NUM}_{DATE}.csv").replace("{DATE}", timestamp_str)
-    base_output_filename_metrics_excess = _get_cfg(secmul, "output_filename_metrics_excess", "srp_mult_metrics_excess_{SPHERE_NUM}_{DATE}.csv").replace("{DATE}", timestamp_str)
 
-    print("base_output_filename: ", base_output_filename)
-    print(f"generate multiple packing starting from {num_spheres_start} spheres, up to {num_spheres_end} spheres per packing")
     box_sizes = load_best_results()
-    bar = tqdm(range(num_spheres_start, num_spheres_end+1))
+    bar = tqdm(range(num_spheres_start, num_spheres_end + 1))
     for sphere_num in bar:
-        bar.set_description(f"Generating packings from {num_spheres_start} to {num_spheres_end}, Currently at {sphere_num} spheres", refresh=True)
+        bar.set_description(f"Generating packings, N={sphere_num}", refresh=True)
         radius = 1 / box_sizes[sphere_num]
 
-        # Parameters (set in cfg so generate_dataset_push_srp reads them)
         cfg.set(secgen, "num_spheres",          str(sphere_num))
         cfg.set(secgen, "bounding_box_width",   "1.0")
         cfg.set(secgen, "sphere_radius",        str(radius))
-        cfg.set(secgen, "best_known_diameter",  str(2*radius))
+        cfg.set(secgen, "best_known_diameter",  str(2 * radius))
 
-        # File paths for this sphere_num
-        cfg.set(secgen, "output_filename",             base_output_filename.replace("{SPHERE_NUM}", str(sphere_num)))
-        cfg.set(secgen, "output_filename_top",         base_output_filename_top.replace("{SPHERE_NUM}", str(sphere_num)))
-        cfg.set(secgen, "output_filename_metrics",     base_output_filename_metrics.replace("{SPHERE_NUM}", str(sphere_num)))
-        cfg.set(secgen, "output_filename_metrics_excess", base_output_filename_metrics_excess.replace("{SPHERE_NUM}", str(sphere_num)))
+        cfg.set(secgen, "output_filename",         base_output_filename.replace("{SPHERE_NUM}", str(sphere_num)))
+        cfg.set(secgen, "output_filename_top",     base_output_filename_top.replace("{SPHERE_NUM}", str(sphere_num)))
+        cfg.set(secgen, "output_filename_metrics", base_output_filename_metrics.replace("{SPHERE_NUM}", str(sphere_num)))
 
         generate_dataset_push_srp(verbose=False)
 
-def load_metrics_PP_p_PBTS(filename):
-    data_excess = []
-    with open(filename) as m_file:
-        lines = m_file.readlines()
-        for data_text in lines[1:]:
-            data_string = data_text.split(",")
-            data_excess.append(float(data_string[-1]))
-    return data_excess
-
 # -----------------------------------------------------------------------------
-# FINAL PUSH MODE: read packings from file, apply SRP + local opt + optional physics push
+# FINAL PUSH MODE: load packings, apply SRP_hardwall + local_opt_projected
 # -----------------------------------------------------------------------------
 def final_push_existing_samples():
     sec = "sample_generation_PP+PBTS"
 
-    # Shared geometric / physical parameters
     D        = _get_cfg(sec, "dimension",            3)
     L        = _get_cfg(sec, "bounding_box_width",   1.0)
     r        = _get_cfg(sec, "sphere_radius",        0.1)
     best_d   = _get_cfg(sec, "best_known_diameter",  2.0 * r)
     N        = _get_cfg(sec, "num_spheres",          10)
+
     dt       = _get_cfg(sec, "dt",                   1e-3)
     max_iter = _get_cfg(sec, "max_iter",             10000)
     tol      = _get_cfg(sec, "tol",                  1e-6)
     mode_bnd = _get_cfg(sec, "boundary_mode",        "reflect")
 
-    # SRP / local optimization parameters
     Imax       = _get_cfg(sec, "srp_Imax",        500)
-    m          = _get_cfg(sec, "srp_m",           20)
+    m_inner    = _get_cfg(sec, "srp_m",           20)
     sigma_frac = _get_cfg(sec, "srp_sigma_frac",  0.2)
     sigma      = sigma_frac * L
     beta       = _get_cfg(sec, "srp_beta",        0.95)
-    tol_opt    = _get_cfg(sec, "srp_tol",         1e-8)
-    maxiter_opt= _get_cfg(sec, "srp_maxiter",     300)
+
+    tol_opt     = _get_cfg(sec, "srp_tol",        1e-8)
+    maxiter_opt = _get_cfg(sec, "srp_maxiter",    300)
     num_srp_restarts = _get_cfg(sec, "num_srp_restarts", 15)
 
     physics_push_mode = _get_cfg(sec, "physics_push_mode", True)
 
-    # IO paths for final push
     stamp      = datetime.now().strftime("%Y-%m-%d")
     out_dir    = _get_cfg(sec, "final_push_output", "./outputs_spheres_push")
     out_dir = os.path.join(out_dir, stamp)
@@ -587,49 +568,47 @@ def final_push_existing_samples():
         "Set sample_generation_PP+PBTS.final_push_input to a valid .pt file"
 
     os.makedirs(out_dir, exist_ok=True)
-    stamp      = datetime.now().strftime("%Y-%m-%d_%H%M%S")
-    dataset_fn = os.path.join(out_dir, f"spheres_srp_pushed_N{N}_{stamp}.pt")
-    metrics_fn = os.path.join(out_dir, f"spheres_metrics_pushed_N{N}_{stamp}.csv")
+    stamp2     = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+    dataset_fn = os.path.join(out_dir, f"spheres_srp_pushed_N{N}_{stamp2}.pt")
+    metrics_fn = os.path.join(out_dir, f"spheres_metrics_pushed_N{N}_{stamp2}.csv")
 
     loaded = torch.load(input_path, map_location="cpu")
-    print(f"[Load] Loaded tensors from '{input_path}', shape {loaded.data.shape}")
-    arr = loaded.detach().cpu().numpy() if isinstance(loaded, torch.Tensor) else None
-    if arr is None or arr.ndim != 3:
-        raise ValueError(f"Expected a tensor at final_push_input, got shape {getattr(loaded, 'shape', None)}")
+    if isinstance(loaded, torch.Tensor):
+        arr = loaded.detach().cpu().numpy()
+    elif hasattr(loaded, "data") and isinstance(loaded.data, torch.Tensor):
+        arr = loaded.data.detach().cpu().numpy()
+    else:
+        raise ValueError(f"final_push_input must be a Tensor or object with .data Tensor; got {type(loaded)}")
 
-    # Expect either (M, D, N) or (M, N, D)
+    if arr.ndim != 3:
+        raise ValueError(f"Expected shape (M,D,N) or (M,N,D), got {arr.shape}")
+
     if arr.shape[1] == D:
-        M_in, d_in, N_in = arr.shape
+        K, _, N_in = arr.shape
     elif arr.shape[-1] == D:
         arr = np.transpose(arr, (0, 2, 1))  # to (M, D, N)
-        M_in, d_in, N_in = arr.shape
+        K, _, N_in = arr.shape
     else:
-        raise ValueError(f"Second or last dimension must be {D}; got shape {arr.shape}")
+        raise ValueError(f"Second or last dimension must be {D}; got {arr.shape}")
 
     if N_in != N:
         raise ValueError(f"Config num_spheres={N} but input samples have N={N_in}")
 
-    K = M_in
-    print(f"[Push] Pushing {K} loaded samples (N={N}, D={D})")
-
     with open(metrics_fn, "w") as mf:
-        mf.write("sample,srp_restart,EL_before,EL_after,pre_push_min,post_push_min,excess\n")
+        mf.write("sample,srp_restart,EL_before,EL_after,pre_min,post_min,excess\n")
 
     data_out = np.zeros((K * num_srp_restarts, D, N), dtype=np.float32)
-    half = L / 2.0
-    scale = (L - 2.0 * r) / L
 
-    min_dists = []
-
-    # Arrays for top-10 stats
     best_EL_before_list = [0.0] * K
     best_EL_after_list  = [0.0] * K
     best_pre_min_list   = [0.0] * K
     best_post_min_list  = [0.0] * K
-    best_excess_list    = [float('inf')] * K
+    best_excess_list    = [float("inf")] * K
     best_restart_idx_list = [-1] * K
 
-    for s in tqdm(range(K), desc="Pushing Samples", unit="sample"):
+    min_dists = []
+
+    for s in tqdm(range(K), desc="Pushing Samples (hard-wall)", unit="sample"):
         centers_in = arr[s].T.astype(np.float64)  # (N, D)
 
         if physics_push_mode:
@@ -638,36 +617,28 @@ def final_push_existing_samples():
                 max_iter=max_iter, dt=dt, tol=tol,
                 boundary_mode=mode_bnd, visualize=False, verbose=False
             )
+            centers0 = centers0.astype(np.float64)
         else:
             centers0 = centers_in.copy()
 
-        X0 = (centers0 - half).ravel()
+        X0 = centers0.ravel()
+        project_minwall_inplace(X0, L, N, proj_iters=6)
 
-        # per-sample best
         best_post_min_sample = -1.0
-        best_excess_sample = float('inf')
+        best_excess_sample = float("inf")
         best_EL_before = math.inf
         best_EL_after  = math.inf
         best_pre_min   = 0.0
         best_restart   = -1
-        best_centers   = centers0.copy()
 
         for k in range(num_srp_restarts):
-            eps = 1e-6
             add_noise = (k > 0)
-            X_srp = SRP(X0, L, N, r, Imax, m, sigma, beta, add_noise)
-            X_srp_clip = np.clip(X_srp, -L/2 + eps, L/2 - eps)
-            EL_before = compute_EL(X_srp_clip, L, N, r)
+            X_srp = SRP_hardwall(X0, L, N, r, Imax, m_inner, sigma, beta, add_noise)
+            EL_before = float(compute_overlap_EL_abs(X_srp, L, N, r))
 
-            X_lo, EL_after = local_opt(X_srp_clip, L, N, r, tol_opt, maxiter_opt)
-
-            D_eff = X_lo.size // N
-            coords = X_lo.reshape((N, D_eff))
-            centers_opt = (coords + half) * scale + r
-            centers_opt = np.minimum(np.maximum(centers_opt, r + EPS_SMALL), L - r - EPS_SMALL)
-
-            diffs_pre = centers_opt[:, None, :] - centers_opt[None, :, :]
-            pre_min = np.min(np.linalg.norm(diffs_pre, axis=-1)[np.triu_indices(N, k=1)])
+            X_lo, EL_after = local_opt_projected(X_srp, L, N, r, tol_opt, maxiter_opt, lr=0.05)
+            centers_opt = X_lo.reshape((N, D))
+            pre_min = float(min_pairwise_distance(centers_opt))
 
             if physics_push_mode:
                 centers_k, _ = eliminate_overlaps_box(
@@ -675,11 +646,13 @@ def final_push_existing_samples():
                     max_iter=max_iter, dt=dt, tol=tol,
                     boundary_mode=mode_bnd, visualize=False, verbose=False
                 )
+                Xk = centers_k.astype(np.float64).ravel()
+                project_minwall_inplace(Xk, L, N, proj_iters=6)
+                centers_k = Xk.reshape((N, D))
             else:
                 centers_k = centers_opt
 
-            diffs_k = centers_k[:, None, :] - centers_k[None, :, :]
-            post_min = np.min(np.linalg.norm(diffs_k, axis=-1)[np.triu_indices(N, k=1)])
+            post_min = float(min_pairwise_distance(centers_k))
             excess = best_d - post_min
 
             with open(metrics_fn, "a") as mf:
@@ -687,7 +660,6 @@ def final_push_existing_samples():
 
             if post_min > best_post_min_sample:
                 best_post_min_sample = post_min
-                best_centers = centers_k.copy()
             if excess < best_excess_sample:
                 best_excess_sample = excess
                 best_EL_before = EL_before
@@ -695,7 +667,7 @@ def final_push_existing_samples():
                 best_pre_min   = pre_min
                 best_restart   = k + 1
 
-            data_out[s * num_srp_restarts + k] = centers_k.copy().T.astype(np.float32)
+            data_out[s * num_srp_restarts + k] = centers_k.T.astype(np.float32)
 
         min_dists.append(best_post_min_sample)
         best_EL_before_list[s] = best_EL_before
@@ -706,15 +678,14 @@ def final_push_existing_samples():
         best_restart_idx_list[s] = best_restart
 
     torch.save(torch.from_numpy(data_out), dataset_fn)
-    print(f"\nSaved pushed dataset:  {dataset_fn}, shape {data_out.data.shape}")
-    print(f"Saved pushed metrics:  {metrics_fn}")
+    print(f"[Save] Saved pushed dataset:  {dataset_fn}, shape {data_out.shape}")
+    print(f"[Save] Saved pushed metrics:  {metrics_fn}")
 
-    # Top-10 metrics (minimal excess)
     num_top10 = min(10, K)
     order_top10 = np.argsort(best_excess_list)[:num_top10]
     metrics_top10_fn = metrics_fn.replace(".csv", "_top10.csv")
     with open(metrics_top10_fn, "w") as mf:
-        mf.write("sample,EL_before,EL_after,pre_push_min,post_push_min,excess,srp_restart\n")
+        mf.write("sample,EL_before,EL_after,pre_min,post_min,excess,srp_restart\n")
         for idx in order_top10:
             mf.write(
                 f"{idx},"
@@ -725,31 +696,31 @@ def final_push_existing_samples():
                 f"{best_excess_list[idx]:.6f},"
                 f"{best_restart_idx_list[idx]}\n"
             )
-    print(f"Saved top-10 pushed metrics: {metrics_top10_fn}")
+    print(f"[Save] Saved top-10 pushed metrics: {metrics_top10_fn}")
     return dataset_fn
 
 # -----------------------------------------------------------------------------
 # Main mode switch
 # -----------------------------------------------------------------------------
-def main(state:PipelineState=None):
+def main(state: PipelineState = None):
     main_sec = "sample_generation_PP+PBTS"
     mode = _get_cfg(main_sec, "mode", "training_set_gen").strip().lower()
 
     if mode == "training_set_gen":
-        # Only look at the multi-sphere section here
         multi_sec = "sample_generation_PP+PBTS_multiple_sphere_num"
         multi_active = _get_cfg(multi_sec, "active", False)
 
         if multi_active:
             generate_dataset_push_srp_different_sphere_count()
         else:
-            data_save_path = generate_dataset_push_srp(verbose=False)
-            if state: state.set_samples_path(data_save_path)
+            path = generate_dataset_push_srp(verbose=False)
+            if state:
+                state.set_samples_path(path)
 
     elif mode == "final_push":
-        data_save_path = final_push_existing_samples()
-        if state: state.set_pushed_samples_path(data_save_path)
-
+        path = final_push_existing_samples()
+        if state:
+            state.set_pushed_samples_path(path)
     else:
         raise ValueError(f"Unknown mode '{mode}'. Use 'training_set_gen' or 'final_push'.")
 

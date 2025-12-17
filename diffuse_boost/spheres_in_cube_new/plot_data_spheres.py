@@ -290,9 +290,8 @@ def main():
     if len(sys.argv) > 1:
         files = sys.argv[1:]
     else:
-        files = ["diffuse_boost/output/spheres_in_cube_new/training_sets/srp_data_N191_2025-11-27_00-00-19.pt",
-                 "diffuse_boost/output/spheres_in_cube_new/generated_sets/spheres_gen_500x191_20251128_000000.pt",
-                 "diffuse_boost/output/spheres_in_cube_new/final_pushed/spheres_srp_pushed_N191_2025-11-28_002657.pt"]
+        files = ["diffuse_boost/output/spheres_in_cube_new/training_sets/2025-12-16/srp_data_N23_2025-12-16_17-24-47.pt",
+                 ]
 
     if not files:
         print("No files provided. Exiting.")
