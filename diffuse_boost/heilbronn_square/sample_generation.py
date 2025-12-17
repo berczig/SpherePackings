@@ -4,6 +4,14 @@ import platform
 if platform.system() == "Darwin" and os.environ.get("SPHEREPACK_DISABLE_KMP_HACK") != "1":
     os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
+import sys
+from pathlib import Path
+
+# Ensure repo root is importable when launching file directly from VS Code sub-workspaces
+_repo_root = Path(__file__).resolve().parents[2]
+if str(_repo_root) not in sys.path:
+    sys.path.insert(0, str(_repo_root))
+
 import math
 import numpy as np
 import torch
@@ -578,6 +586,8 @@ def final_push_existing_samples():
         raise ValueError(f"Config N={N} but input samples have N={N_in}")
 
     K = M_in
+    if K <= 0:
+        raise ValueError(f"final_push_input contains no samples (M={M_in}).")
     print(f"Pushing {K} of loaded {M_in} samples (N={N}) using K_active={K_active}")
     with open(metrics_fn, "w") as mf:
         mf.write("sample,min_triangle_area_before,min_triangle_area_after,t_star,success\n")
@@ -586,33 +596,35 @@ def final_push_existing_samples():
 
     with tqdm(total=K, desc="[Pushing Samples]", unit="sample") as pbar:
         for s in range(K):
+            pts0 = arr[s].T.astype(np.float64)
+            X0_  = pts0.ravel()
+
+            X_srp = srp_adaptive_points(
+                X0_, N,
+                Imax=Imax, m=m,
+                step_center=step_center,
+                beta_sched_decay=beta_sched, backtrack=backtrack,
+                w_wall=w_wall,
+                beta_softmin_start=beta_softmin0, beta_softmin_final=beta_softminF,
+                eps_abs=eps_abs,
+                topk_K=topk_K, topk_tol=topk_tol
+            )
+
+            x_star, t_star, res = local_optimize_points_maxmin_active(
+                X_srp, N, K_active,
+                gtol=gtol, ftol=ftol, maxiter=500
+            )
+            pts_star = x_star.reshape(N,2)
+            A_before = float(min_triangle_area(pts0, eps_abs))
+            A_after  = float(min_triangle_area(pts_star, eps_abs))
+
+            data[s,0,:] = pts_star[:,0].astype(np.float32)
+            data[s,1,:] = pts_star[:,1].astype(np.float32)
+
+            with open(metrics_fn, "a") as mf:
+                mf.write(f"{s},{A_before:.10f},{A_after:.10f},{t_star:.10f},{res.success}\n")
+
             pbar.update(1)
-
-        pts0 = arr[s].T.astype(np.float64)
-        X0_  = pts0.ravel()
-
-        X_srp = srp_adaptive_points(
-            X0_, N,
-            Imax=Imax, m=m,
-            step_center=step_center,
-            beta_sched_decay=beta_sched, backtrack=backtrack,
-            w_wall=w_wall,
-            beta_softmin_start=beta_softmin0, beta_softmin_final=beta_softminF,
-            eps_abs=eps_abs,
-            topk_K=topk_K, topk_tol=topk_tol
-        )
-
-        x_star, t_star, res = local_optimize_points_maxmin_active(X_srp, N, K_active,
-                                                                  gtol=gtol, ftol=ftol, maxiter=500)
-        pts_star = x_star.reshape(N,2)
-        A_before = float(min_triangle_area(pts0, eps_abs))
-        A_after  = float(min_triangle_area(pts_star, eps_abs))
-
-        data[s,0,:] = pts_star[:,0].astype(np.float32)
-        data[s,1,:] = pts_star[:,1].astype(np.float32)
-
-        with open(metrics_fn, "a") as mf:
-            mf.write(f"{s},{A_before:.10f},{A_after:.10f},{t_star:.10f},{res.success}\n")
 
     torch.save(torch.from_numpy(data), dataset_fn)
     print(f"\nSaved pushed dataset:  {dataset_fn}")

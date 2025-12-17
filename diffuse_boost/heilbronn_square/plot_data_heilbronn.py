@@ -161,9 +161,9 @@ def plot_3d(dataset, title="plot"):
 
 
 if __name__ == "__main__":
-    training_data = "diffuse_boost/output/heilbronn_square/training_sets/heilbronn_srp_600x13_2025-11-05_120626.pt"
-    gen_samples = "diffuse_boost/output/heilbronn_square/fixed_gen_sets/heilbronn_srp_pushed_2025-11-07_110336.pt"
-    pushed_samples = "diffuse_boost/output/heilbronn_square/fixed_gen_sets/heilbronn_srp_pushed_2025-11-06_092110.pt"
+    training_data = "diffuse_boost/output/heilbronn_square/training_sets/heilbronn_srp_1500x13_2025-12-15_180226.pt"
+    gen_samples = "diffuse_boost/output/heilbronn_square/generated_sets/heilbronn_gen_1500x13_20251216_182922.pt"
+    pushed_samples = "diffuse_boost/output/heilbronn_square/fixed_gen_sets/heilbronn_srp_pushed_2025-12-16_182924.pt"
 
     # if training data is a dict, let training_data be the tensor corresponding to key "pushed"
     td_loaded = torch.load(training_data)
