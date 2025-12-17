@@ -34,6 +34,20 @@ def _get_cfg(section, key, fallback):
     except Exception:
         return fallback
 
+
+def _set_cfg(section, key, value):
+    """Set a config value in the in-memory ConfigParser.
+
+    This is intentionally runtime-only (does not write back to disk).
+    """
+    from diffuse_boost import cfg
+    if not cfg.has_section(section):
+        cfg.add_section(section)
+    if isinstance(value, bool):
+        cfg.set(section, key, "true" if value else "false")
+    else:
+        cfg.set(section, key, str(value))
+
 # -----------------------------------------------------------------------------
 # Small utilities
 # -----------------------------------------------------------------------------
@@ -278,6 +292,23 @@ def apply_symmetries_to_data(data, L):
     data: (M, D, N)
     """
     M, D, N = data.shape
+
+    # The full hyperoctahedral symmetry group has size D! * 2^D.
+    # This explodes very quickly (e.g., D=12 -> ~2e12 transforms) and will
+    # effectively hang the pipeline. We guard and let the caller skip.
+    try:
+        num_syms = math.factorial(int(D)) * (2 ** int(D))
+    except Exception:
+        num_syms = float("inf")
+
+    # D=6 => 46,080 (OK). D=7 => 645,120 (already heavy). D>=8 is huge.
+    max_syms = 100_000
+    if num_syms > max_syms:
+        raise ValueError(
+            f"Symmetry enrichment skipped: D={D} would generate {num_syms} transforms (> {max_syms}). "
+            "Reduce dimension or disable symmetry enrichment."
+        )
+
     mats = get_cube_symmetry_matrices(D)
     out = np.zeros((M * len(mats), D, N), dtype=data.dtype)
     center = L / 2

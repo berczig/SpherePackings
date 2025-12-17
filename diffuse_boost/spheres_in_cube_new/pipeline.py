@@ -83,7 +83,7 @@ if __name__ == "__main__":
         # (Re)train Model
         # If we started from scratch (start) or explicitly requested training, do a clean train on the first loop.
         if i == 0 and start_at_step in ("start", "train_and_sampling"):
-            _set_cfg("flow_matching", "mode", "train_and_sampling")
+            _set_cfg("flow_matching", "mode", "training_and_sampling")
         else:
             _set_cfg("flow_matching", "mode", "retrain_and_sampling")
 
