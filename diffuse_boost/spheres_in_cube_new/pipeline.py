@@ -1,5 +1,6 @@
 import diffuse_boost
 import numpy
+import os
 from diffuse_boost import cfg
 from rich.console import Console
 
@@ -64,6 +65,12 @@ if __name__ == "__main__":
     if start_at_step == "start":
         _set_cfg("sample_generation_PP+PBTS", "mode", "training_set_gen")
         data_generation.main(state=state)
+        # Ensure flow-matching trains on the dataset we just generated.
+        if not state.samples_path:
+            raise RuntimeError("[Pipeline] training_set_gen completed but state.samples_path was not set.")
+        if not os.path.exists(state.samples_path):
+            raise FileNotFoundError(f"[Pipeline] Generated training dataset not found on disk: '{state.samples_path}'")
+        _set_cfg("flow_matching", "dataset_path", state.samples_path)
     elif start_at_step == "push":
         console.print(f"[Pipeline] [Start Push]", style="blue")
         _set_cfg("sample_generation_PP+PBTS", "mode", "final_push")
@@ -74,7 +81,8 @@ if __name__ == "__main__":
         console.print(f"[Pipeline] Iteration ({i+1}/{iterations})", style="blue")
 
         # (Re)train Model
-        if i == 0 and start_at_step == "train_and_sampling":
+        # If we started from scratch (start) or explicitly requested training, do a clean train on the first loop.
+        if i == 0 and start_at_step in ("start", "train_and_sampling"):
             _set_cfg("flow_matching", "mode", "train_and_sampling")
         else:
             _set_cfg("flow_matching", "mode", "retrain_and_sampling")
