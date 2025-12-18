@@ -55,7 +55,7 @@ if __name__ == "__main__":
     console = Console()
 
     iterations = _get_cfg("spheres_in_cube_new_pipeline", "iterations", 1)
-    start_at_step = _get_cfg("spheres_in_cube_new_pipeline", "start_at_step", "push")
+    start_at_step = _get_cfg("spheres_in_cube_new_pipeline", "start_at_step", "start")
 
     #"start", "train_and_sample", "push", "retrain_and_sample"
     state = PipelineState()
