@@ -11,12 +11,29 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 from itertools import combinations
+from datetime import datetime
 
 
 def load_dataset(file):
     if isinstance(file, torch.Tensor):
         return file
-    return torch.load(file)
+    loaded = torch.load(file)
+    # Some of our saved artifacts are dicts (e.g. {"pushed": tensor, ...}).
+    # For plotting, pick the most relevant tensor.
+    if isinstance(loaded, dict):
+        preferred_keys = ["pushed", "dataset", "data", "tensor"]
+        for key in preferred_keys:
+            value = loaded.get(key)
+            if isinstance(value, torch.Tensor):
+                return value
+        # Fallback: first tensor-like value in dict
+        for value in loaded.values():
+            if isinstance(value, torch.Tensor):
+                return value
+        raise ValueError(
+            f"Loaded a dict from '{file}', but it contained no torch.Tensor values. Keys={list(loaded.keys())}"
+        )
+    return loaded
 
 
 def _min_triangle_area_sample(points_2xn: np.ndarray) -> float:
@@ -73,12 +90,13 @@ def compute_metrics(tensor_data):
         # data_2n[idx] has shape (2, N)
         min_areas[idx] = _min_triangle_area_sample(data_2n[idx])
 
-    return {"min_triangle_areas": min_areas}
+    return {"min_triangle_areas": min_areas, "num_points": int(data_2n.shape[2])}
 
 
-def plot(Arrays, labels, savepath, n_bins=100,
+def plot(Arrays, labels, savepath=None, n_bins=100,
          title="Min Triangle Area", xlabel="Min Triangle Area",
-         ylabel="Frequency", plotmode="overlay", n_xticks=15):
+         ylabel="Frequency", plotmode="overlay", n_xticks=15,
+         save_dir=None, filename=None, show=False):
     max_val = -np.inf
     min_val = np.inf
     for values in Arrays:
@@ -128,22 +146,69 @@ def plot(Arrays, labels, savepath, n_bins=100,
     plt.xlim(min_val, max_val)
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
-    plt.show()
-    # If you prefer files:
-    # os.makedirs(savepath, exist_ok=True)
-    # plt.savefig(os.path.join(savepath, "min_triangle_area_hist.png"), dpi=150, bbox_inches="tight")
-    # plt.close()
+
+    out_dir = save_dir if save_dir is not None else savepath
+    if out_dir:
+        os.makedirs(out_dir, exist_ok=True)
+        out_name = filename if filename else "min_triangle_area_hist.png"
+        out_path = os.path.join(out_dir, out_name)
+        plt.savefig(out_path, dpi=150, bbox_inches="tight")
+
+    if show:
+        plt.show()
+    else:
+        plt.close()
 
 
 def plot_files_combined(files, labels, savepath, **kwargs):
     arrays_min_area = []
+    max_of_min_areas = []
+    n_points = None
     for file in files:
         dataset = load_dataset(file)
         metr = compute_metrics(dataset)
-        arrays_min_area.append(metr["min_triangle_areas"])
-    plot(Arrays=arrays_min_area, labels=labels, savepath=os.path.join(savepath, "min_triangle_area"),
-         title="Normalized Min Triangle Area Frequency",
-         xlabel="Min Triangle Area", ylabel="Frequency", **kwargs)
+        min_areas = metr["min_triangle_areas"]
+        arrays_min_area.append(min_areas)
+        max_of_min_areas.append(float(np.max(min_areas)) if len(min_areas) else float("nan"))
+        if n_points is None:
+            n_points = metr.get("num_points")
+
+    # Always save into the fixed Heilbronn output folder
+    save_dir = os.path.join(
+        "diffuse_boost", "output", "heilbronn_square", "fixed_gen_sets", "distribution_plots"
+    )
+    stamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+    n_tag = f"N{int(n_points)}" if n_points is not None else "Nunknown"
+    filename = f"heilbronn_min_triangle_area_hist_{n_tag}_{stamp}.png"
+
+    title_n = f" (N={int(n_points)})" if n_points is not None else ""
+    labels_with_stats = []
+    for base_label, v in zip(labels, max_of_min_areas):
+        if np.isfinite(v):
+            labels_with_stats.append(f"{base_label} (max minA={v:.6g})")
+        else:
+            labels_with_stats.append(f"{base_label} (max minA=n/a)")
+
+    plot(
+        Arrays=arrays_min_area,
+        labels=labels_with_stats,
+        save_dir=save_dir,
+        filename=filename,
+        show=False,
+        title=f"Normalized Min Triangle Area Frequency{title_n}",
+        xlabel="Min Triangle Area",
+        ylabel="Frequency",
+        **kwargs,
+    )
+
+
+def plot_named_datasets(datasets, **kwargs):
+    """datasets: list of (path_or_tensor, name)"""
+    if not datasets:
+        raise ValueError("datasets list is empty")
+    files = [p for (p, _) in datasets]
+    labels = [name for (_, name) in datasets]
+    plot_files_combined(files, labels, savepath="output", **kwargs)
 
 
 def plot_3d(dataset, title="plot"):
@@ -161,52 +226,29 @@ def plot_3d(dataset, title="plot"):
 
 
 if __name__ == "__main__":
-    training_data = "diffuse_boost/output/heilbronn_square/training_sets/heilbronn_srp_1500x13_2025-12-15_180226.pt"
-    gen_samples = "diffuse_boost/output/heilbronn_square/generated_sets/heilbronn_gen_1500x13_20251216_182922.pt"
-    pushed_samples = "diffuse_boost/output/heilbronn_square/fixed_gen_sets/heilbronn_srp_pushed_2025-12-16_182924.pt"
+    # Edit this list directly (no argparse):
+    # Each entry is (path_to_pt, label)
+    DATASETS = [
+        (
+            "diffuse_boost/output/heilbronn_square/training_sets/heilbronn_srp_1500x13_2025-12-15_180226.pt",
+            "Training data" 
+        ),
+        (
+            "diffuse_boost/output/heilbronn_square/fixed_gen_sets/heilbronn_srp_pushed_2025-12-17_092749.pt",
+            "1st iteration"
+        ),
+        (
+            "diffuse_boost/output/heilbronn_square/fixed_gen_sets/heilbronn_srp_pushed_2025-12-20_025749.pt","2nd iteration"
+        ),
+        (
+            "diffuse_boost/output/heilbronn_square/fixed_gen_sets/heilbronn_srp_pushed_2025-12-20_210041.pt", "3rd iteration"
+        ),
+    ]
 
-    # if training data is a dict, let training_data be the tensor corresponding to key "pushed"
-    td_loaded = torch.load(training_data)
-    if isinstance(td_loaded, dict):
-        training_data = td_loaded["pushed"]
+    plot_named_datasets(DATASETS)
 
-    plot_files_combined(
-        [training_data, gen_samples, pushed_samples],
-        ["Training data", "2nd iteration", "4th iteration"],
-        "output"
-    )
-
-    # Optional: print best min triangle area per set
-
-    training_data_tensor = load_dataset(training_data)
-    training_metrics = compute_metrics(training_data_tensor)
-    print("Max Min Triangle Area (Training Data):", np.max(training_metrics["min_triangle_areas"]))
-
-    sample_data_tensor = load_dataset(gen_samples)
-    sample_metrics = compute_metrics(sample_data_tensor)
-    print("Max Min Triangle Area (Generated Samples):", np.max(sample_metrics["min_triangle_areas"]))
-
-    pushed_samples_data = load_dataset(pushed_samples)
-    pushed_samples_metrics = compute_metrics(pushed_samples_data)
-    print("Max Min Triangle Area (SRP Pushed Samples):", np.max(pushed_samples_metrics["min_triangle_areas"]))
-
-    # Merge the top 50% of training, generated, and pushed samples into one tensor and save it for future plotting
-    def top_k_fraction(tensor_data, fraction):
-        metrics = compute_metrics(tensor_data)
-        min_areas = metrics["min_triangle_areas"]
-        k = max(1, int(len(min_areas) * fraction))
-        top_indices = np.argsort(min_areas)[-k:]
-        if isinstance(tensor_data, torch.Tensor):
-            return tensor_data[top_indices]
-        else:
-            return torch.tensor(tensor_data)[top_indices]
-    fraction = 0.5
-    top_training = top_k_fraction(training_data_tensor, fraction)
-    top_generated = top_k_fraction(sample_data_tensor, fraction)
-    top_pushed = top_k_fraction(pushed_samples_data, fraction)
-
-    merged_top = torch.cat([top_training, top_generated, top_pushed], dim=0)
-    #Create output directory if it doesn't exist
-    os.makedirs("diffuse_boost/output/heilbronn_square/fixed_gen_sets/merged_sets/", exist_ok=True)
-    merged_fn = f"diffuse_boost/output/heilbronn_square/fixed_gen_sets/merged_sets/heilbronn_srp_top{int(fraction*100)}pct_merged_{len(merged_top)}x{merged_top.shape[2]}_{np.datetime64('now').astype(str).replace(':','').replace(' ','_')}.pt"
-    torch.save(merged_top, merged_fn)
+    # Optional: print max(min triangle area) per dataset
+    for path, label in DATASETS:
+        tensor = load_dataset(path)
+        metrics = compute_metrics(tensor)
+        print(f"Max Min Triangle Area ({label}):", np.max(metrics["min_triangle_areas"]))

@@ -378,16 +378,32 @@ def main():
         # You can provide plot names directly in this list:
         #   files = [("path/to/file.pt", "Nice label"), ...]
         files = [
-            ("diffuse_boost/output/star_discrepancy/training_sets/star_srp_600x60_2025-12-16_094458.pt", "Training set"),
+            ("diffuse_boost/output/star_discrepancy/training_sets/star_srp_1000x20_2025-12-15_104724.pt", "Training set"),
+            #("diffuse_boost/output/star_discrepancy/generated_samples/star_gen_1000x20_20251215_135316.pt", "Generated"),
             (
-                "diffuse_boost/output/star_discrepancy/generated_samples/star_gen_600x60_20251216_192227.pt", "Generated"
+                "diffuse_boost/output/star_discrepancy/final_pushed/star_srp_pushed_2025-12-15_172541.pt", "1st iteration"
             ),
             (
-                "diffuse_boost/output/star_discrepancy/final_pushed/star_srp_pushed_2025-12-16_192228.pt", "Pushed"
+                "diffuse_boost/output/star_discrepancy/final_pushed/star_srp_pushed_2025-12-15_210502.pt",
+                "2nd iteration",
             ),
             #(
-            #    "diffuse_boost/output/star_discrepancy/final_pushed/star_srp_pushed_2025-12-15_210502.pt",
-            #    "3rd iteration",
+            #    "diffuse_boost/output/star_discrepancy/final_pushed/star_srp_pushed_2025-12-17_124855.pt",
+            #    "Pushed final",
+            #),
+            #("diffuse_boost/output/star_discrepancy/training_sets/star_srp_600x60_2025-12-16_094458.pt", "Training set"),
+            #    "diffuse_boost/output/star_discrepancy/generated_samples/star_gen_600x60_20251216_192227.pt", "Generated"
+            #),
+            #(
+            #    "diffuse_boost/output/star_discrepancy/final_pushed/star_srp_pushed_2025-12-16_192228.pt", "1st iteration"
+            #),
+            #(
+             #   "diffuse_boost/output/star_discrepancy/final_pushed/star_srp_pushed_2025-12-17_050355.pt",
+             #   "2nd iteration",
+            #),
+            #(
+            #    "diffuse_boost/output/star_discrepancy/final_pushed/star_srp_pushed_2025-12-17_124855.pt",
+            #    "Pushed final",
             #),
         ]
 

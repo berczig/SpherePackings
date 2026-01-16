@@ -1,5 +1,16 @@
 import os, platform
 
+# Allow running this file directly (e.g. `python path/to/plot_data_sumradii.py`)
+# without requiring an editable install. When executed as a script, Python only
+# adds this file's directory to sys.path, so the repo root isn't visible.
+if __name__ == "__main__" and __package__ in (None, ""):
+    import sys
+    from pathlib import Path
+
+    repo_root = Path(__file__).resolve().parents[2]
+    if str(repo_root) not in sys.path:
+        sys.path.insert(0, str(repo_root))
+
 import diffuse_boost
 # Quick unblock for macOS OpenMP duplication. Disable via:
 #   export SPHEREPACK_DISABLE_KMP_HACK=1
@@ -22,10 +33,10 @@ from datetime import datetime
 #   - (path_or_tensor,)  -> title auto-derived from file basename
 #   - path_or_tensor     -> title auto-derived from file basename
 PLOT_DATASETS = [
-     (r"diffuse_boost/output/circles_in_square/training_sets/circle_srp_generated_3000x30_2025-12-15_160956.pt", "Training data"),
-     (r"diffuse_boost/output/circles_in_square/fixed_gen_sets/circle_final_push_mod_3000x30_2025-12-15_163630.pt", "1st iteration"),
-     (r"diffuse_boost/output/circles_in_square/fixed_gen_sets/circle_final_push_mod_3000x30_2025-12-15_172158.pt", "2nd iteration"),
-     (r"diffuse_boost/output/circles_in_square/fixed_gen_sets/circle_final_push_mod_3000x30_2025-12-15_175913.pt", "3rd iteration"),
+     (r"diffuse_boost/output/circles_in_square/training_sets/circle_srp_generated_3000x26_2025-12-15_161340.pt", "Training data"),
+     (r"diffuse_boost/output/circles_in_square/generated_sets/flow_centers_only_gen_20251215_172211.pt", "Generated samples"),
+     (r"diffuse_boost/output/circles_in_square/fixed_gen_sets/circle_final_push_mod_3000x26_2025-12-15_172216.pt", "Pushed samples"),
+     #(r"diffuse_boost/output/circles_in_square/fixed_gen_sets/circle_final_push_mod_3000x26_2025-12-15_175708.pt", "3rd iteration"),
     ]
 
 save_dir = "diffuse_boost/output/circles_in_square/fixed_gen_sets/distribution_plots"  # where to save the plot PNG

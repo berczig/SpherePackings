@@ -1,4 +1,16 @@
 import os
+
+# Allow running this file directly (e.g. `python path/to/pipeline_heilbronn.py`)
+# without requiring an editable install. When executed as a script, Python only
+# adds this file's directory to sys.path, so the repo root isn't visible.
+if __name__ == "__main__" and __package__ in (None, ""):
+    import sys
+    from pathlib import Path
+
+    repo_root = Path(__file__).resolve().parents[2]
+    if str(repo_root) not in sys.path:
+        sys.path.insert(0, str(repo_root))
+
 from rich.console import Console
 
 import diffuse_boost
