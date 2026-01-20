@@ -10,6 +10,12 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+from tqdm import tqdm
+from pathlib import Path
+
+from diffuse_boost.spheres_in_cube_new.pipeline import PipelineState
+from diffuse_boost.spheres_in_cube_new.flow_matching_spheres import calculate_min_sep
+from diffuse_boost.spheres_in_cube.best_results import load_best_results
 
 
 # ============================================================
@@ -54,7 +60,18 @@ def load_dataset(file):
     raw = load_raw(file)
     return extract_tensor(raw)
 
-
+def get_all_file_names(folder:str, labeler:callable):
+    """
+    Returns a list of relative paths (folder + filename) 
+    sorted alphabetically.
+    """
+    path = Path(folder)
+    
+    # f is the full path object; we convert to string to get the relative path
+    # We filter with .is_file() to exclude subfolders
+    files = sorted([(str(f), labeler(index)) for index, f in enumerate(path.iterdir()) if f.is_file()])
+    print("files:", files)
+    return files
 # ============================================================
 # Geometry: min pair distance & radii
 # ============================================================
@@ -77,6 +94,9 @@ def _min_pairwise_distance_sample(points_nd: np.ndarray) -> float:
                 best = d
     return float(best if np.isfinite(best) else 0.0)
 
+def compute_radii2(tensor_data):
+    min_dists = calculate_min_sep(tensor_data, len(tensor_data), chunk=128)
+    return {"radii": 0.5*min_dists.numpy(), "min_distances": min_dists.numpy()}
 
 def compute_radii(tensor_data):
     """
@@ -103,12 +123,17 @@ def compute_radii(tensor_data):
     min_dists = np.empty(M, dtype=np.float64)
     radii = np.empty(M, dtype=np.float64)
 
-    for idx in range(M):
+    # min_dists2 = calculate_min_sep(torch.tensor(data_d_n), M, chunk=128)
+    for idx in tqdm(range(M)):
         # data_d_n[idx]: (d, N) -> (N, d)
         pts = data_d_n[idx].T.astype(np.float64, copy=False)
         md = _min_pairwise_distance_sample(pts)
         min_dists[idx] = md
         radii[idx] = 0.5 * md
+    # diff = torch.tensor(min_dists)-min_dists2
+    # print("diff: ", diff)
+    # print(torch.sum(torch.abs(diff)))
+
 
     return {"radii": radii, "min_distances": min_dists}
 
@@ -116,6 +141,34 @@ def compute_radii(tensor_data):
 # ============================================================
 # Plotting utilities
 # ============================================================
+
+def plot_double_1D(data1, data2, data1_label, data2_label, x_label, y_label, title, horizontal_value=None, horizontal_label=None):
+
+    # 2. Create figure and axes (Object-Oriented style)
+    fig, ax = plt.subplots(figsize=(8, 5))
+
+    # 3. Plot the data
+    # If you only provide one array, it is used as y-values and 
+    # x-values are automatically generated as indices (0, 1, 2...)
+    ax.plot(data1, marker='o', linestyle='-', color='b', label=data1_label)
+    ax.plot(data2, marker='o', linestyle='-', color='r', label=data2_label)
+
+    if horizontal_value:
+        ax.axhline(y=0.090490, color='g', linestyle='-', linewidth=2, label=horizontal_label)
+
+    # 4. Customize labels and title
+    ax.set_title(title, fontsize=14)
+    ax.set_xlabel(x_label)
+    ax.set_ylabel(y_label)
+
+    # 5. Enhance visuals (2026 Best Practices)
+    ax.grid(True, linestyle='--', alpha=0.7) # Add subtle grid
+    ax.legend()                              # Display the legend
+    plt.tight_layout()                       # Adjust layout to prevent clipping
+
+    # 6. Save or Show
+    # plt.savefig("plot_2026.png", dpi=300)  # Save at high resolution
+    plt.show()
 
 def plot(Arrays, labels, savepath,
          n_bins=100,
@@ -215,7 +268,7 @@ def plot(Arrays, labels, savepath,
         plt.close()
 
 
-def plot_files_combined(files, labels, savepath, **kwargs):
+def plot_files_combined(files, labels, savepath, title, **kwargs):
     """
     files: list of .pt paths (or tensors)
     labels: list of labels (same length)
@@ -223,18 +276,38 @@ def plot_files_combined(files, labels, savepath, **kwargs):
     kwargs: forwarded to plot(...)
     """
     arrays_radii = []
-    for file in files:
+    radius_averages = []
+    radius_maxs = []
+    for i, file in enumerate(files):
         dataset = load_dataset(file)
-        metr = compute_radii(dataset)
+        metr = compute_radii2(dataset)
+        #print("metr: ", metr)
         arrays_radii.append(metr["radii"])
+        radius_avg = np.mean(metr['radii'])
+        radius_max = np.max(metr['radii'])
+        radius_averages.append(radius_avg)
+        radius_maxs.append(radius_max)
+        labels[i] = f"{labels[i]}, max radius = {radius_max:.6f}, avg. radius = {radius_avg:.6f}"
+
+    num_spheres = dataset.shape[2]
+    best_cube_lengths = load_best_results()
+    try:
+        best_radius = 1/best_cube_lengths[num_spheres]
+    except:
+        best_radius = 0.0
+    title = f"{title}, {num_spheres} Spheres, best radius = {best_radius:.6f}"
 
     plot(Arrays=arrays_radii,
          labels=labels,
          savepath=savepath,
-         title="Sphere radius distribution",
+         title=title if title else "Sphere radius distribution" ,
          xlabel="Effective radius (min distance / 2)",
          ylabel="Frequency",
          **kwargs)
+    
+    # avg and radius plot
+    plot_double_1D(radius_maxs, radius_averages, "Max. radius", "Avg radius", "Pipeline loop", "", "Avg. and Max. Radius per Pipeline step", best_radius, "radius to beat")
+
 
 
 # ============================================================
@@ -282,7 +355,7 @@ def plot_3d(dataset, title="plot"):
 # Main: interactive multi-file radius plots
 # ============================================================
 
-def main():
+def main(state:PipelineState=None):
     # Usage 1: pass files as command-line arguments
     #   python plot_radii.py file1.pt file2.pt ...
     # Usage 2: run with no args, enter paths interactively
@@ -290,46 +363,92 @@ def main():
     if len(sys.argv) > 1:
         files = sys.argv[1:]
     else:
-        files = ["diffuse_boost/output/spheres_in_cube_new/training_sets/2025-12-17/srp_data_N31_2025-12-17_10-47-49.pt",
-                 "diffuse_boost/output/spheres_in_cube_new/generated_sets/2025-12-17/spheres_gen_800x31_20251217_114311.pt",
-            "diffuse_boost/output/spheres_in_cube_new/final_pushed/2025-12-17/spheres_srp_pushed_N31_2025-12-17_114311.pt"
-                 ]
+        # files = ["diffuse_boost/output/spheres_in_cube_new/training_sets/srp_data_N191_2025-11-27_00-00-19.pt",
+        #          "diffuse_boost/output/spheres_in_cube_new/generated_sets/spheres_gen_500x191_20251128_000000.pt",
+        #          "diffuse_boost/output/spheres_in_cube_new/final_pushed/spheres_srp_pushed_N191_2025-11-28_002657.pt"]
+        
+        # files = ["diffuse_boost/output/spheres_in_cube_new/generated_sets/spheres_gen_500x191_20251128_000000.pt",
+        #          "diffuse_boost/output/spheres_in_cube_new/generated_sets/spheres_gen_500x191_20251128_094024_w=0.pt"]
+        
+        # files = ["diffuse_boost/output/spheres_in_cube_new/training_sets/2025-11-27/srp_data_N191_2025-11-27_00-00-19.pt",
+        #          "diffuse_boost/output/spheres_in_cube_new/final_pushed/2025-11-29/spheres_srp_pushed_N191_2025-11-29_041209.pt",
+        #          "diffuse_boost/output/spheres_in_cube_new/final_pushed/2025-11-29/spheres_srp_pushed_N191_2025-11-29_073551.pt",
+        #          "diffuse_boost/output/spheres_in_cube_new/final_pushed/2025-11-29/spheres_srp_pushed_N191_2025-11-29_105908.pt",
+        #          "diffuse_boost/output/spheres_in_cube_new/final_pushed/2025-11-29/spheres_srp_pushed_N191_2025-11-29_154519.pt",
+        #          "diffuse_boost/output/spheres_in_cube_new/final_pushed/2025-11-29/spheres_srp_pushed_N191_2025-11-29_211112.pt",]
+        
+        # files= ["diffuse_boost/output/spheres_in_cube_new/final_pushed/spheres_srp_pushed_N191_2025-11-28_002657.pt"]
+
+        files = [("diffuse_boost/output/spheres_in_cube_new/training_sets/2025-12-04/srp_data_N191_2025-12-04_01-50-14.pt", "Training"),
+                 ("diffuse_boost/output/spheres_in_cube_new/best_merge/2025-12-04/merge_20251204_064146.pt",  "Push1"),
+                 ("diffuse_boost/output/spheres_in_cube_new/best_merge/2025-12-04/merge_20251204_100128.pt",  "Push2"),
+                 ("diffuse_boost/output/spheres_in_cube_new/best_merge/2025-12-04/merge_20251204_131713.pt",  "Push3"),
+                 ("diffuse_boost/output/spheres_in_cube_new/best_merge/2025-12-04/merge_20251204_163338.pt",  "Push4"),
+                 ("diffuse_boost/output/spheres_in_cube_new/best_merge/2025-12-04/merge_20251204_203037.pt",  "Push5"),
+                 ("diffuse_boost/output/spheres_in_cube_new/best_merge/2025-12-05/merge_20251205_045225.pt",  "Push6"),
+                 ("diffuse_boost/output/spheres_in_cube_new/best_merge/2025-12-05/merge_20251205_073550.pt",  "Push7"),]
+        
+        files = [("diffuse_boost/output/spheres_in_cube_new/training_sets/2025-12-08/srp_data_N79_2025-12-08_10-35-35.pt", "Training"),
+                 ("diffuse_boost/output/spheres_in_cube_new/best_merge/2025-12-08/merge_20251208_113954.pt",  "Push1"),
+                 ("diffuse_boost/output/spheres_in_cube_new/best_merge/2025-12-08/merge_20251208_140034.pt",  "Push4")]
+        
+        files = [("diffuse_boost/spheres_in_cube_new/my_test_data.pt", "2 spheres"),
+                 ("diffuse_boost/output/spheres_in_cube_new/final_pushed/2025-12-12/spheres_srp_pushed_N2_2025-12-12_103429.pt", "10, pushed, radius=0.1"),
+                 ("diffuse_boost/output/spheres_in_cube_new/final_pushed/2025-12-12/spheres_srp_pushed_N2_2025-12-12_103347.pt", "10, pushed, radius=0.3"),
+                 ("diffuse_boost/output/spheres_in_cube_new/final_pushed/2025-12-12/spheres_srp_pushed_N2_2025-12-12_104038.pt", "10, pushed, radius=0.55"),]
+        
+        files = [("diffuse_boost/spheres_in_cube_new/my_test_data2.pt", "2 spheres"),
+                 ("diffuse_boost/output/spheres_in_cube_new/final_pushed/2025-12-12/spheres_srp_pushed_N3_2025-12-12_104658.pt", "10, pushed, radius=0.05"),
+                 ("diffuse_boost/output/spheres_in_cube_new/final_pushed/2025-12-12/spheres_srp_pushed_N3_2025-12-12_104755.pt", "10, pushed, radius=0.4"),
+                 ("diffuse_boost/output/spheres_in_cube_new/final_pushed/2025-12-12/spheres_srp_pushed_N3_2025-12-12_110205.pt", "10, pushed, radius=0.4 no stat"),]
+        
+        files = [("diffuse_boost/output/spheres_in_cube_new/2026_experiments/191/3/training.pt", "training"),
+                 ("diffuse_boost/output/spheres_in_cube_new/2026_experiments/191/3/merge5.pt", "iteration 5"),
+                 ("diffuse_boost/output/spheres_in_cube_new/2026_experiments/191/3/merge10.pt", "iteration 10"),
+                 ("diffuse_boost/output/spheres_in_cube_new/2026_experiments/191/3/merge15.pt", "iteration 15")]
+        
+        files = [("diffuse_boost/output/spheres_in_cube_new/2026_experiments/191/1/training.pt", "training"),
+                 ("diffuse_boost/output/spheres_in_cube_new/2026_experiments/191/1/merge1.pt", "iteration 1"),
+                 ("diffuse_boost/output/spheres_in_cube_new/2026_experiments/191/1/merge5.pt", "iteration 5"),]
+        
+        merges = get_all_file_names(folder="diffuse_boost/output/spheres_in_cube_new/2026_experiments/191/4_100_trainsize", labeler = lambda it: f"Iteration {it+1}")
+        # [merges[i] for i in [0,42]]
+        files = [("diffuse_boost/output/spheres_in_cube_new/2026_experiments/191/4_100_trainsize/training/srp_data_N191_2026-01-18_03-57-04.pt", "training")] + [merges[-1]]
+                 
+
+        
+        
 
     if not files:
         print("No files provided. Exiting.")
         sys.exit(0)
 
-    labels = []
-    for f in files:
-        default_label = os.path.splitext(os.path.basename(str(f)))[0]
-        lab = input(f"Label for {f} (default: {default_label}): ").strip()
-        if not lab:
-            lab = default_label
-        labels.append(lab)
+    title = "Sphere Radius"
 
     out_dir_default = "diffuse_boost/output/spheres_in_cube_new/distribution_plots"
-    out_dir = input(f"Output directory for plots (default: {out_dir_default}): ").strip()
+    out_dir = "default" # input(f"Output directory for plots (default: {out_dir_default}): ").strip()
     if not out_dir:
         out_dir = out_dir_default
     else:
         out_dir = os.path.join(out_dir_default, out_dir)
 
     plot_files_combined(
-        files,
-        labels,
+        files=[file[0] for file in files],
+        labels=[file[1] for file in files],
         savepath=out_dir,
         plotmode="overlay",   # or "stacked"
         n_bins=80,
+        title=title,
         show=True,
         filename="sphere_radii_hist.png",
     )
 
     # Optional: print max radius per set
-    print("\n=== Summary: max effective radius per dataset ===")
-    for f, lab in zip(files, labels):
-        td = load_dataset(f)
-        metr = compute_radii(td)
-        print(f"{lab}: max radius = {np.max(metr['radii']):.6f} (over {len(metr['radii'])} samples)")
+    # print("\n=== Summary: max effective radius per dataset ===")
+    # for f, lab in files:
+    #     td = load_dataset(f)
+    #     metr = compute_radii2(td)
+    #     print(f"{lab}: max radius = {np.max(metr['radii']):.6f}, avg. radius = {np.mean(metr['radii'])} ({len(metr['radii'])} samples)")
 
 
 if __name__ == "__main__":
