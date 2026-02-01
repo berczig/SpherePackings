@@ -73,10 +73,10 @@ class PipelineState:
 
 if __name__ == "__main__":
     # Avoid Circular imports
-    from diffuse_boost.spheres_in_cube_new2.data_generation import _get_cfg, _set_cfg
-    from diffuse_boost.spheres_in_cube_new2 import data_generation
-    from diffuse_boost.spheres_in_cube_new2 import flow_matching_spheres
-    from diffuse_boost.spheres_in_cube_new2 import plot_data_spheres
+    from diffuse_boost.spheres_in_cube_12d.data_generation import _get_cfg, _set_cfg
+    from diffuse_boost.spheres_in_cube_12d import data_generation
+    from diffuse_boost.spheres_in_cube_12d import flow_matching_spheres
+    from diffuse_boost.spheres_in_cube_12d import plot_data_spheres
 
     # Color 
     console = Console()
