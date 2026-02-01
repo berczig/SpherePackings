@@ -1617,7 +1617,13 @@ def main(state:PipelineState=None):
     resume_path = cfg.get(sec, "resume_model_path", fallback="").strip()
     model_path = resume_path
 
+    use_rg_after_train = cfg.getboolean("spheres_in_cube_new_pipeline", "use_rg_cfm", fallback=False)
+
     if mode == "training_and_sampling":
+        # If RG-CFM is enabled, optionally warm-start from the last fine-tuned checkpoint.
+        if use_rg_after_train and resume_path:
+            model, opt = load_model_if_exists(model, opt, resume_path, device)
+
         # Supervised training
         model, hist, model_path = train_flow_model(
             model, opt, train_loader, epochs,
@@ -1634,7 +1640,6 @@ def main(state:PipelineState=None):
             state.set_model_path(model_path)
 
         # Optional RG-CFM immediately after training
-        use_rg_after_train = cfg.getboolean("spheres_in_cube_new_pipeline", "use_rg_cfm", fallback=False)
         if use_rg_after_train:
             # Ensure RG-CFM starts from the checkpoint we just trained 
             ref_path = (state.model_path if (state and getattr(state, "model_path", "")) else model_path)
@@ -1716,6 +1721,29 @@ def main(state:PipelineState=None):
             small_t_weight=small_t_weight,
             small_t_gamma=small_t_gamma,
         )
+
+        # Optional RG-CFM immediately after retraining
+        if use_rg_after_train:
+            ref_path = model_path
+            if ref_path:
+                cfg.set(sec, "rg_ref_path", ref_path)
+                cfg.set(sec, "resume_model_path", ref_path)
+            print("[flow_matching] Starting RG-CFM immediately after supervised retraining.")
+            ft_path = rg_cfm_main(state=state)
+            # Make the fine-tuned checkpoint discoverable for any subsequent reload/sampling codepaths.
+            if ft_path:
+                cfg.set(sec, "rg_ref_path", ft_path)
+                cfg.set(sec, "resume_model_path", ft_path)
+            # Reload the fine-tuned model into memory before sampling
+            if state and state.model_path:
+                model, opt = load_model_if_exists(model, opt, state.model_path, device)
+                model_path = state.model_path
+            elif ft_path:
+                model, opt = load_model_if_exists(model, opt, ft_path, device)
+                model_path = ft_path
+            else:
+                model, opt = load_model_if_exists(model, opt, cfg.get(sec, "resume_model_path", fallback="").strip(), device)
+
         samples = sample_flow_model(
             model, opt, num_new, batch_n, points_N,
             device, sphere_radius, 0.0, clip_range, d,

@@ -104,20 +104,18 @@ if __name__ == "__main__":
     for i in range(iterations):
         console.print(f"[Pipeline] Iteration ({i+1}/{iterations})", style="blue")
 
-        if use_rg_cfm:
-            # Single call: training_and_sampling now handles RG-CFM internally (if enabled) then samples
+        # (Re)train Model
+        if i == 0 and start_at_step in ["train_and_sampling", "training_and_sampling", "start"]:
             _set_cfg("flow_matching", "mode", "training_and_sampling")
-            console.print(f"[Pipeline] [Start training_and_sampling (with RG-CFM enabled)] - Iteration ({i+1}/{iterations}); mode={_get_cfg('flow_matching','mode','')}", style="blue")
-            flow_matching_spheres.main(state=state)
         else:
-            # (Re)train Model
-            if i == 0 and start_at_step in ["train_and_sampling", "training_and_sampling", "start"]:
-                _set_cfg("flow_matching", "mode", "training_and_sampling")
-            else:
-                _set_cfg("flow_matching", "mode", "retrain_and_sampling")
+            _set_cfg("flow_matching", "mode", "retrain_and_sampling")
 
+        if use_rg_cfm:
+            console.print(f"[Pipeline] [Start {_get_cfg('flow_matching','mode','')} (RG-CFM enabled)] - Iteration ({i+1}/{iterations}); mode={_get_cfg('flow_matching','mode','')}", style="blue")
+        else:
             console.print(f"[Pipeline] [Start retraining and sampling] - Iteration ({i+1}/{iterations}); mode={_get_cfg('flow_matching','mode','')}", style="blue")
-            flow_matching_spheres.main(state=state)
+
+        flow_matching_spheres.main(state=state)
 
         _set_cfg("sample_generation_PP+PBTS", "final_push_input", state.samples_path)
         _set_cfg("flow_matching", "resume_model_path", state.model_path)
