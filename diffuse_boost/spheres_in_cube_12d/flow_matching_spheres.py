@@ -228,10 +228,50 @@ def distance_penalty(output, radius, margin=0.0, beta=10.0, p=2, q=0.05, eps=1e-
     topk, _ = torch.topk(v, k=k, dim=1, largest=True, sorted=False)
     return topk.mean()
 
+@torch.no_grad()
+def project_minwall_reflect_torch(x: torch.Tensor, L: float, 
+                                  proj_iters: int = 3, eps: float = 1e-8) -> torch.Tensor:
+    """
+    Iteratively enforces x in [m(X), L-m(X)]^d with m(X)=0.5*d_min(X),
+    using reflection (not clipping).
 
-def _box_clamp(x, r, L):
-    # Snap to [r, L-r] per coordinate
-    return x.clamp(r, L - r)
+    x: (B, d, N)
+    """
+    B, d, N = x.shape
+    L = float(L)
+
+    # stabilize NaNs/Infs first
+    mid = 0.5 * L
+    x = torch.nan_to_num(x, nan=mid, posinf=L - eps, neginf=eps)
+    for _ in range(int(proj_iters)):
+        P = x.permute(0, 2, 1).contiguous()                     # (B, N, d)
+        D = torch.cdist(P, P)                                   # (B, N, N)
+        eye = torch.eye(N, device=x.device, dtype=torch.bool)[None]
+        D = D.masked_fill(eye, float("inf"))
+        dmin = D.amin(dim=-1).amin(dim=-1)                      # (B,)
+        m = 0.5 * dmin                                          # (B,)
+        m = m.clamp(min=0.0, max=0.5 * L - eps)
+
+        a = m.view(B, 1, 1)
+        b = (L - m).view(B, 1, 1)
+        length = (b - a).clamp_min(eps)
+        twoL = 2.0 * length
+
+        # reflect into [a,b]
+        v = x - a
+        v = v - twoL * torch.floor(v / twoL)
+        v = torch.where(v > length, twoL - v, v)
+        x = a + v
+
+    return x
+
+
+def _clamp_box(x):
+    # Safety net: clamp does not remove NaNs.
+    #mid = 0.5 * (r + (L - r))
+    #x = torch.nan_to_num(x, nan=mid, posinf=(L - r), neginf=r)
+    x = project_minwall_reflect_torch(x, L=1.0, proj_iters=4)
+    return x#.clamp(r, L - r)
 
 
 def sample_t(B, device, small_t_weight=0.5, gamma=2.0):
@@ -374,6 +414,18 @@ class RGCFMTrainer:
         self.prox_lambda = float(config.get("prox_lambda", 2.0))
         self.final_passes = int(config.get("final_passes", 6))
         self.tol_finish = float(config.get("tol_finish", 1e-8))
+        #geometry-aware exploration
+        # explore_magnitude is dimensionless; actual step size ~ explore_magnitude * sphere_radius
+        self.explore_magnitude = float(config.get("explore_magnitude", 0.0))
+        self.explore_contact_frac = float(config.get("explore_contact_frac", 1.0))
+        self.explore_local_frac = float(config.get("explore_local_frac", 0.25))
+        # make exploration stronger when overlap is large
+        self.explore_overlap_gain = float(config.get("explore_overlap_gain", 1.0))
+        self.explore_scale_cap = float(config.get("explore_scale_cap", 4.0))
+        #ensure exploration does not redefine the data manifold
+        self.repair_after_explore = bool(config.get("repair_after_explore", True))
+
+
 
         self.history = []
         self.global_step = 0
@@ -388,6 +440,260 @@ class RGCFMTrainer:
         self.net_model.load_state_dict(sd, strict=True)
         self.ref_model.load_state_dict(sd)
         self.ref_model.eval()
+
+    @torch.no_grad()
+    def project_minwall_reflect_torch(x: torch.Tensor, L: float, 
+                                      proj_iters: int = 3, eps: float = 1e-8) -> torch.Tensor:
+        """
+        Iteratively enforces x in [m(X), L-m(X)]^d with m(X)=0.5*d_min(X),
+        using reflection (not clipping).
+    
+        x: (B, d, N)
+        """
+        B, d, N = x.shape
+        L = float(L)
+    
+        # stabilize NaNs/Infs first
+        mid = 0.5 * L
+        x = torch.nan_to_num(x, nan=mid, posinf=L - eps, neginf=eps)
+    
+        for _ in range(int(proj_iters)):
+            P = x.permute(0, 2, 1).contiguous()                     # (B, N, d)
+            D = torch.cdist(P, P)                                   # (B, N, N)
+            eye = torch.eye(N, device=x.device, dtype=torch.bool)[None]
+            D = D.masked_fill(eye, float("inf"))
+            dmin = D.amin(dim=-1).amin(dim=-1)                      # (B,)
+            m = 0.5 * dmin                                          # (B,)
+            m = m.clamp(min=0.0, max=0.5 * L - eps)
+    
+            a = m.view(B, 1, 1)
+            b = (L - m).view(B, 1, 1)
+            length = (b - a).clamp_min(eps)
+            twoL = 2.0 * length
+    
+            # reflect into [a,b]
+            v = x - a
+            v = v - twoL * torch.floor(v / twoL)
+            v = torch.where(v > length, twoL - v, v)
+            x = a + v
+    
+        return x
+
+
+    @torch.no_grad()
+    def _repair_feasible(self, x: torch.Tensor, *, max_iters: int = None, tol: float = None) -> torch.Tensor:
+        """
+        Deterministic overlap repair for hard spheres in [r, L-r]^d.
+        Runs a few GN-like projection iterations until max overlap <= tol.
+
+        x: (B, d, N)
+        Returns: repaired x, same shape, box-clamped.
+        """
+        B, d, N = x.shape
+        device = x.device
+        r = float(self.sphere_radius)
+        L = float(self.clip_range)
+
+        # Use existing knobs; scale up iterations for "near-zero overlap" repair
+        if max_iters is None:
+            max_iters = max(20, 5 * int(self.proj_outer_iters))
+        if tol is None:
+            # tol_finish=1e-8 is too strict for float32; use a practical threshold.
+            tol = max(1e-6, float(self.tol_finish))
+
+        # Always repair using ALL active overlaps (do not subsample contacts)
+        q_repair = 1.0
+        alpha = float(self.alpha_proj)
+        wall_weight = float(self.wall_weight)
+        wall_margin = float(self.wall_margin)
+
+        def clamp_box(u):
+            mid = 0.5 * (r + (L - r))
+            u = torch.nan_to_num(u, nan=mid, posinf=(L - r), neginf=r)
+            return u.clamp(r, L - r)
+
+        def wall_push(u):
+            if wall_weight <= 0.0:
+                return torch.zeros_like(u)
+            thr = wall_margin * (2.0 * r)
+            delta = torch.zeros_like(u)
+            for ax in range(d):
+                dl = u[:, ax, :] - r
+                dh = (L - r) - u[:, ax, :]
+                near_low  = dl < thr
+                near_high = dh < thr
+                delta[:, ax, :] += torch.where(near_low,  (thr - dl), torch.zeros_like(dl))
+                delta[:, ax, :] -= torch.where(near_high, (thr - dh), torch.zeros_like(dh))
+            return wall_weight * delta
+
+        x = clamp_box(x)
+
+        for _ in range(int(max_iters)):
+            # compute overlaps without noise
+            P = x.permute(0, 2, 1).contiguous()                 # (B, N, d)
+            diff = P[:, :, None, :] - P[:, None, :, :]         # (B, N, N, d)
+            dist = diff.norm(dim=-1).clamp_min(1e-12)          # (B, N, N)
+            overlap = (2.0 * r - dist)                         # (B, N, N), positive => overlap
+
+            eye = torch.eye(N, device=device, dtype=torch.bool)[None]
+            overlap = overlap.masked_fill(eye, 0.0)
+
+            max_ov = overlap.clamp_min(0.0).amax(dim=(1, 2))    # (B,)
+            if float(max_ov.max()) <= tol:
+                break
+
+            active = overlap > 0.0
+            if q_repair < 1.0 and active.any():
+                # (kept for completeness; q_repair=1.0 by default)
+                flat = overlap.clone()
+                flat[~active] = float("-inf")
+                thr = torch.quantile(flat.view(B, -1), 1.0 - q_repair, dim=1, keepdim=True).view(B, 1, 1)
+                active = active & (overlap >= thr)
+
+            n = (diff / dist.unsqueeze(-1))                    # (B, N, N, d)
+
+            # GN-like contact relief (same structure as your sampler)
+            w = 0.5 * overlap * active.float()                 # (B, N, N)
+            term_i = (w.unsqueeze(-1) * n).sum(dim=2)          # (B, N, d)
+            term_j = (w.transpose(1, 2).unsqueeze(-1) * n.transpose(1, 2)).sum(dim=2)  # (B, N, d)
+            delta_pairs = (term_i - term_j)                    # (B, N, d)
+
+            deg = active.float().sum(dim=2, keepdim=True).clamp_min(1.0)  # (B, N, 1)
+            delta_pairs = (delta_pairs / deg).permute(0, 2, 1)            # (B, d, N)
+
+            delta = delta_pairs + wall_push(x)
+            x = clamp_box(x + alpha * delta)
+
+        return x
+
+
+    @torch.no_grad()
+    def _explore_actions(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Geometry-aware exploration operator E(x' | x) for static sphere packings.
+
+        x: (B, d, N) configurations sampled from the current flow policy.
+        Returns: explored configurations x', same shape, box-clamped.
+
+        Exploration direction is built from:
+          - contact overlaps and normals (pairwise constraints),
+          - soft wall pushes near the box boundaries,
+        then normalized and scaled to have magnitude ~ explore_magnitude * sphere_radius,
+        with optional additional local jitter.
+        """
+        M = self.explore_magnitude
+        if M <= 0.0:
+            return x  # exploration disabled
+
+        B, d, N = x.shape
+        device = x.device
+        r = self.sphere_radius
+        L = self.clip_range
+
+        # --- 1) Compute overlaps and normals (contact graph) ---
+        # P: (B, N, d)
+        P = x.permute(0, 2, 1).contiguous()
+        if self.eps_nrm > 0.0:
+            P = P + (self.eps_nrm * r) * torch.randn_like(P)
+
+        # pairwise differences and distances
+        diff = P[:, :, None, :] - P[:, None, :, :]    # (B, N, N, d)
+        dist = diff.norm(dim=-1).clamp_min(1e-12)     # (B, N, N)
+        n = diff / dist.unsqueeze(-1)                 # (B, N, N, d), unit normals i<-j
+
+        overlap = (2.0 * r - dist)                    # positive => penetrating
+        eye = torch.eye(N, device=device, dtype=torch.bool)[None]  # (1, N, N)
+        overlap = overlap.masked_fill(eye, 0.0)       # no self-overlap
+
+        # active contact mask, possibly top-q by overlap magnitude
+        pos = overlap > 0.0                           # (B, N, N)
+        if self.contact_q >= 1.0 or not pos.any():
+            active = pos
+        else:
+            flat = overlap.clone()
+            flat[~pos] = float('-inf')
+            # quantile per-batch over all pairs
+            thr = torch.quantile(flat.view(B, -1), 1.0 - self.contact_q, dim=1, keepdim=True)
+            thr = thr.view(B, 1, 1)
+            active = pos & (overlap >= thr)
+
+        # --- 2) Contact-relief displacement (Gauss-Newton-like) ---
+        # same structure as _JJt_inv_h_times_Jt, but local to this method
+        w = 0.5 * overlap * active.float()            # (B, N, N)
+        term_i = (w.unsqueeze(-1) * n).sum(dim=2)     # (B, N, d)
+        term_j = (
+            w.transpose(1, 2).unsqueeze(-1)
+            * n.transpose(1, 2)
+        ).sum(dim=2)                                  # (B, N, d)
+        delta_pairs = term_i - term_j                 # (B, N, d)
+        deg = active.float().sum(dim=2, keepdim=True).clamp_min(1.0)  # (B, N, 1)
+        delta_pairs = (delta_pairs / deg).permute(0, 2, 1)            # (B, d, N)
+
+        # --- 3) Soft wall push near boundaries (reusing wall_margin, wall_weight) ---
+        thr_wall = self.wall_margin * (2.0 * r)
+        delta_walls = torch.zeros_like(x)
+        if self.wall_weight > 0.0:
+            for ax in range(d):
+                dl = x[:, ax, :] - r          # distance to low face
+                dh = (L - r) - x[:, ax, :]    # distance to high face
+                near_low = dl < thr_wall
+                near_high = dh < thr_wall
+
+                delta_walls[:, ax, :] += torch.where(
+                    near_low, (thr_wall - dl), torch.zeros_like(dl)
+                )
+                delta_walls[:, ax, :] -= torch.where(
+                    near_high, (thr_wall - dh), torch.zeros_like(dh)
+                )
+            delta_walls = self.wall_weight * delta_walls
+
+        # --- 4) Combine contact and wall directions ---
+        # explore_contact_frac weights contact vs wall direction
+        c_frac = float(self.explore_contact_frac)
+        direction = c_frac * delta_pairs + (1.0 - c_frac) * delta_walls  # (B, d, N)
+
+        # Handle degenerate case where direction is (almost) zero for some samples
+        dir_norm = direction.norm(dim=(1, 2), keepdim=True)  # (B, 1, 1)
+        zero_mask = dir_norm < 1e-8
+        if zero_mask.any():
+            rand = torch.randn_like(direction)
+            rand_norm = rand.norm(dim=(1, 2), keepdim=True).clamp_min(1e-8)
+            rand_unit = rand / rand_norm
+            direction = torch.where(zero_mask, rand_unit, direction)
+            dir_norm = direction.norm(dim=(1, 2), keepdim=True).clamp_min(1e-8)
+
+        direction_unit = direction / dir_norm
+        # Scale by exploration magnitude AND overlap magnitude
+        # overlap is in absolute length units; normalize by (2r) to get a dimensionless severity
+        ov_pos = overlap.clamp_min(0.0)  # (B,N,N)
+        ov_max = ov_pos.amax(dim=(1, 2), keepdim=True)  # (B,1,1)
+        # scale = 1 + gain * (max_overlap / (2r))
+        denom = (2.0 * r) + 1e-12
+        scale = 1.0 + self.explore_overlap_gain * (ov_max / denom)
+        scale = scale.clamp(min=1.0, max=self.explore_scale_cap)
+        # base step size ~ M * r, amplified if overlap is large
+        step = (M * r) * scale * direction_unit
+
+        has_overlap = (overlap > 0.0).any(dim=(1, 2), keepdim=True)  # (B,1,1)
+        # randomize sign per configuration to diversify exploration
+        sign = torch.where(
+            torch.rand(B, 1, 1, device=device) < 0.5,
+            torch.tensor(1.0, device=device),
+            torch.tensor(-1.0, device=device),
+        )
+        step = torch.where(has_overlap, step, step * sign)
+
+        # optional additional local isotropic jitter
+        local_amp = self.explore_local_frac * M * r
+        if local_amp > 0.0:
+            # not adding random jitter on samples that are already overlapping.
+            has_overlap = (overlap > 0.0).any(dim=(1, 2), keepdim=True)
+            amp = torch.where(has_overlap, torch.zeros_like(has_overlap, dtype=step.dtype), torch.full_like(has_overlap, local_amp, dtype=step.dtype))
+            step = step + torch.randn_like(step) * amp
+
+        x_pert = x + step
+        x_pert = _clamp_box(x_pert)
+        return x_pert
 
     @torch.no_grad()
     def sample_batch(self, ep: int):
@@ -421,40 +727,56 @@ class RGCFMTrainer:
             tol_finish=self.tol_finish,
             return_cond=True,
         )
+
         x1 = torch.from_numpy(samples_np).to(self.device, dtype=torch.float32)
+        # geometry-aware exploration:
+        # E(x' | x) uses contact graph + walls to propose nearby configurations.
+        x1 = self._explore_actions(x1)
+        #repair AFTER exploration so we reward on-manifold
+        if self.repair_after_explore:
+            x1 = self._repair_feasible(x1)
         cond_used = None
         if cond_batches is not None and cond_batches.numel() > 0:
             cond_used = cond_batches.to(self.device)
             if cond_used.size(0) > x1.size(0):
                 cond_used = cond_used[:x1.size(0)]
 
-         # Reward: larger minsep => better (supports larger effective radius)
+        # Reward: larger minsep => better (supports larger effective radius)
+        #P = x1.permute(0, 2, 1).contiguous()  # (B, N, d)
+        #dmat = torch.cdist(P, P)
+        #eye = torch.eye(self.num_points, device=self.device, dtype=torch.bool)[None]
+        #dmat = dmat.masked_fill(eye, float('inf'))
+        #minsep = dmat.amin(dim=-1).amin(dim=-1)  # (B,)
+        ## Overlap threshold: minsep must be >= 2 * r
+        #min_allowed = 2.0 * self.sphere_radius
+        #valid_mask = minsep >= min_allowed
+        ## Base reward: normalized minsep (larger = better)
+        #rewards = minsep / self.clip_range  # (B,)
+        ## Keep reward differences even if all samples overlap.
+        ## Penalize by how far minsep falls below 2r, but don't collapse to a constant.
+        #violation = (min_allowed - minsep).clamp_min(0.0)          # (B,)
+        #rewards = (minsep / self.clip_range) - 2.0 * (violation / self.clip_range)
+        #rewards = rewards.detach()
+        #return x1, rewards, cond_used
+
+        # Reward: use effective radius r_eff := minsep/2 (does not require "best_known_bound")
         P = x1.permute(0, 2, 1).contiguous()  # (B, N, d)
         dmat = torch.cdist(P, P)
         eye = torch.eye(self.num_points, device=self.device, dtype=torch.bool)[None]
         dmat = dmat.masked_fill(eye, float('inf'))
         minsep = dmat.amin(dim=-1).amin(dim=-1)  # (B,)
 
-        # Overlap threshold: minsep must be >= 2 * r
-        min_allowed = 2.0 * self.sphere_radius
-        valid_mask = minsep >= min_allowed
-
-        # Base reward: normalized minsep (larger = better)
-        rewards = minsep / self.clip_range  # (B,)
-
-        # Strongly downweight overlapping configs
-        if (~valid_mask).any():
-            if valid_mask.any():
-                bad_floor = rewards[valid_mask].min() - 1.0
-            else:
-                bad_floor = rewards.min() - 1.0
-            rewards = torch.where(valid_mask, rewards, bad_floor)
-
+        r_eff = 0.5 * minsep  # (B,)
+        rewards = (r_eff / self.clip_range)      # normalize to box length scale
+        if not self.repair_after_explore:
+            # mild discouragement if overlaps exist
+            rewards = rewards - 0.1 * ((-minsep).clamp_min(0.0) / self.clip_range)
         rewards = rewards.detach()
-        return x1, rewards, cond_used
+        return x1, rewards, cond_used, r_eff.detach()
 
 
-    def compute_loss(self, x_data: torch.Tensor, rewards: torch.Tensor, cond: torch.Tensor = None):
+    def compute_loss(self, x_data: torch.Tensor, rewards: torch.Tensor, 
+                     cond: torch.Tensor = None, r_eff: torch.Tensor = None):
         """
         x_data: policy sample treated as 'data' endpoint (x0 in FM_PATH).
         Prior sample is generated as x1, matching pretraining semantics (data -> prior).
@@ -480,7 +802,7 @@ class RGCFMTrainer:
         x_t = path_sample.x_t
         u_t = path_sample.dx_t
 
-        x_t_clamped = _box_clamp(x_t, self.sphere_radius, self.clip_range)
+        x_t_clamped = _clamp_box(x_t)
 
         v_ft = self.net_model(t, x_t_clamped, cond=cond)
         with torch.no_grad():
@@ -495,6 +817,23 @@ class RGCFMTrainer:
         w = torch.exp(self.temperature * r_norm).clamp(max=self.weight_clip)
         w = w / (w.mean().detach() + 1e-8)
 
+
+        ## Reward weights (rank/percentile soft-selection)
+        ## ranks in [0, B-1], where rank 0 is lowest reward
+        #ranks = torch.argsort(torch.argsort(rewards, dim=0), dim=0).to(dtype=x_data.dtype)
+        ## percentile in [0,1]
+        #p = ranks / max(1, (B - 1))
+        ## map percentile -> weight in [w_min, w_max] (bounded, stable)
+        #w_min = float(getattr(self, "rank_w_min", 0.3))   # or config
+        #w_max = float(getattr(self, "rank_w_max", 2.5))   # or config
+        #w = w_min + (w_max - w_min) * p
+        ## optional: sharpen selection without exponentials (gamma>1 increases top emphasis)
+        #gamma = float(getattr(self, "rank_gamma", 2.0))   # or config, e.g. 1.5–3.0
+        #w = w.pow(gamma)
+        ## normalize to mean 1, like before
+        #w = w / (w.mean().detach() + 1e-8)
+
+
         L_fm = (w * fm_loss_per_sample).mean()
         w2_per_sample = (v_ft - v_ref).pow(2).mean(dim=(1, 2))
         L_w2 = w2_per_sample.mean()
@@ -508,6 +847,9 @@ class RGCFMTrainer:
             "reward_mean": rewards.mean().item(),
             "reward_max": rewards.max().item(),
             "weight_mean": w.mean().item(),
+            "r_eff_mean": (r_eff.mean().item() if r_eff is not None else float("nan")),
+            "r_eff_max":  (r_eff.max().item()  if r_eff is not None else float("nan")),
+
         }
         return loss, metrics
 
@@ -516,11 +858,11 @@ class RGCFMTrainer:
         for ep in range(num_epochs):
             ep_metrics = []
             for _ in range(steps_per_epoch):
-                x1_batch, rewards, cond_used = self.sample_batch(ep)
+                x1_batch, rewards, cond_used, r_eff = self.sample_batch(ep)
                 # sample_flow_model sets model/optimizer to eval; switch back for training
                 self.net_model.train()
                 self.optimizer.train()
-                loss, metrics = self.compute_loss(x1_batch, rewards, cond=cond_used)
+                loss, metrics = self.compute_loss(x1_batch, rewards, cond=cond_used, r_eff=r_eff)
 
                 self.optimizer.zero_grad()
                 loss.backward()
@@ -534,7 +876,7 @@ class RGCFMTrainer:
             if ep_metrics:
                 avg = {k: float(np.mean([m[k] for m in ep_metrics])) for k in ep_metrics[0].keys()}
                 hist.append([avg["fm_loss"], avg["fm_loss_weighted"], avg["w2_loss"], avg["loss"], avg["reward_mean"]])
-                print(f"[RG-CFM] Epoch {ep+1}/{num_epochs} | FM={avg['fm_loss']:.4f} FMw={avg['fm_loss_weighted']:.4f} W2={avg['w2_loss']:.4f} Loss={avg['loss']:.4f} R={avg['reward_mean']:.4f}")
+                print(f"[RG-CFM] Epoch {ep+1}/{num_epochs} | FM={avg['fm_loss']:.4f} FMw={avg['fm_loss_weighted']:.4f} W2={avg['w2_loss']:.4f} Loss={avg['loss']:.4f} R={avg['reward_mean']:.4f} rEff={avg['r_eff_mean']:.6f} rEffMax={avg['r_eff_max']:.6f}")
         self.history = np.array(hist, dtype=np.float32)
         self.net_model.eval()
         self.optimizer.eval()
@@ -593,7 +935,7 @@ def train_flow_model(
             x_t  = path_sample.x_t
             dx_t = path_sample.dx_t         # target velocity along the path
 
-            u_pred = model(t_in, _box_clamp(x_t, sphere_radius, clip_max), cond=cond_in)
+            u_pred = model(t_in, _clamp_box(x_t), cond=cond_in)
 
             # Flow-matching loss
             diff = u_pred - dx_t
@@ -713,8 +1055,51 @@ def sample_flow_model(
     L = float(clip_max)
     r = float(sphere_radius)
 
+    @torch.no_grad()
+    def project_minwall_reflect_torch(x: torch.Tensor, L: float, 
+                                      proj_iters: int = 3, eps: float = 1e-8) -> torch.Tensor:
+        """
+        Iteratively enforces x in [m(X), L-m(X)]^d with m(X)=0.5*d_min(X),
+        using reflection (not clipping).
+    
+        x: (B, d, N)
+        """
+        B, d, N = x.shape
+        L = float(L)
+    
+        # stabilize NaNs/Infs first
+        mid = 0.5 * L
+        x = torch.nan_to_num(x, nan=mid, posinf=L - eps, neginf=eps)
+    
+        for _ in range(int(proj_iters)):
+            P = x.permute(0, 2, 1).contiguous()                     # (B, N, d)
+            D = torch.cdist(P, P)                                   # (B, N, N)
+            eye = torch.eye(N, device=x.device, dtype=torch.bool)[None]
+            D = D.masked_fill(eye, float("inf"))
+            dmin = D.amin(dim=-1).amin(dim=-1)                      # (B,)
+            m = 0.5 * dmin                                          # (B,)
+            m = m.clamp(min=0.0, max=0.5 * L - eps)
+    
+            a = m.view(B, 1, 1)
+            b = (L - m).view(B, 1, 1)
+            length = (b - a).clamp_min(eps)
+            twoL = 2.0 * length
+    
+            # reflect into [a,b]
+            v = x - a
+            v = v - twoL * torch.floor(v / twoL)
+            v = torch.where(v > length, twoL - v, v)
+            x = a + v
+    
+        return x
+
+
     def _clamp_box(x):
-        return x.clamp(r, L - r)
+        # Safety net: clamp does not remove NaNs.
+        #mid = 0.5 * (r + (L - r))
+        #x = torch.nan_to_num(x, nan=mid, posinf=(L - r), neginf=r)
+        x = project_minwall_reflect_torch(x, L=L, proj_iters=4)
+        return x#.clamp(r, L - r)
 
     # model expects t \in [1->0]
     class _FMVF:
@@ -876,7 +1261,8 @@ def sample_flow_model(
             tau      = k / n_steps
             tau_next = (k + 1) / n_steps
             # Forward shoot to tau=1 with learned field
-            u1 = _ode_solve_with_model(u, tau, 1.0, cond)
+            #u1 = _ode_solve_with_model(u, tau, 1.0, cond)
+            u1 = _ode_solve_with_model(u, tau, tau_next, cond)
             # Terminal projection Π_H
             u_proj = _project_terminal(u1)
             # Reverse OT
@@ -884,6 +1270,8 @@ def sample_flow_model(
 
         # final polishing
         u = _final_polish(u)
+        # OPTIONAL: enforce true sphere wall constraint only at the end
+        #u = torch.nan_to_num(u, nan=0.5*L, posinf=L-r, neginf=r).clamp(r, L - r)
         samples.append(u.cpu().numpy())
         remaining -= bs
 
@@ -944,6 +1332,15 @@ def rg_cfm_main(state: PipelineState = None):
     rg_ref_path = cfg.get(sec, "rg_ref_path", fallback="").strip()
     if not rg_ref_path:
         rg_ref_path = cfg.get(sec, "resume_model_path", fallback="").strip()
+    # exploration actions (dimensionless, optional; 0.0 disables)
+    rg_explore_mag = cfg.getfloat(sec, "rg_explore_magnitude", fallback=0.0)
+    rg_explore_contact_frac = cfg.getfloat(sec, "rg_explore_contact_frac", fallback=1.0)
+    rg_explore_local_frac = cfg.getfloat(sec, "rg_explore_local_frac", fallback=0.25)
+    rg_explore_overlap_gain = cfg.getfloat(sec, "rg_explore_overlap_gain", fallback=1.0)
+    rg_explore_scale_cap    = cfg.getfloat(sec, "rg_explore_scale_cap", fallback=4.0)
+    rg_repair_after_explore = cfg.getboolean(sec, "rg_repair_after_explore", fallback=True)
+
+
     assert rg_ref_path, "rg_ref_path (or resume_model_path) must be set for RG-CFM."
 
     # Time sampling knobs
@@ -1000,7 +1397,7 @@ def rg_cfm_main(state: PipelineState = None):
     assert full_ds.N == num_spheres, f"num_spheres={num_spheres} but dataset N={full_ds.N}"
     cond_loader = DataLoader(full_ds, batch_size=rg_batch, shuffle=True)
 
-    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    device = torch.device('cuda:1' if torch.cuda.is_available() else 'cpu')
     model = FlowSetTransformer(d, **st_kwargs).to(device)
 
     trainer_cfg = {
@@ -1027,6 +1424,13 @@ def rg_cfm_main(state: PipelineState = None):
         "prox_lambda": prox_lambda,
         "final_passes": final_passes,
         "tol_finish": tol_finish,
+        "explore_magnitude": rg_explore_mag,
+        "explore_contact_frac": rg_explore_contact_frac,
+        "explore_local_frac": rg_explore_local_frac,
+        "explore_overlap_gain": rg_explore_overlap_gain,
+        "explore_scale_cap": rg_explore_scale_cap,
+        "repair_after_explore": rg_repair_after_explore,
+
     }
 
     trainer = RGCFMTrainer(
@@ -1155,7 +1559,7 @@ def main(state:PipelineState=None):
     # also record dim_out in params (for loading)
     st_kwargs["dim_out"] = d
 
-    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    device = torch.device('cuda:1' if torch.cuda.is_available() else 'cpu')
 
     full_ds = SpherePackingDataset(
         dataset_path,
@@ -1232,15 +1636,24 @@ def main(state:PipelineState=None):
         # Optional RG-CFM immediately after training
         use_rg_after_train = cfg.getboolean("spheres_in_cube_new_pipeline", "use_rg_cfm", fallback=False)
         if use_rg_after_train:
-            if state and state.model_path:
-                cfg.set(sec, "rg_ref_path", state.model_path)
-                cfg.set(sec, "resume_model_path", state.model_path)
+            # Ensure RG-CFM starts from the checkpoint we just trained 
+            ref_path = (state.model_path if (state and getattr(state, "model_path", "")) else model_path)
+            if ref_path:
+                cfg.set(sec, "rg_ref_path", ref_path)
+                cfg.set(sec, "resume_model_path", ref_path)
             print("[flow_matching] Starting RG-CFM immediately after supervised training.")
-            rg_cfm_main(state=state)
+            ft_path = rg_cfm_main(state=state)
+            # Make the fine-tuned checkpoint discoverable for any subsequent reload/sampling codepaths.
+            if ft_path:
+                cfg.set(sec, "rg_ref_path", ft_path)
+                cfg.set(sec, "resume_model_path", ft_path)
             # Reload the fine-tuned model into memory before sampling
             if state and state.model_path:
                 model, opt = load_model_if_exists(model, opt, state.model_path, device)
                 model_path = state.model_path
+            elif ft_path:
+                model, opt = load_model_if_exists(model, opt, ft_path, device)
+                model_path = ft_path
             else:
                 model, opt = load_model_if_exists(model, opt, cfg.get(sec, "resume_model_path", fallback="").strip(), device)
 
